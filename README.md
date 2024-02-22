@@ -1,4 +1,7 @@
+[![AuroraFlow CI Test Suite](https://github.com/jsugg/auroraflow/actions/workflows/ci.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/ci.yml)
 # AuroraFlow :: Import Joy and Chill into your Test Scripts
+![AuroraFlow Logo](https://github.com/jsugg/auroraflow/blob/main/.github/assets/auroraflow-logo.png?raw=true)
+
 ## ~ A Robust AI-Driven Test Automation Framework you can Rely on ~
 
 ## Objective
