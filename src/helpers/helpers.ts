@@ -1,3 +1,7 @@
+import { Logger, getMainLogger } from '../utils/logger';
+
+const mainLogger: Logger = getMainLogger();
+
 /**
  * Waits for a specified number of milliseconds.
  * This function can be used to delay execution within asynchronous functions.
@@ -5,7 +9,13 @@
  * @param ms The number of milliseconds to wait.
  * @returns A promise that resolves after the specified delay, returning void.
  */
-export function wait(ms: number): Promise<void> {
+export function wait(
+  ms: number,
+  logger: Logger | null = mainLogger
+): Promise<void> {
+  if (logger) {
+    logger.info(`Waiting for ${ms}ms`);
+  }
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
@@ -28,13 +38,13 @@ export async function retry<T>({
   retries = 3,
   initialDelay = 300,
   backoffFactor = 2,
-  logger = console.error, // Use `null` to disable logging
+  logger = mainLogger, // Use `null` to disable logging
 }: {
   fn: () => Promise<T>;
   retries?: number;
   initialDelay?: number;
   backoffFactor?: number;
-  logger?: ((...data: unknown[]) => void) | null;
+  logger?: Logger | null;
 }): Promise<T> {
   let currentDelay = initialDelay;
 
@@ -44,20 +54,30 @@ export async function retry<T>({
     } catch (err: unknown) {
       if (err instanceof Error) {
         if (logger) {
-          logger(
+          logger.info(
             `Attempt ${attempt} failed: ${err.message}. Retrying in ${currentDelay}ms...`
           );
         }
         if (attempt === retries) {
+          if (logger) {
+            logger.error(
+              `All ${retries} retries failed. Last error: ${err.message}`
+            );
+          }
           throw new Error(
             `All ${retries} retries failed. Last error: ${err.message}`
           );
         }
       } else {
         if (logger) {
-          logger(`Attempt ${attempt} failed. Retrying in ${currentDelay}ms...`);
+          logger.info(
+            `Attempt ${attempt} failed. Retrying in ${currentDelay}ms...`
+          );
         }
         if (attempt === retries) {
+          if (logger) {
+            logger.error(`All ${retries} retries failed.`);
+          }
           throw new Error(`All ${retries} retries failed.`);
         }
       }
