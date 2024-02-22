@@ -5,6 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "npx playwright test --config=configs/playwright.config.ts",
+    "test-report": "npx playwright show-report test-reports",
     "lint": "eslint . --fix"
   },
   "keywords": [],

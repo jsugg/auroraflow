@@ -128,7 +128,7 @@ This diagram focuses on the data management aspect, showing how the Selector Ana
 
 ### SAT Development and Integration
 
-- Develop SAT as an independent, AI-driven tool that runs in parallel to TAF executions. It should analyze the application's UI, automatically identify changes in selectors, and update Redis accordingly.
+- Develop SAT as an independent, AI-driven tool that runs in parallel to TAF executions. It should analyze the application's UI, automatically identify changes in selectors, and update Redis accordingly. For separation of concerns, it resides on a separate repository.
 - Utilize TensorFlow.js for building or customizing ML models, trained on historical test data and web application changes. Incorporate NLP techniques for improved page context understanding.
 
 ### CI/CD Pipeline Enhancements

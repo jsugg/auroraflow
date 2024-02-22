@@ -1,6 +1,6 @@
 import { Page } from 'playwright';
 import { Logger, createChildLogger } from '../utils/logger';
-import { PageObjectBase } from '../../pageObjects/pageObjectBase';
+import { PageObjectBase } from '../pageObjects/pageObjectBase';
 
 export class PageFactory {
   private page: Page;

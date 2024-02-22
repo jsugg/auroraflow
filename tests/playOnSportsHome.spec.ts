@@ -1,5 +1,5 @@
 import { PageFactory } from '../src/helpers/pageFactory';
-import PlayOnSportsHomePage from '../pageObjects/playOnSportsHome';
+import PlayOnSportsHomePage from '../src/pageObjects/playOnSportsHome';
 import { test, expect } from '@playwright/test';
 
 test('verify navigation menu links are correct', async ({ page }) => {
