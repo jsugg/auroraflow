@@ -13,4 +13,5 @@ jobs:
         node-version: '21'
     - run: npm install
     - run: npx playwright install 
+    - run: npx playwright install-deps
     - run: npm run test
