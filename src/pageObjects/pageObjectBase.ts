@@ -23,12 +23,14 @@ class PageActionError extends Error {
 
 // Abstract class for Page Objects
 export abstract class PageObjectBase {
-  page: Page;
-  logger: Logger;
+  protected page: Page;
+  protected logger: Logger;
+  protected url: string;
 
   constructor(page: Page, pageObjectName: string = new.target.name) {
     this.page = page;
     this.logger = createChildLogger(pageObjectName);
+    this.url = '#';
     this.initialize();
   }
 
@@ -89,6 +91,10 @@ export abstract class PageObjectBase {
       `Navigated to ${url}`,
       `Error navigating to ${url}`
     );
+  }
+
+  public async open(): Promise<void> {
+    await this.navigateTo(this.url);
   }
 
   public async getTitle(): Promise<string> {
