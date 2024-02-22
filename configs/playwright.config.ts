@@ -1,4 +1,4 @@
-import { PlaywrightTestConfig } from '@playwright/test';
+import { PlaywrightTestConfig, devices } from '@playwright/test';
 
 const config: PlaywrightTestConfig = {
   use: {
@@ -9,10 +9,30 @@ const config: PlaywrightTestConfig = {
     trace: 'on-first-retry',
   },
   projects: [
-    { name: 'Chrome', use: { browserName: 'chromium' } },
-    { name: 'Firefox', use: { browserName: 'firefox' } },
-    { name: 'Safari', use: { browserName: 'webkit' } },
-    { name: 'Edge', use: { browserName: 'chromium', channel: 'msedge' } },
+    {
+      name: 'Google Chrome',
+      use: { ...devices['Desktop Chrome'], channel: 'chrome' },
+    },
+    {
+      name: 'Firefox',
+      use: { ...devices['Desktop Firefox'] },
+    },
+    {
+      name: 'Safari',
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
+      name: 'Microsoft Edge',
+      use: { ...devices['Desktop Edge'], channel: 'msedge' },
+    },
+    {
+      name: 'Mobile Chrome',
+      use: { ...devices['Galaxy S9+'] },
+    },
+    {
+      name: 'Mobile Safari',
+      use: { ...devices['iPhone 13'] },
+    },
   ],
   outputDir: '../test-results',
   testDir: '../tests',
