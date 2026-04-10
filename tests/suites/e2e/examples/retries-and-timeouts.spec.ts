@@ -40,7 +40,13 @@ test('targeted retry recovers from transient API failures', async ({ page }) => 
 
   await retry({
     fn: async () => {
-      await reliabilityPage.clickFetchMessage();
+      await Promise.all([
+        page.waitForResponse((response) => response.url() === MESSAGE_ENDPOINT, {
+          timeout: 1_000,
+        }),
+        reliabilityPage.clickFetchMessage(),
+      ]);
+
       const status = await reliabilityPage.statusText();
       if (status !== 'Recovered on attempt 3') {
         throw new Error(`Unexpected status during retry loop: ${status}`);
