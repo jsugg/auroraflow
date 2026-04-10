@@ -20,7 +20,7 @@
     "workflows:lint": "node scripts/workflows-lint.mjs",
     "workflows:security": "pipx run zizmor .github/workflows",
     "security:check": "npm run workflows:security && npm audit --audit-level=high",
-    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run workflows:lint",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run test:integration && npm run workflows:lint",
     "verify:smoke": "npm run verify && npm run test:smoke"
   },
   "engines": {

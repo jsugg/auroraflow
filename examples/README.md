@@ -9,6 +9,7 @@ This directory contains runnable examples that demonstrate framework patterns an
 
 ## Quickstart
 - Open the quickstart fixture-based example in `examples/quickstart/`.
+- Open reliability examples in `examples/reliability/` for deterministic network mocking and targeted retries.
 - Run only examples locally:
 
 ```bash

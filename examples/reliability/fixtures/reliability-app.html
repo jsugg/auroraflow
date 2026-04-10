@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Reliability Fixture App</title>
+  </head>
+  <body>
+    <h1>Reliability Fixture</h1>
+    <button id="fetch-message">Fetch Message</button>
+    <button id="render-delayed">Render Delayed Status</button>
+    <p id="status" aria-live="polite">Idle</p>
+
+    <script>
+      const status = document.getElementById('status');
+      const messageEndpoint = 'https://auroraflow.local/api/message';
+
+      document.getElementById('fetch-message').addEventListener('click', async () => {
+        status.textContent = 'Loading...';
+
+        try {
+          const response = await fetch(messageEndpoint, {
+            method: 'GET',
+            headers: { Accept: 'application/json' },
+          });
+          const payload = await response.json();
+
+          if (!response.ok) {
+            status.textContent = payload.error ?? `HTTP ${response.status}`;
+            return;
+          }
+
+          status.textContent = payload.message ?? 'No message';
+        } catch (_error) {
+          status.textContent = 'Network error';
+        }
+      });
+
+      document.getElementById('render-delayed').addEventListener('click', () => {
+        status.textContent = 'Waiting...';
+        setTimeout(() => {
+          status.textContent = 'Rendered after delay';
+        }, 600);
+      });
+    </script>
+  </body>
+</html>

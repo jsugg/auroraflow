@@ -102,10 +102,10 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-playwright-chrome-${{ hashFiles('package-lock.json') }}
 
-      - name: Install Playwright browser (Chrome)
-        if: env.SHOULD_RUN_SMOKE == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
+      - name: Ensure Playwright browser (Chrome) is installed
+        if: env.SHOULD_RUN_SMOKE == 'true'
         run: npx playwright install --with-deps chrome
 
       - name: Run smoke test

@@ -23,13 +23,19 @@ jobs:
       fail-fast: false
       max-parallel: 3
       matrix:
-        project:
-          - Google Chrome
-          - Firefox
-          - Safari
-          - Microsoft Edge
-          - Mobile Chrome
-          - Mobile Safari
+        include:
+          - project: Google Chrome
+            install_args: chrome
+          - project: Firefox
+            install_args: firefox
+          - project: Safari
+            install_args: webkit
+          - project: Microsoft Edge
+            install_args: msedge
+          - project: Mobile Chrome
+            install_args: chromium
+          - project: Mobile Safari
+            install_args: webkit
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -50,11 +56,10 @@ jobs:
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
           path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
+          key: ${{ runner.os }}-playwright-${{ matrix.install_args }}-${{ hashFiles('package-lock.json') }}
 
-      - name: Install Playwright browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
-        run: npx playwright install --with-deps chrome chromium firefox webkit msedge
+      - name: Ensure required Playwright browser is installed
+        run: npx playwright install --with-deps ${{ matrix.install_args }}
 
       - name: Run full E2E suite
         run: npx playwright test --config=configs/playwright.config.ts --project="${{ matrix.project }}"
