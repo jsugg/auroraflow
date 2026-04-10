@@ -134,7 +134,7 @@ export abstract class PageObjectBase {
   public async waitForSelector(
     selector: string,
     options: ActionOptions = {},
-  ): Promise<ElementHandle<SVGElement | HTMLElement> | null> {
+  ): Promise<ElementHandle<unknown> | null> {
     return this.safeAction(
       () => this.page.waitForSelector(selector, options),
       `Waited for selector: ${selector}`,
