@@ -14,6 +14,7 @@
     "test:unit": "vitest run tests/suites/unit tests/suites/framework --passWithNoTests",
     "test:integration": "vitest run tests/suites/integration tests/suites/contracts --passWithNoTests",
     "test:smoke": "npx playwright test --config=configs/playwright.config.ts --project='Google Chrome'",
+    "test:examples": "npx playwright test --config=configs/playwright.config.ts tests/suites/e2e/examples --project='Google Chrome'",
     "test:e2e": "npx playwright test --config=configs/playwright.config.ts",
     "test-report": "npx playwright show-report test-reports",
     "workflows:lint": "node scripts/workflows-lint.mjs",
