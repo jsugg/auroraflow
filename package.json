@@ -4,30 +4,56 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "test": "npx playwright test --config=configs/playwright.config.ts",
+    "prepare": "husky",
+    "format": "prettier . --write",
+    "format:check": "prettier . --check",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "tsc --noEmit",
+    "test": "npm run test:e2e",
+    "test:unit": "vitest run tests/suites/unit tests/suites/framework --passWithNoTests",
+    "test:integration": "vitest run tests/suites/integration tests/suites/contracts --passWithNoTests",
+    "test:smoke": "npx playwright test --config=configs/playwright.config.ts --project='Google Chrome'",
+    "test:e2e": "npx playwright test --config=configs/playwright.config.ts",
     "test-report": "npx playwright show-report test-reports",
-    "lint": "eslint . --fix"
+    "workflows:lint": "node scripts/workflows-lint.mjs",
+    "workflows:security": "pipx run zizmor .github/workflows",
+    "security:check": "npm run workflows:security && npm audit --audit-level=high",
+    "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run workflows:lint",
+    "verify:smoke": "npm run verify && npm run test:smoke"
+  },
+  "engines": {
+    "node": ">=20 <23"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
-    "@playwright/test": "^1.41.2",
-    "@types/node": "^20.11.19",
-    "@types/pino-multi-stream": "^5.1.6",
-    "@typescript-eslint/eslint-plugin": "^7.0.2",
-    "@typescript-eslint/parser": "^7.0.2",
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-prettier": "^5.1.3",
-    "pino": "^8.19.0",
-    "pino-pretty": "^10.3.1",
-    "playwright": "^1.41.2",
-    "prettier": "^3.2.5",
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@eslint/js": "^9.39.4",
+    "@playwright/test": "^1.59.1",
+    "@types/node": "^20.19.39",
+    "actionlint": "^2.0.6",
+    "eslint": "^9.39.4",
+    "eslint-config-prettier": "^10.1.8",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "pino": "^10.3.1",
+    "pino-pretty": "^13.1.3",
+    "playwright": "^1.59.1",
+    "prettier": "^3.8.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.3.3"
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.58.1",
+    "vitest": "^4.1.4"
   },
-  "dependencies": {
-    "node": "^20.11.1"
+  "lint-staged": {
+    "*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}": [
+      "prettier --write"
+    ],
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "eslint --fix"
+    ]
   }
 }

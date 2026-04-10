@@ -135,3 +135,6 @@ dist
 # Project-specific
 test-reports/**
 test-results/**
+.local/
+.serena/
+.husky/_/
