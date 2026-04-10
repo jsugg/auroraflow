@@ -1,0 +1,7 @@
+node_modules/
+dist/
+test-results/
+test-reports/
+.local/
+.serena/
+README.md

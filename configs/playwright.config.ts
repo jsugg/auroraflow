@@ -1,6 +1,7 @@
 import { PlaywrightTestConfig, devices } from '@playwright/test';
 
 const config: PlaywrightTestConfig = {
+  retries: process.env.CI ? 1 : 0,
   use: {
     headless: true,
     viewport: { width: 1280, height: 720 },
@@ -35,7 +36,7 @@ const config: PlaywrightTestConfig = {
     },
   ],
   outputDir: '../test-results',
-  testDir: '../tests',
+  testDir: '../tests/suites/e2e',
   fullyParallel: true,
   reporter: [['html', { outputFolder: '../test-reports' }]],
 };

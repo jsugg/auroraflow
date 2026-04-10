@@ -9,10 +9,7 @@ const mainLogger: Logger = getMainLogger();
  * @param ms The number of milliseconds to wait.
  * @returns A promise that resolves after the specified delay, returning void.
  */
-export function wait(
-  ms: number,
-  logger: Logger | null = mainLogger
-): Promise<void> {
+export function wait(ms: number, logger: Logger | null = mainLogger): Promise<void> {
   if (logger) {
     logger.info(`Waiting for ${ms}ms`);
   }
@@ -55,24 +52,18 @@ export async function retry<T>({
       if (err instanceof Error) {
         if (logger) {
           logger.info(
-            `Attempt ${attempt} failed: ${err.message}. Retrying in ${currentDelay}ms...`
+            `Attempt ${attempt} failed: ${err.message}. Retrying in ${currentDelay}ms...`,
           );
         }
         if (attempt === retries) {
           if (logger) {
-            logger.error(
-              `All ${retries} retries failed. Last error: ${err.message}`
-            );
+            logger.error(`All ${retries} retries failed. Last error: ${err.message}`);
           }
-          throw new Error(
-            `All ${retries} retries failed. Last error: ${err.message}`
-          );
+          throw new Error(`All ${retries} retries failed. Last error: ${err.message}`);
         }
       } else {
         if (logger) {
-          logger.info(
-            `Attempt ${attempt} failed. Retrying in ${currentDelay}ms...`
-          );
+          logger.info(`Attempt ${attempt} failed. Retrying in ${currentDelay}ms...`);
         }
         if (attempt === retries) {
           if (logger) {

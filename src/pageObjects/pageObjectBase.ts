@@ -14,7 +14,7 @@ interface ActionOptions {
 class PageActionError extends Error {
   constructor(
     message: string,
-    public originalError?: Error
+    public originalError?: Error,
   ) {
     super(message);
     this.name = 'PageActionError';
@@ -31,7 +31,7 @@ export abstract class PageObjectBase {
     this.page = page;
     this.logger = createChildLogger(pageObjectName);
     this.url = '#';
-    this.initialize();
+    void this.initialize();
   }
 
   // Asynchronous initialization pattern
@@ -43,7 +43,7 @@ export abstract class PageObjectBase {
   protected async safeAction<T>(
     action: () => Promise<T>,
     successMessage: string,
-    errorMessage: string
+    errorMessage: string,
   ): Promise<T> {
     try {
       const result = await action();
@@ -55,20 +55,18 @@ export abstract class PageObjectBase {
       // Take a screenshot on error
       await this.page
         .screenshot({
-          path: `test-results/screenshots/${new Date().toISOString()}_${errorMessage.replace(
+          path: `test-results/screenshots/${new Date().toISOString().replace(/[:.]/g, '-')}_${errorMessage.replace(
             /[^a-z0-9]/gi,
-            '_'
+            '_',
           )}.png`,
         })
         .catch((screenshotError) =>
-          this.logger.error('Failed to take a screenshot.', { screenshotError })
+          this.logger.error('Failed to take a screenshot.', { screenshotError }),
         );
 
       throw new PageActionError(
-        `${errorMessage}: ${
-          error instanceof Error ? error.message : 'Unknown Error'
-        }`,
-        error instanceof Error ? error : undefined
+        `${errorMessage}: ${error instanceof Error ? error.message : 'Unknown Error'}`,
+        error instanceof Error ? error : undefined,
       );
     }
   }
@@ -76,20 +74,18 @@ export abstract class PageObjectBase {
   // Navigation method utilizing safeAction for error handling
   public async navigateTo(
     url: string,
-    options: NavigationOptions = { waitUntil: 'domcontentloaded' }
+    options: NavigationOptions = { waitUntil: 'domcontentloaded' },
   ): Promise<Response> {
     return this.safeAction(
       async () => {
         const response: Response | null = await this.page.goto(url, options);
         if (!response || !response.ok()) {
-          throw new Error(
-            `Navigation to ${url} failed with status: ${response?.status()}`
-          );
+          throw new Error(`Navigation to ${url} failed with status: ${response?.status()}`);
         }
         return response;
       },
       `Navigated to ${url}`,
-      `Error navigating to ${url}`
+      `Error navigating to ${url}`,
     );
   }
 
@@ -101,21 +97,15 @@ export abstract class PageObjectBase {
     return this.page.title();
   }
 
-  public async click(
-    selector: string,
-    options: ActionOptions = {}
-  ): Promise<void | null> {
+  public async click(selector: string, options: ActionOptions = {}): Promise<void | null> {
     return this.safeAction(
       () => this.page.click(selector, options),
       `Clicked on selector: ${selector}`,
-      `Error clicking on selector ${selector}`
+      `Error clicking on selector ${selector}`,
     );
   }
 
-  protected async clickWhenVisible(
-    selector: string,
-    options: ActionOptions = {}
-  ): Promise<void> {
+  protected async clickWhenVisible(selector: string, options: ActionOptions = {}): Promise<void> {
     await this.page.waitForSelector(selector, { state: 'visible', ...options });
     await this.page.click(selector, options);
     this.logger.info(`Clicked on visible selector: ${selector}`);
@@ -124,34 +114,31 @@ export abstract class PageObjectBase {
   public async type(
     selector: string,
     text: string,
-    options: ActionOptions = {}
+    options: ActionOptions = {},
   ): Promise<void | null> {
-    this.safeAction(
+    return this.safeAction(
       () => this.page.fill(selector, text, options),
       `Typed text in selector: ${selector}`,
-      `Error typing in selector ${selector}`
+      `Error typing in selector ${selector}`,
     );
   }
 
-  public async getText(
-    selector: string,
-    options: ActionOptions = {}
-  ): Promise<string | null> {
+  public async getText(selector: string, options: ActionOptions = {}): Promise<string | null> {
     return this.safeAction(
       () => this.page.textContent(selector, options),
       `Retrieved text from selector: ${selector}`,
-      `Error retrieving text from selector ${selector}`
+      `Error retrieving text from selector ${selector}`,
     );
   }
 
   public async waitForSelector(
     selector: string,
-    options: ActionOptions = {}
+    options: ActionOptions = {},
   ): Promise<ElementHandle<SVGElement | HTMLElement> | null> {
     return this.safeAction(
       () => this.page.waitForSelector(selector, options),
       `Waited for selector: ${selector}`,
-      `Error waiting for selector ${selector}`
+      `Error waiting for selector ${selector}`,
     );
   }
 
@@ -165,15 +152,11 @@ export abstract class PageObjectBase {
     return this.safeAction(
       () => this.page.screenshot({ path }),
       'Screenshot taken',
-      'Error taking screenshot'
+      'Error taking screenshot',
     );
   }
 
   public async close(): Promise<void | null> {
-    this.safeAction(
-      () => this.page.close(),
-      'Page closed',
-      'Error closing page'
-    );
+    return this.safeAction(() => this.page.close(), 'Page closed', 'Error closing page');
   }
 }
