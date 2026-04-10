@@ -20,7 +20,7 @@ jobs:
     name: Dependency Review
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
       contents: read
       pull-requests: read
@@ -33,7 +33,7 @@ jobs:
   npm-audit:
     name: NPM Audit
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -57,7 +57,7 @@ jobs:
   codeql:
     name: CodeQL
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 20
     permissions:
       security-events: write
       contents: read
@@ -86,7 +86,7 @@ jobs:
   workflow-security:
     name: Workflow Security (zizmor)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
     permissions:
       contents: read
     steps:
@@ -99,7 +99,6 @@ jobs:
         uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: '3.12'
-          cache: 'pip'
 
       - name: Install zizmor
         run: python -m pip install --upgrade pip zizmor
@@ -118,6 +117,7 @@ jobs:
       - workflow-security
     permissions:
       contents: read
+    timeout-minutes: 5
     steps:
       - name: Enforce upstream security job results
         env:
