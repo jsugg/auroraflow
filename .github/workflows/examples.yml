@@ -27,13 +27,13 @@ jobs:
       run_examples: ${{ steps.paths-filter.outputs.examples }}
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
       - name: Detect examples-relevant changes
         id: paths-filter
-        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
         with:
           filters: |
             examples:
@@ -55,12 +55,12 @@ jobs:
       SHOULD_RUN_EXAMPLES: ${{ github.ref == 'refs/heads/main' || needs.preflight.outputs.run_examples == 'true' }}
     steps:
       - name: Checkout
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           persist-credentials: false
 
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
         with:
           node-version: 22
           cache: npm
@@ -72,7 +72,7 @@ jobs:
       - name: Cache Playwright browsers
         if: env.SHOULD_RUN_EXAMPLES == 'true'
         id: playwright-cache
-        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chrome-${{ hashFiles('package-lock.json') }}
@@ -87,7 +87,7 @@ jobs:
 
       - name: Upload examples artifacts
         if: env.SHOULD_RUN_EXAMPLES == 'true' && always()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: examples-artifacts
           retention-days: 7

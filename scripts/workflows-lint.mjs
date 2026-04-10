@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
+import { spawnSync } from 'node:child_process';
 import { createLinter } from 'actionlint';
 
 async function findWorkflowFiles(dir) {
@@ -22,6 +23,15 @@ async function findWorkflowFiles(dir) {
 }
 
 async function main() {
+  const actionlintResult = spawnSync('actionlint', ['-color'], {
+    stdio: 'inherit',
+    shell: false,
+  });
+  if (!actionlintResult.error) {
+    process.exitCode = actionlintResult.status ?? 1;
+    return;
+  }
+
   const workflowsDir = path.resolve('.github/workflows');
   const workflowFiles = await findWorkflowFiles(workflowsDir);
   const runLinter = await createLinter();
