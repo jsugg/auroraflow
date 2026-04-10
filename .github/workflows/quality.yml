@@ -14,12 +14,40 @@ permissions:
   contents: read
 
 jobs:
+  preflight:
+    name: Preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run_smoke: ${{ steps.paths-filter.outputs.smoke }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          persist-credentials: false
+
+      - name: Detect smoke-relevant changes
+        id: paths-filter
+        uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3
+        with:
+          filters: |
+            smoke:
+              - 'src/**'
+              - 'tests/suites/e2e/**'
+              - 'configs/playwright.config.ts'
+              - 'package.json'
+              - 'package-lock.json'
+              - '.github/workflows/quality.yml'
+
   verify:
     name: Verify (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     permissions:
       contents: read
     timeout-minutes: 5
+    needs: preflight
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -46,10 +74,12 @@ jobs:
   smoke-e2e:
     name: Smoke E2E (Chrome)
     runs-on: ubuntu-latest
-    needs: verify
+    needs: [preflight, verify]
     timeout-minutes: 8
     permissions:
       contents: read
+    env:
+      SHOULD_RUN_SMOKE: ${{ github.ref == 'refs/heads/main' || needs.preflight.outputs.run_smoke == 'true' }}
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -63,9 +93,11 @@ jobs:
           cache: npm
 
       - name: Install dependencies
+        if: env.SHOULD_RUN_SMOKE == 'true'
         run: npm ci
 
       - name: Cache Playwright browsers
+        if: env.SHOULD_RUN_SMOKE == 'true'
         id: playwright-cache
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
         with:
@@ -73,14 +105,15 @@ jobs:
           key: ${{ runner.os }}-playwright-${{ hashFiles('package-lock.json') }}
 
       - name: Install Playwright browser (Chrome)
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        if: env.SHOULD_RUN_SMOKE == 'true' && steps.playwright-cache.outputs.cache-hit != 'true'
         run: npx playwright install --with-deps chrome
 
       - name: Run smoke test
+        if: env.SHOULD_RUN_SMOKE == 'true'
         run: npm run test:smoke
 
       - name: Upload smoke artifacts
-        if: always()
+        if: env.SHOULD_RUN_SMOKE == 'true' && always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: smoke-e2e-artifacts
@@ -88,3 +121,7 @@ jobs:
           path: |
             test-results/
             test-reports/
+
+      - name: Skip smoke lane when no relevant changes
+        if: env.SHOULD_RUN_SMOKE != 'true'
+        run: echo "No smoke-relevant changes detected; smoke lane completed as no-op."

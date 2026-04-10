@@ -16,9 +16,20 @@ permissions:
 
 jobs:
   e2e:
-    name: Full E2E Browser Matrix
+    name: Full E2E (${{ matrix.project }})
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        project:
+          - Google Chrome
+          - Firefox
+          - Safari
+          - Microsoft Edge
+          - Mobile Chrome
+          - Mobile Safari
     steps:
       - name: Checkout
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
@@ -46,13 +57,13 @@ jobs:
         run: npx playwright install --with-deps chrome chromium firefox webkit msedge
 
       - name: Run full E2E suite
-        run: npm run test:e2e
+        run: npx playwright test --config=configs/playwright.config.ts --project="${{ matrix.project }}"
 
       - name: Upload E2E artifacts
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         if: always()
         with:
-          name: e2e-matrix-artifacts
+          name: e2e-matrix-artifacts-${{ matrix.project }}
           retention-days: 14
           path: |
             test-results/
