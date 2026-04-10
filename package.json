@@ -16,7 +16,7 @@
     "test:smoke": "npx playwright test --config=configs/playwright.config.ts --project='Google Chrome'",
     "test:e2e": "npx playwright test --config=configs/playwright.config.ts",
     "test-report": "npx playwright show-report test-reports",
-    "workflows:lint": "actionlint",
+    "workflows:lint": "node scripts/workflows-lint.mjs",
     "workflows:security": "pipx run zizmor .github/workflows",
     "security:check": "npm run workflows:security && npm audit --audit-level=high",
     "verify": "npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run workflows:lint",
