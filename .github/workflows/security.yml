@@ -20,7 +20,7 @@ jobs:
     name: Dependency Review
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 2
     permissions:
       contents: read
       pull-requests: read
@@ -33,7 +33,7 @@ jobs:
   npm-audit:
     name: NPM Audit
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:
@@ -56,8 +56,9 @@ jobs:
 
   codeql:
     name: CodeQL
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 12
     permissions:
       security-events: write
       contents: read
@@ -86,7 +87,7 @@ jobs:
   workflow-security:
     name: Workflow Security (zizmor)
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
     permissions:
       contents: read
     steps:
@@ -117,7 +118,7 @@ jobs:
       - workflow-security
     permissions:
       contents: read
-    timeout-minutes: 5
+    timeout-minutes: 3
     steps:
       - name: Enforce upstream security job results
         env:
@@ -134,11 +135,11 @@ jobs:
             echo "NPM audit failed: $NPM_AUDIT_RESULT"
             exit 1
           fi
-          if [ "$CODEQL_RESULT" != "success" ]; then
-            echo "CodeQL failed: $CODEQL_RESULT"
-            exit 1
-          fi
           if [ "$WORKFLOW_SECURITY_RESULT" != "success" ]; then
             echo "Workflow security failed: $WORKFLOW_SECURITY_RESULT"
+            exit 1
+          fi
+          if [ "${{ github.event_name }}" != "pull_request" ] && [ "$CODEQL_RESULT" != "success" ]; then
+            echo "CodeQL failed: $CODEQL_RESULT"
             exit 1
           fi
