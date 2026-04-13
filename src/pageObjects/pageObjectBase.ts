@@ -1,5 +1,8 @@
 import { ElementHandle, Page, Response } from 'playwright';
 import { Logger, createChildLogger } from '../utils/logger';
+import { resolveSelfHealingConfig } from '../framework/selfHealing/config';
+import { captureFailureEvent } from '../framework/selfHealing/failureCapture';
+import { SelfHealingActionType } from '../framework/selfHealing/types';
 
 interface NavigationOptions {
   waitUntil?: 'load' | 'domcontentloaded' | 'networkidle';
@@ -8,6 +11,11 @@ interface NavigationOptions {
 
 interface ActionOptions {
   timeout?: number;
+}
+
+interface ActionContext {
+  type: SelfHealingActionType;
+  target?: string;
 }
 
 // Custom Error for Page Actions
@@ -26,9 +34,11 @@ export abstract class PageObjectBase {
   protected page: Page;
   protected logger: Logger;
   protected url: string;
+  protected pageObjectName: string;
 
   constructor(page: Page, pageObjectName: string = new.target.name) {
     this.page = page;
+    this.pageObjectName = pageObjectName;
     this.logger = createChildLogger(pageObjectName);
     this.url = '#';
     void this.initialize();
@@ -44,6 +54,7 @@ export abstract class PageObjectBase {
     action: () => Promise<T>,
     successMessage: string,
     errorMessage: string,
+    actionContext: ActionContext = { type: 'unknown' },
   ): Promise<T> {
     try {
       const result = await action();
@@ -51,23 +62,50 @@ export abstract class PageObjectBase {
       return result;
     } catch (error) {
       this.logger.error(errorMessage, { error });
+      const screenshotPath = this.buildFailureScreenshotPath(errorMessage);
 
       // Take a screenshot on error
       await this.page
         .screenshot({
-          path: `test-results/screenshots/${new Date().toISOString().replace(/[:.]/g, '-')}_${errorMessage.replace(
-            /[^a-z0-9]/gi,
-            '_',
-          )}.png`,
+          path: screenshotPath,
         })
         .catch((screenshotError) =>
           this.logger.error('Failed to take a screenshot.', { screenshotError }),
         );
 
+      await captureFailureEvent({
+        config: resolveSelfHealingConfig(process.env),
+        pageObjectName: this.pageObjectName,
+        currentUrl: this.resolveCurrentUrl(),
+        screenshotPath,
+        action: {
+          type: actionContext.type,
+          target: actionContext.target,
+          description: errorMessage,
+        },
+        error,
+      }).catch((captureError) =>
+        this.logger.error('Failed to capture self-healing failure artifact.', { captureError }),
+      );
+
       throw new PageActionError(
         `${errorMessage}: ${error instanceof Error ? error.message : 'Unknown Error'}`,
         error instanceof Error ? error : undefined,
       );
+    }
+  }
+
+  private buildFailureScreenshotPath(errorMessage: string): string {
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const sanitizedMessage = errorMessage.replace(/[^a-z0-9]/gi, '_');
+    return `test-results/screenshots/${timestamp}_${sanitizedMessage}.png`;
+  }
+
+  private resolveCurrentUrl(): string | undefined {
+    try {
+      return this.page.url();
+    } catch {
+      return undefined;
     }
   }
 
@@ -86,6 +124,7 @@ export abstract class PageObjectBase {
       },
       `Navigated to ${url}`,
       `Error navigating to ${url}`,
+      { type: 'navigate', target: url },
     );
   }
 
@@ -102,6 +141,7 @@ export abstract class PageObjectBase {
       () => this.page.click(selector, options),
       `Clicked on selector: ${selector}`,
       `Error clicking on selector ${selector}`,
+      { type: 'click', target: selector },
     );
   }
 
@@ -120,6 +160,7 @@ export abstract class PageObjectBase {
       () => this.page.fill(selector, text, options),
       `Typed text in selector: ${selector}`,
       `Error typing in selector ${selector}`,
+      { type: 'type', target: selector },
     );
   }
 
@@ -128,6 +169,7 @@ export abstract class PageObjectBase {
       () => this.page.textContent(selector, options),
       `Retrieved text from selector: ${selector}`,
       `Error retrieving text from selector ${selector}`,
+      { type: 'read', target: selector },
     );
   }
 
@@ -139,6 +181,7 @@ export abstract class PageObjectBase {
       () => this.page.waitForSelector(selector, options),
       `Waited for selector: ${selector}`,
       `Error waiting for selector ${selector}`,
+      { type: 'wait', target: selector },
     );
   }
 
@@ -153,10 +196,13 @@ export abstract class PageObjectBase {
       () => this.page.screenshot({ path }),
       'Screenshot taken',
       'Error taking screenshot',
+      { type: 'screenshot', target: path },
     );
   }
 
   public async close(): Promise<void | null> {
-    return this.safeAction(() => this.page.close(), 'Page closed', 'Error closing page');
+    return this.safeAction(() => this.page.close(), 'Page closed', 'Error closing page', {
+      type: 'close',
+    });
   }
 }
