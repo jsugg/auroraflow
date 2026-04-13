@@ -60,6 +60,11 @@ describe('captureFailureEvent', () => {
       timestamp: fixedNow.toISOString(),
       eventId: '2026-04-13T12-00-00-000Z_abc123',
     });
+    expect(result?.suggestions).toBeDefined();
+    expect(result?.suggestions.length).toBeGreaterThan(0);
+    expect(result?.suggestions[0]?.score).toBeGreaterThanOrEqual(
+      result?.suggestions[1]?.score ?? 0,
+    );
     expect(writer).toHaveBeenCalledTimes(1);
   });
 });

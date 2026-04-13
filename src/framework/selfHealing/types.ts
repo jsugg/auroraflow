@@ -15,6 +15,31 @@ export type SelfHealingActionType =
   | 'close'
   | 'unknown';
 
+export type SelfHealingSuggestionStrategy =
+  | 'original'
+  | 'testId'
+  | 'roleName'
+  | 'ariaLabel'
+  | 'text'
+  | 'cssFallback'
+  | 'fallback';
+
+export interface SelfHealingSuggestionSignals {
+  roleSignal: number;
+  accessibleNameSignal: number;
+  uniquenessSignal: number;
+  historicalSignal: number;
+  similaritySignal: number;
+}
+
+export interface SelfHealingSuggestion {
+  locator: string;
+  strategy: SelfHealingSuggestionStrategy;
+  score: number;
+  rationale: string;
+  signals: SelfHealingSuggestionSignals;
+}
+
 export interface SelfHealingActionContext {
   type: SelfHealingActionType;
   target?: string;
@@ -38,4 +63,5 @@ export interface CapturedFailureEvent {
   screenshotPath?: string;
   action: SelfHealingActionContext;
   error: CapturedFailureError;
+  suggestions: SelfHealingSuggestion[];
 }
