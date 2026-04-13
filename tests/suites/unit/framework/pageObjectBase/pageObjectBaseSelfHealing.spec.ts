@@ -75,6 +75,7 @@ describe('PageObjectBase self-healing integration', () => {
       minConfidence: number;
       action: { type: string; target?: string };
       currentUrl?: string;
+      suggestions: Array<{ locator: string; score: number }>;
     };
 
     expect(content.mode).toBe('suggest');
@@ -82,5 +83,9 @@ describe('PageObjectBase self-healing integration', () => {
     expect(content.minConfidence).toBe(0.95);
     expect(content.currentUrl).toBe('https://example.test/page');
     expect(content.action).toMatchObject({ type: 'type', target: '#username' });
+    expect(content.suggestions.length).toBeGreaterThan(0);
+    expect(content.suggestions[0]?.score).toBeGreaterThanOrEqual(
+      content.suggestions[1]?.score ?? 0,
+    );
   });
 });

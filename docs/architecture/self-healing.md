@@ -28,3 +28,5 @@ Each artifact includes:
 - action metadata (type, target, description).
 - normalized error details.
 - screenshot path captured for the failure.
+- ranked locator suggestions with weighted scoring signals
+  (`roleSignal`, `accessibleNameSignal`, `uniquenessSignal`, `historicalSignal`, `similaritySignal`).

@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { CapturedFailureError, CapturedFailureEvent, SelfHealingActionContext } from './types';
 import { SelfHealingConfig } from './types';
+import { generateRankedLocatorSuggestions } from './suggestionEngine';
 
 export type FailureArtifactWriter = (event: CapturedFailureEvent) => Promise<void>;
 
@@ -65,6 +66,10 @@ export async function captureFailureEvent({
   }
 
   const occurredAt = now();
+  const suggestions = generateRankedLocatorSuggestions({
+    actionType: action.type,
+    failedTarget: action.target,
+  });
   const event: CapturedFailureEvent = {
     artifactVersion: '1.0.0',
     eventId: buildEventId(occurredAt, randomSuffix()),
@@ -76,6 +81,7 @@ export async function captureFailureEvent({
     screenshotPath,
     action,
     error: normalizeError(error),
+    suggestions,
   };
 
   await writer(event);
