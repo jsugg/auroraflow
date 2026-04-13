@@ -2,6 +2,7 @@ import { ElementHandle, Page, Response } from 'playwright';
 import { Logger, createChildLogger } from '../utils/logger';
 import { resolveSelfHealingConfig } from '../framework/selfHealing/config';
 import { captureFailureEvent } from '../framework/selfHealing/failureCapture';
+import { evaluateGuardedSuggestionsDryRun } from '../framework/selfHealing/guardedValidation';
 import { SelfHealingActionType } from '../framework/selfHealing/types';
 
 interface NavigationOptions {
@@ -73,8 +74,9 @@ export abstract class PageObjectBase {
           this.logger.error('Failed to take a screenshot.', { screenshotError }),
         );
 
+      const selfHealingConfig = resolveSelfHealingConfig(process.env);
       await captureFailureEvent({
-        config: resolveSelfHealingConfig(process.env),
+        config: selfHealingConfig,
         pageObjectName: this.pageObjectName,
         currentUrl: this.resolveCurrentUrl(),
         screenshotPath,
@@ -84,6 +86,17 @@ export abstract class PageObjectBase {
           description: errorMessage,
         },
         error,
+        decorateEvent: async (event) => {
+          if (selfHealingConfig.mode !== 'guarded') {
+            return;
+          }
+          event.guardedValidation = await evaluateGuardedSuggestionsDryRun({
+            page: this.page,
+            actionType: actionContext.type,
+            minConfidence: selfHealingConfig.minConfidence,
+            suggestions: event.suggestions,
+          });
+        },
       }).catch((captureError) =>
         this.logger.error('Failed to capture self-healing failure artifact.', { captureError }),
       );

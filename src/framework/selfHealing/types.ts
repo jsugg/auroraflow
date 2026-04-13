@@ -52,6 +52,34 @@ export interface CapturedFailureError {
   stack?: string;
 }
 
+export type GuardedValidationStatus =
+  | 'accepted'
+  | 'below_confidence_threshold'
+  | 'unsupported_locator_expression'
+  | 'no_matches'
+  | 'not_visible'
+  | 'evaluation_error';
+
+export interface GuardedValidationCandidate {
+  locator: string;
+  strategy: SelfHealingSuggestionStrategy;
+  score: number;
+  confidenceEligible: boolean;
+  matchedElements: number;
+  visible: boolean;
+  status: GuardedValidationStatus;
+  message?: string;
+}
+
+export interface GuardedValidationSummary {
+  mode: 'dry-run';
+  actionType: SelfHealingActionType;
+  minConfidence: number;
+  acceptedLocator?: string;
+  acceptedScore?: number;
+  candidates: GuardedValidationCandidate[];
+}
+
 export interface CapturedFailureEvent {
   artifactVersion: '1.0.0';
   eventId: string;
@@ -64,4 +92,5 @@ export interface CapturedFailureEvent {
   action: SelfHealingActionContext;
   error: CapturedFailureError;
   suggestions: SelfHealingSuggestion[];
+  guardedValidation?: GuardedValidationSummary;
 }

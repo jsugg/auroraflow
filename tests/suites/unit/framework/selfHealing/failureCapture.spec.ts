@@ -67,4 +67,43 @@ describe('captureFailureEvent', () => {
     );
     expect(writer).toHaveBeenCalledTimes(1);
   });
+
+  it('applies event decoration before persisting artifacts', async () => {
+    const writer = vi.fn<(_: unknown) => Promise<void>>().mockResolvedValue();
+    const result = await captureFailureEvent({
+      config: { mode: 'guarded', minConfidence: 0.92 },
+      pageObjectName: 'ExamplePage',
+      action: {
+        type: 'click',
+        target: '#submit',
+        description: 'Error clicking selector #submit',
+      },
+      error: new Error('click failed'),
+      writer,
+      decorateEvent: async (event) => {
+        event.guardedValidation = {
+          mode: 'dry-run',
+          actionType: 'click',
+          minConfidence: 0.92,
+          acceptedLocator: "page.getByRole('button', { name: /submit/i })",
+          acceptedScore: 0.93,
+          candidates: [],
+        };
+      },
+    });
+
+    expect(result?.guardedValidation).toMatchObject({
+      mode: 'dry-run',
+      actionType: 'click',
+      acceptedScore: 0.93,
+    });
+    expect(writer).toHaveBeenCalledWith(
+      expect.objectContaining({
+        guardedValidation: expect.objectContaining({
+          mode: 'dry-run',
+          actionType: 'click',
+        }),
+      }),
+    );
+  });
 });
