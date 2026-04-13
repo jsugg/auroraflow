@@ -25,7 +25,7 @@
     "verify:smoke": "npm run verify && npm run test:smoke"
   },
   "engines": {
-    "node": ">=20 <23"
+    "node": ">=20 <25"
   },
   "keywords": [],
   "author": "",

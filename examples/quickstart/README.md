@@ -12,6 +12,9 @@ This quickstart is a deterministic Playwright + POM example using a local HTML f
 - `pageObjects/SampleAppPage.ts`: minimal POM wrapper.
 - `tests/suites/e2e/examples/quickstart.spec.ts`: runnable E2E test.
 
+## Common Failure Mode
+Replacing role/label selectors with fragile CSS chains usually increases maintenance cost when UI markup changes.
+
 ## Run
 
 ```bash
