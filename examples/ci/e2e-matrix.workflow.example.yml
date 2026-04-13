@@ -1,0 +1,61 @@
+name: E2E Matrix (Template)
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *'
+
+concurrency:
+  group: e2e-template-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  e2e:
+    name: Full E2E (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - project: Google Chrome
+            install_args: chrome
+          - project: Firefox
+            install_args: firefox
+          - project: Safari
+            install_args: webkit
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7 # v5.0.4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ matrix.install_args }}-${{ hashFiles('package-lock.json') }}
+      - name: Ensure required Playwright browser is installed
+        run: npx playwright install --with-deps ${{ matrix.install_args }}
+      - name: Run matrix suite
+        run: npx playwright test --project="${{ matrix.project }}"
+      - name: Upload matrix artifacts
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: e2e-template-artifacts-${{ matrix.project }}
+          retention-days: 14
+          path: |
+            test-results/
+            test-reports/

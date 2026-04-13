@@ -10,6 +10,9 @@ This directory contains runnable examples that demonstrate framework patterns an
 ## Quickstart
 - Open the quickstart fixture-based example in `examples/quickstart/`.
 - Open reliability examples in `examples/reliability/` for deterministic network mocking and targeted retries.
+- Open data-provider examples in `examples/data/` for in-memory and Redis-backed contracts.
+- Open observability examples in `examples/observability/` for correlation and instrumentation patterns.
+- Open CI templates in `examples/ci/` for copy-ready workflow baselines.
 - Run only examples locally:
 
 ```bash
