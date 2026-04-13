@@ -30,3 +30,16 @@ Each artifact includes:
 - screenshot path captured for the failure.
 - ranked locator suggestions with weighted scoring signals
   (`roleSignal`, `accessibleNameSignal`, `uniquenessSignal`, `historicalSignal`, `similaritySignal`).
+
+### Guarded Mode Dry-Run Validation
+
+When mode is `guarded`, AuroraFlow evaluates ranked locator suggestions in dry-run mode before writing
+the failure artifact:
+
+- Candidates below `SELF_HEAL_MIN_CONFIDENCE` are marked as skipped.
+- Supported locator expressions are resolved against the current page and checked for matches and visibility.
+- The first confidence-eligible visible candidate is marked as `accepted` for operator review.
+- No action is auto-applied in this stage; validation is diagnostic and auditable only.
+
+Guarded validation results are stored in `guardedValidation` with per-candidate status and accepted
+candidate metadata when available.

@@ -15,6 +15,7 @@ export interface CaptureFailureEventInput {
   currentUrl?: string;
   screenshotPath?: string;
   writer?: FailureArtifactWriter;
+  decorateEvent?: (event: CapturedFailureEvent) => Promise<void> | void;
   now?: () => Date;
   randomSuffix?: () => string;
 }
@@ -58,6 +59,7 @@ export async function captureFailureEvent({
   currentUrl,
   screenshotPath,
   writer = createFileFailureArtifactWriter(),
+  decorateEvent,
   now = () => new Date(),
   randomSuffix = () => randomUUID(),
 }: CaptureFailureEventInput): Promise<CapturedFailureEvent | null> {
@@ -83,6 +85,10 @@ export async function captureFailureEvent({
     error: normalizeError(error),
     suggestions,
   };
+
+  if (decorateEvent) {
+    await decorateEvent(event);
+  }
 
   await writer(event);
   return event;
