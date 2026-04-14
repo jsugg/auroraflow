@@ -11,6 +11,10 @@ describe('resolveSelfHealingConfig', () => {
     expect(config).toEqual({
       mode: 'off',
       minConfidence: DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
+      safetyPolicy: {
+        allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+        allowedDomains: [],
+      },
     });
   });
 
@@ -23,6 +27,10 @@ describe('resolveSelfHealingConfig', () => {
     expect(config).toEqual({
       mode: 'guarded',
       minConfidence: 0.97,
+      safetyPolicy: {
+        allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+        allowedDomains: [],
+      },
     });
   });
 
@@ -35,6 +43,22 @@ describe('resolveSelfHealingConfig', () => {
     expect(config).toEqual({
       mode: 'off',
       minConfidence: DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
+      safetyPolicy: {
+        allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+        allowedDomains: [],
+      },
+    });
+  });
+
+  it('parses allow-lists and filters unsupported actions', () => {
+    const config = resolveSelfHealingConfig({
+      SELF_HEAL_ALLOWED_ACTIONS: ' click , type , unsupported , click ',
+      SELF_HEAL_ALLOWED_DOMAINS: 'example.test, sub.example.test , ',
+    });
+
+    expect(config.safetyPolicy).toEqual({
+      allowedActions: ['click', 'type'],
+      allowedDomains: ['example.test', 'sub.example.test'],
     });
   });
 });

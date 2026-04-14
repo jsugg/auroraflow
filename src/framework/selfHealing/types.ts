@@ -1,10 +1,5 @@
 export type SelfHealingMode = 'off' | 'suggest' | 'guarded';
 
-export interface SelfHealingConfig {
-  mode: SelfHealingMode;
-  minConfidence: number;
-}
-
 export type SelfHealingActionType =
   | 'navigate'
   | 'click'
@@ -14,6 +9,17 @@ export type SelfHealingActionType =
   | 'screenshot'
   | 'close'
   | 'unknown';
+
+export interface SelfHealingSafetyPolicy {
+  allowedActions: SelfHealingActionType[];
+  allowedDomains: string[];
+}
+
+export interface SelfHealingConfig {
+  mode: SelfHealingMode;
+  minConfidence: number;
+  safetyPolicy: SelfHealingSafetyPolicy;
+}
 
 export type SelfHealingSuggestionStrategy =
   | 'original'
@@ -60,6 +66,20 @@ export type GuardedValidationStatus =
   | 'not_visible'
   | 'evaluation_error';
 
+export type GuardedValidationPolicyBlockReason =
+  | 'action_not_allowed'
+  | 'domain_not_allowed'
+  | 'missing_or_invalid_url';
+
+export interface GuardedValidationPolicyDecision {
+  actionAllowed: boolean;
+  domainAllowed: boolean;
+  evaluatedDomain?: string;
+  blockedReason?: GuardedValidationPolicyBlockReason;
+  allowedActions: SelfHealingActionType[];
+  allowedDomains: string[];
+}
+
 export interface GuardedValidationCandidate {
   locator: string;
   strategy: SelfHealingSuggestionStrategy;
@@ -75,6 +95,7 @@ export interface GuardedValidationSummary {
   mode: 'dry-run';
   actionType: SelfHealingActionType;
   minConfidence: number;
+  policy: GuardedValidationPolicyDecision;
   acceptedLocator?: string;
   acceptedScore?: number;
   candidates: GuardedValidationCandidate[];
@@ -86,6 +107,7 @@ export interface CapturedFailureEvent {
   timestamp: string;
   mode: SelfHealingMode;
   minConfidence: number;
+  safetyPolicy: SelfHealingSafetyPolicy;
   pageObjectName: string;
   currentUrl?: string;
   screenshotPath?: string;

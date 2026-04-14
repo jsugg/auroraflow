@@ -14,6 +14,15 @@ AuroraFlow supports a mode-gated self-healing failure-capture foundation for fai
 - Accepted range is `0` to `1`.
 - Invalid or missing values default to `0.92`.
 
+## Guarded Safety Policy
+
+- `SELF_HEAL_ALLOWED_ACTIONS` controls which action types may run guarded validation.
+- Default actions: `click,type,read,wait,screenshot`.
+- `navigate`, `close`, and `unknown` are blocked unless explicitly allowed.
+- `SELF_HEAL_ALLOWED_DOMAINS` controls host allow-list for guarded validation.
+- When domain allow-list is empty, domain checks are not enforced.
+- When domain allow-list is set, guarded validation is blocked for missing/invalid URLs and non-allowed hosts.
+
 ## Failure Artifact Output
 
 When mode is `suggest` or `guarded`, failed actions emit structured JSON artifacts to:
@@ -24,6 +33,7 @@ Each artifact includes:
 
 - `eventId`, `timestamp`, and schema version.
 - mode and confidence threshold used at runtime.
+- safety policy used at runtime (`allowedActions`, `allowedDomains`).
 - page object context and current URL (when available).
 - action metadata (type, target, description).
 - normalized error details.
@@ -40,6 +50,8 @@ the failure artifact:
 - Supported locator expressions are resolved against the current page and checked for matches and visibility.
 - The first confidence-eligible visible candidate is marked as `accepted` for operator review.
 - No action is auto-applied in this stage; validation is diagnostic and auditable only.
+- Policy checks run before candidate validation and can block evaluation for disallowed actions/domains.
 
 Guarded validation results are stored in `guardedValidation` with per-candidate status and accepted
-candidate metadata when available.
+candidate metadata when available, plus policy decision details (`actionAllowed`, `domainAllowed`,
+`blockedReason`, `evaluatedDomain`).

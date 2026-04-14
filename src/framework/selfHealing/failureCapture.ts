@@ -78,6 +78,7 @@ export async function captureFailureEvent({
     timestamp: occurredAt.toISOString(),
     mode: config.mode,
     minConfidence: config.minConfidence,
+    safetyPolicy: config.safetyPolicy,
     pageObjectName,
     currentUrl,
     screenshotPath,
