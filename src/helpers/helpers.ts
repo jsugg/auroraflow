@@ -72,7 +72,7 @@ export async function retry<T>({
           throw new Error(`All ${retries} retries failed.`);
         }
       }
-      await wait(currentDelay);
+      await wait(currentDelay, logger);
       currentDelay *= backoffFactor;
     }
   }

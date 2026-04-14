@@ -13,7 +13,7 @@ function fixtureUrl(): string {
   return pathToFileURL(fixturePath).toString();
 }
 
-test('deterministic network mock returns stable API response', async ({ page }) => {
+test('@smoke deterministic network mock returns stable API response', async ({ page }) => {
   const reliabilityPage = new ReliabilityAppPage(page);
 
   await page.route(MESSAGE_ENDPOINT, async (route) => {

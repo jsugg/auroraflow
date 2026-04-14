@@ -8,7 +8,7 @@ function fixtureUrl(): string {
   return pathToFileURL(fixturePath).toString();
 }
 
-test('quickstart fixture form submits deterministic greeting', async ({ page }) => {
+test('@smoke quickstart fixture form submits deterministic greeting', async ({ page }) => {
   const samplePage = new SampleAppPage(page);
 
   await samplePage.open(fixtureUrl());

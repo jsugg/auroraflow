@@ -14,7 +14,7 @@ function fixtureUrl(): string {
   return pathToFileURL(fixturePath).toString();
 }
 
-test('targeted retry recovers from transient API failures', async ({ page }) => {
+test('@smoke targeted retry recovers from transient API failures', async ({ page }) => {
   let attempts = 0;
   const reliabilityPage = new ReliabilityAppPage(page);
 
@@ -62,7 +62,7 @@ test('targeted retry recovers from transient API failures', async ({ page }) => 
   await expect(await reliabilityPage.statusText()).toBe('Recovered on attempt 3');
 });
 
-test('explicit timeout assertion handles delayed UI updates deterministically', async ({
+test('@smoke explicit timeout assertion handles delayed UI updates deterministically', async ({
   page,
 }) => {
   const reliabilityPage = new ReliabilityAppPage(page);
