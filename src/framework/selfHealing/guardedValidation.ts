@@ -1,8 +1,10 @@
 import type { Locator, Page } from 'playwright';
 import type {
   GuardedValidationCandidate,
+  GuardedValidationPolicyDecision,
   GuardedValidationSummary,
   SelfHealingActionType,
+  SelfHealingSafetyPolicy,
   SelfHealingSuggestion,
 } from './types';
 
@@ -11,6 +13,8 @@ export interface GuardedValidationInput {
   actionType: SelfHealingActionType;
   minConfidence: number;
   suggestions: ReadonlyArray<SelfHealingSuggestion>;
+  currentUrl?: string;
+  safetyPolicy: SelfHealingSafetyPolicy;
   maxCandidates?: number;
 }
 
@@ -80,13 +84,99 @@ function bySuggestionPriority(left: SelfHealingSuggestion, right: SelfHealingSug
   return left.locator.localeCompare(right.locator);
 }
 
+function parseCurrentHost(currentUrl: string | undefined): string | null {
+  if (!currentUrl) {
+    return null;
+  }
+
+  try {
+    const parsedUrl = new URL(currentUrl);
+    return parsedUrl.hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+}
+
+function isAllowedDomain(currentHost: string, allowedDomains: ReadonlyArray<string>): boolean {
+  return allowedDomains.some((allowedDomain) => {
+    const normalizedDomain = allowedDomain.toLowerCase();
+    return currentHost === normalizedDomain || currentHost.endsWith(`.${normalizedDomain}`);
+  });
+}
+
+function createPolicyDecision({
+  actionType,
+  currentUrl,
+  safetyPolicy,
+}: {
+  actionType: SelfHealingActionType;
+  currentUrl?: string;
+  safetyPolicy: SelfHealingSafetyPolicy;
+}): GuardedValidationPolicyDecision {
+  const allowedActions = [...safetyPolicy.allowedActions];
+  const allowedDomains = [...safetyPolicy.allowedDomains];
+  const actionAllowed = allowedActions.includes(actionType);
+  if (!actionAllowed) {
+    return {
+      actionAllowed: false,
+      domainAllowed: false,
+      blockedReason: 'action_not_allowed',
+      allowedActions,
+      allowedDomains,
+    };
+  }
+
+  if (allowedDomains.length === 0) {
+    return {
+      actionAllowed: true,
+      domainAllowed: true,
+      allowedActions,
+      allowedDomains,
+    };
+  }
+
+  const currentHost = parseCurrentHost(currentUrl);
+  if (!currentHost) {
+    return {
+      actionAllowed: true,
+      domainAllowed: false,
+      blockedReason: 'missing_or_invalid_url',
+      allowedActions,
+      allowedDomains,
+    };
+  }
+
+  const domainAllowed = isAllowedDomain(currentHost, allowedDomains);
+  return {
+    actionAllowed: true,
+    domainAllowed,
+    evaluatedDomain: currentHost,
+    blockedReason: domainAllowed ? undefined : 'domain_not_allowed',
+    allowedActions,
+    allowedDomains,
+  };
+}
+
 export async function evaluateGuardedSuggestionsDryRun({
   page,
   actionType,
   minConfidence,
   suggestions,
+  currentUrl,
+  safetyPolicy,
   maxCandidates,
 }: GuardedValidationInput): Promise<GuardedValidationSummary> {
+  const policy = createPolicyDecision({ actionType, currentUrl, safetyPolicy });
+  if (policy.blockedReason) {
+    return {
+      mode: 'dry-run',
+      actionType,
+      minConfidence,
+      policy,
+      candidates: [],
+    };
+  }
+
   const boundedLimit = toBoundedCandidateLimit(maxCandidates);
   const candidates: GuardedValidationCandidate[] = [];
   let acceptedLocator: string | undefined;
@@ -167,6 +257,7 @@ export async function evaluateGuardedSuggestionsDryRun({
     mode: 'dry-run',
     actionType,
     minConfidence,
+    policy,
     acceptedLocator,
     acceptedScore,
     candidates,

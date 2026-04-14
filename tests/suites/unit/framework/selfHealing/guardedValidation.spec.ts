@@ -79,9 +79,19 @@ describe('evaluateGuardedSuggestionsDryRun', () => {
       actionType: 'click',
       minConfidence: 0.5,
       suggestions,
+      currentUrl: 'https://example.test/page',
+      safetyPolicy: {
+        allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+        allowedDomains: ['example.test'],
+      },
     });
 
     expect(result.mode).toBe('dry-run');
+    expect(result.policy).toMatchObject({
+      actionAllowed: true,
+      domainAllowed: true,
+      evaluatedDomain: 'example.test',
+    });
     expect(result.acceptedLocator).toBe("page.getByRole('button', { name: /submit/i })");
     expect(result.acceptedScore).toBe(0.93);
     expect(result.candidates[0]).toMatchObject({
@@ -109,6 +119,11 @@ describe('evaluateGuardedSuggestionsDryRun', () => {
       actionType: 'click',
       minConfidence: 0.5,
       suggestions,
+      currentUrl: 'https://example.test/page',
+      safetyPolicy: {
+        allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+        allowedDomains: [],
+      },
     });
 
     expect(result.acceptedLocator).toBeUndefined();
@@ -121,5 +136,60 @@ describe('evaluateGuardedSuggestionsDryRun', () => {
         visible: false,
       }),
     ]);
+  });
+
+  it('blocks guarded validation when action type is not allowed by policy', async () => {
+    const pageMock = createGuardedPageMock();
+    const suggestions: SelfHealingSuggestion[] = [
+      createSuggestion("page.getByRole('button', { name: /submit/i })", 0.93, 'roleName'),
+    ];
+
+    const result = await evaluateGuardedSuggestionsDryRun({
+      page: pageMock as unknown as Page,
+      actionType: 'close',
+      minConfidence: 0.5,
+      suggestions,
+      currentUrl: 'https://example.test/page',
+      safetyPolicy: {
+        allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+        allowedDomains: ['example.test'],
+      },
+    });
+
+    expect(result.acceptedLocator).toBeUndefined();
+    expect(result.candidates).toEqual([]);
+    expect(result.policy).toMatchObject({
+      actionAllowed: false,
+      domainAllowed: false,
+      blockedReason: 'action_not_allowed',
+    });
+  });
+
+  it('blocks guarded validation when current domain is outside allow-list', async () => {
+    const pageMock = createGuardedPageMock();
+    const suggestions: SelfHealingSuggestion[] = [
+      createSuggestion("page.getByRole('button', { name: /submit/i })", 0.93, 'roleName'),
+    ];
+
+    const result = await evaluateGuardedSuggestionsDryRun({
+      page: pageMock as unknown as Page,
+      actionType: 'click',
+      minConfidence: 0.5,
+      suggestions,
+      currentUrl: 'https://blocked.test/page',
+      safetyPolicy: {
+        allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+        allowedDomains: ['example.test'],
+      },
+    });
+
+    expect(result.acceptedLocator).toBeUndefined();
+    expect(result.candidates).toEqual([]);
+    expect(result.policy).toMatchObject({
+      actionAllowed: true,
+      domainAllowed: false,
+      evaluatedDomain: 'blocked.test',
+      blockedReason: 'domain_not_allowed',
+    });
   });
 });

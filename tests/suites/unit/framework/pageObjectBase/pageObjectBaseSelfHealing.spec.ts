@@ -64,6 +64,8 @@ describe('PageObjectBase self-healing integration', () => {
   beforeEach(async () => {
     process.env.SELF_HEAL_MODE = 'suggest';
     process.env.SELF_HEAL_MIN_CONFIDENCE = '0.95';
+    delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
+    delete process.env.SELF_HEAL_ALLOWED_DOMAINS;
     await rm(artifactsDir, { recursive: true, force: true });
     pageMock = createPageMock();
     pageObject = new TestPageObject(pageMock as unknown as Page);
@@ -72,6 +74,8 @@ describe('PageObjectBase self-healing integration', () => {
   afterEach(async () => {
     delete process.env.SELF_HEAL_MODE;
     delete process.env.SELF_HEAL_MIN_CONFIDENCE;
+    delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
+    delete process.env.SELF_HEAL_ALLOWED_DOMAINS;
     await rm(artifactsDir, { recursive: true, force: true });
   });
 
@@ -90,6 +94,10 @@ describe('PageObjectBase self-healing integration', () => {
       mode: string;
       pageObjectName: string;
       minConfidence: number;
+      safetyPolicy: {
+        allowedActions: string[];
+        allowedDomains: string[];
+      };
       action: { type: string; target?: string };
       currentUrl?: string;
       suggestions: Array<{ locator: string; score: number }>;
@@ -98,6 +106,10 @@ describe('PageObjectBase self-healing integration', () => {
     expect(content.mode).toBe('suggest');
     expect(content.pageObjectName).toBe('TestPageObject');
     expect(content.minConfidence).toBe(0.95);
+    expect(content.safetyPolicy).toEqual({
+      allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+      allowedDomains: [],
+    });
     expect(content.currentUrl).toBe('https://example.test/page');
     expect(content.action).toMatchObject({ type: 'type', target: '#username' });
     expect(content.suggestions.length).toBeGreaterThan(0);
@@ -109,6 +121,8 @@ describe('PageObjectBase self-healing integration', () => {
   it('captures guarded dry-run validation metadata when mode is guarded', async () => {
     process.env.SELF_HEAL_MODE = 'guarded';
     process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
+    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'type,click';
+    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'example.test';
     pageMock.fill.mockRejectedValueOnce(new Error('fill failed'));
 
     await expect(pageObject.type('#username', 'alice')).rejects.toThrow(
@@ -125,6 +139,13 @@ describe('PageObjectBase self-healing integration', () => {
         mode: string;
         actionType: string;
         acceptedLocator?: string;
+        policy: {
+          actionAllowed: boolean;
+          domainAllowed: boolean;
+          evaluatedDomain?: string;
+          allowedActions: string[];
+          allowedDomains: string[];
+        };
         candidates: Array<{
           locator: string;
           confidenceEligible: boolean;
@@ -138,6 +159,13 @@ describe('PageObjectBase self-healing integration', () => {
     expect(content.guardedValidation?.mode).toBe('dry-run');
     expect(content.guardedValidation?.actionType).toBe('type');
     expect(content.guardedValidation?.acceptedLocator).toBeTruthy();
+    expect(content.guardedValidation?.policy).toMatchObject({
+      actionAllowed: true,
+      domainAllowed: true,
+      evaluatedDomain: 'example.test',
+      allowedActions: ['type', 'click'],
+      allowedDomains: ['example.test'],
+    });
     expect(content.guardedValidation?.candidates.length).toBeGreaterThan(0);
     expect(
       content.guardedValidation?.candidates.some((candidate) => candidate.status === 'accepted'),

@@ -64,6 +64,7 @@ export abstract class PageObjectBase {
     } catch (error) {
       this.logger.error(errorMessage, { error });
       const screenshotPath = this.buildFailureScreenshotPath(errorMessage);
+      const currentUrl = this.resolveCurrentUrl();
 
       // Take a screenshot on error
       await this.page
@@ -78,7 +79,7 @@ export abstract class PageObjectBase {
       await captureFailureEvent({
         config: selfHealingConfig,
         pageObjectName: this.pageObjectName,
-        currentUrl: this.resolveCurrentUrl(),
+        currentUrl,
         screenshotPath,
         action: {
           type: actionContext.type,
@@ -95,6 +96,8 @@ export abstract class PageObjectBase {
             actionType: actionContext.type,
             minConfidence: selfHealingConfig.minConfidence,
             suggestions: event.suggestions,
+            currentUrl,
+            safetyPolicy: selfHealingConfig.safetyPolicy,
           });
         },
       }).catch((captureError) =>

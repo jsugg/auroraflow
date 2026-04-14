@@ -6,7 +6,14 @@ describe('captureFailureEvent', () => {
     const writer = vi.fn<(_: unknown) => Promise<void>>().mockResolvedValue();
 
     const result = await captureFailureEvent({
-      config: { mode: 'off', minConfidence: 0.92 },
+      config: {
+        mode: 'off',
+        minConfidence: 0.92,
+        safetyPolicy: {
+          allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+          allowedDomains: [],
+        },
+      },
       pageObjectName: 'ExamplePage',
       action: {
         type: 'type',
@@ -26,7 +33,14 @@ describe('captureFailureEvent', () => {
     const fixedNow = new Date('2026-04-13T12:00:00.000Z');
 
     const result = await captureFailureEvent({
-      config: { mode: 'suggest', minConfidence: 0.92 },
+      config: {
+        mode: 'suggest',
+        minConfidence: 0.92,
+        safetyPolicy: {
+          allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+          allowedDomains: [],
+        },
+      },
       pageObjectName: 'ExamplePage',
       currentUrl: 'https://example.test',
       screenshotPath: 'test-results/screenshots/failure.png',
@@ -46,6 +60,10 @@ describe('captureFailureEvent', () => {
       mode: 'suggest',
       pageObjectName: 'ExamplePage',
       currentUrl: 'https://example.test',
+      safetyPolicy: {
+        allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+        allowedDomains: [],
+      },
       action: {
         type: 'type',
         target: '#username',
@@ -71,7 +89,14 @@ describe('captureFailureEvent', () => {
   it('applies event decoration before persisting artifacts', async () => {
     const writer = vi.fn<(_: unknown) => Promise<void>>().mockResolvedValue();
     const result = await captureFailureEvent({
-      config: { mode: 'guarded', minConfidence: 0.92 },
+      config: {
+        mode: 'guarded',
+        minConfidence: 0.92,
+        safetyPolicy: {
+          allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+          allowedDomains: ['example.test'],
+        },
+      },
       pageObjectName: 'ExamplePage',
       action: {
         type: 'click',
@@ -85,6 +110,12 @@ describe('captureFailureEvent', () => {
           mode: 'dry-run',
           actionType: 'click',
           minConfidence: 0.92,
+          policy: {
+            actionAllowed: true,
+            domainAllowed: true,
+            allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+            allowedDomains: ['example.test'],
+          },
           acceptedLocator: "page.getByRole('button', { name: /submit/i })",
           acceptedScore: 0.93,
           candidates: [],
