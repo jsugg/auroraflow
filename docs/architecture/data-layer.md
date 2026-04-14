@@ -63,3 +63,18 @@ await registry.upsert({
 - Connection setup failures throw `RedisConnectionError`.
 - Exhausted operation retries throw `RedisOperationError` with operation name and attempts.
 - Invalid selector payload/schema throws `SelectorRegistryValidationError` or `SelectorRegistryDataError`.
+
+## Integration Testing
+
+- Integration suite location: `tests/suites/integration/framework/data/redisIntegration.spec.ts`
+- Runtime model: ephemeral Redis container via Testcontainers (`redis:7.2-alpine`).
+- Command:
+
+```bash
+npm run test:integration
+```
+
+Behavior notes:
+
+- When Docker is available, tests validate real Redis connectivity, namespaced key behavior, TTL handling, and selector registry versioning.
+- When Docker/Testcontainers is unavailable, tests skip with an explicit reason rather than hanging.
