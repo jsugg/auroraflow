@@ -17,6 +17,7 @@
     "test:examples": "npx playwright test --config=configs/playwright.config.ts tests/suites/e2e/examples --project='Google Chrome'",
     "test:e2e": "npx playwright test --config=configs/playwright.config.ts",
     "test-report": "npx playwright show-report test-reports",
+    "self-heal:governance": "node scripts/self-healing-governance.mjs",
     "workflows:lint": "node scripts/workflows-lint.mjs",
     "workflows:security": "pipx run zizmor .github/workflows",
     "shellcheck": "shellcheck scripts/*.sh",

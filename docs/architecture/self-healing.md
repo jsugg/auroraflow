@@ -55,3 +55,25 @@ the failure artifact:
 Guarded validation results are stored in `guardedValidation` with per-candidate status and accepted
 candidate metadata when available, plus policy decision details (`actionAllowed`, `domainAllowed`,
 `blockedReason`, `evaluatedDomain`).
+
+## CI Governance and Triage
+
+AuroraFlow includes a governance pass for self-healing artifacts in CI:
+
+- Command: `npm run self-heal:governance`
+- Default artifact source: `test-results/self-healing`
+- Governance outputs:
+  - JSON summary: `test-results/self-healing-governance-summary.json`
+  - Markdown summary: `test-results/self-healing-governance-summary.md`
+
+### Acknowledgement Gate
+
+- `SELF_HEAL_REQUIRE_ACK_FOR_ACCEPTED` controls whether guarded accepted candidates require explicit acknowledgement (default `true`).
+- `SELF_HEAL_ACKNOWLEDGED=true` acknowledges reviewed guarded accepted candidates and allows the governance step to pass.
+- If guarded accepted candidates exist and acknowledgement is missing, governance fails with a blocking signal.
+
+### Optional Auto-Triage Issue
+
+- CI can open a triage issue automatically when guarded accepted candidates are detected.
+- Enable with repository variable `SELF_HEAL_AUTO_OPEN_TRIAGE_ISSUE=true`.
+- Auto-triage runs on `main` only and uses the governance markdown summary as issue body.
