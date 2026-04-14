@@ -77,6 +77,7 @@ describe('PageObjectBase self-healing integration', () => {
   const artifactsDir = path.join(process.cwd(), 'test-results', 'self-healing');
 
   beforeEach(async () => {
+    process.env.AURORAFLOW_RUN_ID = 'local-run';
     process.env.SELF_HEAL_MODE = 'suggest';
     process.env.SELF_HEAL_MIN_CONFIDENCE = '0.95';
     delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
@@ -87,6 +88,7 @@ describe('PageObjectBase self-healing integration', () => {
   });
 
   afterEach(async () => {
+    delete process.env.AURORAFLOW_RUN_ID;
     delete process.env.SELF_HEAL_MODE;
     delete process.env.SELF_HEAL_MIN_CONFIDENCE;
     delete process.env.SELF_HEAL_ALLOWED_ACTIONS;

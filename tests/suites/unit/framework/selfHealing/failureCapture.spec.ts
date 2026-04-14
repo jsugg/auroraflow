@@ -51,6 +51,7 @@ describe('captureFailureEvent', () => {
       },
       error: new Error('fill failed'),
       writer,
+      env: {},
       now: () => fixedNow,
       randomSuffix: () => 'abc123',
     });
