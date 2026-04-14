@@ -94,6 +94,25 @@ jobs:
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@c10b8064de6f491fea524254123dbe5e09572f13 # v4.35.1
 
+  secret-scan:
+    name: Secret Scan (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Run gitleaks scan
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: 'false'
+
   workflow-security:
     name: Workflow Security (zizmor)
     runs-on: ubuntu-latest
@@ -125,6 +144,7 @@ jobs:
       - dependency-review
       - npm-audit
       - codeql
+      - secret-scan
       - workflow-security
     permissions:
       contents: read
@@ -135,6 +155,7 @@ jobs:
           DEPENDENCY_REVIEW_RESULT: ${{ needs.dependency-review.result }}
           NPM_AUDIT_RESULT: ${{ needs.npm-audit.result }}
           CODEQL_RESULT: ${{ needs.codeql.result }}
+          SECRET_SCAN_RESULT: ${{ needs.secret-scan.result }}
           WORKFLOW_SECURITY_RESULT: ${{ needs.workflow-security.result }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ] && [ "$DEPENDENCY_REVIEW_RESULT" != "success" ]; then
@@ -143,6 +164,10 @@ jobs:
           fi
           if [ "$NPM_AUDIT_RESULT" != "success" ]; then
             echo "NPM audit failed: $NPM_AUDIT_RESULT"
+            exit 1
+          fi
+          if [ "$SECRET_SCAN_RESULT" != "success" ]; then
+            echo "Secret scan failed: $SECRET_SCAN_RESULT"
             exit 1
           fi
           if [ "$WORKFLOW_SECURITY_RESULT" != "success" ]; then
