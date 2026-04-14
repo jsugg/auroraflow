@@ -1,0 +1,6 @@
+self-hosted-runner:
+  labels: []
+
+config-variables:
+  - SELF_HEAL_ACKNOWLEDGED
+  - SELF_HEAL_AUTO_OPEN_TRIAGE_ISSUE
