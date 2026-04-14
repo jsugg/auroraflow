@@ -16,6 +16,13 @@ export interface CaptureFailureEventInput {
   screenshotPath?: string;
   writer?: FailureArtifactWriter;
   decorateEvent?: (event: CapturedFailureEvent) => Promise<void> | void;
+  correlation?: {
+    runId?: string;
+    testId?: string;
+    component?: string;
+    errorCode?: string;
+  };
+  env?: Readonly<Record<string, string | undefined>>;
   now?: () => Date;
   randomSuffix?: () => string;
 }
@@ -41,6 +48,43 @@ function buildEventId(now: Date, randomSuffix: string): string {
   return `${timestamp}_${suffix || 'event'}`;
 }
 
+function normalizeOptionalIdentifier(rawValue: string | undefined): string | undefined {
+  if (!rawValue) {
+    return undefined;
+  }
+  const normalized = rawValue.trim();
+  return normalized === '' ? undefined : normalized;
+}
+
+function resolveRunId({
+  correlationRunId,
+  env,
+}: {
+  correlationRunId: string | undefined;
+  env: Readonly<Record<string, string | undefined>>;
+}): string {
+  return (
+    normalizeOptionalIdentifier(correlationRunId) ??
+    normalizeOptionalIdentifier(env.AURORAFLOW_RUN_ID) ??
+    normalizeOptionalIdentifier(env.GITHUB_RUN_ID) ??
+    'local-run'
+  );
+}
+
+function resolveTestId({
+  correlationTestId,
+  env,
+}: {
+  correlationTestId: string | undefined;
+  env: Readonly<Record<string, string | undefined>>;
+}): string | undefined {
+  return (
+    normalizeOptionalIdentifier(correlationTestId) ??
+    normalizeOptionalIdentifier(env.AURORAFLOW_TEST_ID) ??
+    normalizeOptionalIdentifier(env.PLAYWRIGHT_TEST_ID)
+  );
+}
+
 export function createFileFailureArtifactWriter(
   outputDirectory: string = path.join('test-results', 'self-healing'),
 ): FailureArtifactWriter {
@@ -60,6 +104,8 @@ export async function captureFailureEvent({
   screenshotPath,
   writer = createFileFailureArtifactWriter(),
   decorateEvent,
+  correlation,
+  env = process.env,
   now = () => new Date(),
   randomSuffix = () => randomUUID(),
 }: CaptureFailureEventInput): Promise<CapturedFailureEvent | null> {
@@ -72,10 +118,24 @@ export async function captureFailureEvent({
     actionType: action.type,
     failedTarget: action.target,
   });
+  const runId = resolveRunId({
+    correlationRunId: correlation?.runId,
+    env,
+  });
+  const testId = resolveTestId({
+    correlationTestId: correlation?.testId,
+    env,
+  });
+  const component = normalizeOptionalIdentifier(correlation?.component) ?? pageObjectName;
+  const errorCode = normalizeOptionalIdentifier(correlation?.errorCode) ?? 'page_action_error';
   const event: CapturedFailureEvent = {
     artifactVersion: '1.0.0',
     eventId: buildEventId(occurredAt, randomSuffix()),
     timestamp: occurredAt.toISOString(),
+    runId,
+    testId,
+    component,
+    errorCode,
     mode: config.mode,
     minConfidence: config.minConfidence,
     safetyPolicy: config.safetyPolicy,

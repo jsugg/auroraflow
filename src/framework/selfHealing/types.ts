@@ -118,6 +118,10 @@ export interface CapturedFailureEvent {
   artifactVersion: '1.0.0';
   eventId: string;
   timestamp: string;
+  runId: string;
+  testId?: string;
+  component: string;
+  errorCode: string;
   mode: SelfHealingMode;
   minConfidence: number;
   safetyPolicy: SelfHealingSafetyPolicy;
