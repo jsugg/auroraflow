@@ -42,13 +42,14 @@ export abstract class PageObjectBase {
   protected logger: Logger;
   protected url: string;
   protected pageObjectName: string;
+  private initialized = false;
+  private initializationPromise: Promise<void> | null = null;
 
   constructor(page: Page, pageObjectName: string = new.target.name) {
     this.page = page;
     this.pageObjectName = pageObjectName;
     this.logger = createChildLogger(pageObjectName);
     this.url = '#';
-    void this.initialize();
   }
 
   // Asynchronous initialization pattern
@@ -63,8 +64,12 @@ export abstract class PageObjectBase {
     errorMessage: string,
     actionContext: ActionContext = { type: 'unknown' },
     guardedAutoHealAction?: GuardedAutoHealAction<T>,
+    requiresInitialization: boolean = true,
   ): Promise<T> {
     try {
+      if (requiresInitialization) {
+        await this.ensureInitialized();
+      }
       const result = await action();
       this.logger.info(successMessage, { result });
       return result;
@@ -184,6 +189,23 @@ export abstract class PageObjectBase {
     return `test-results/screenshots/${timestamp}_${sanitizedMessage}.png`;
   }
 
+  private async ensureInitialized(): Promise<void> {
+    if (this.initialized) {
+      return;
+    }
+
+    if (!this.initializationPromise) {
+      this.initializationPromise = (async () => {
+        await this.initialize();
+        this.initialized = true;
+      })().finally(() => {
+        this.initializationPromise = null;
+      });
+    }
+
+    await this.initializationPromise;
+  }
+
   private resolveCurrentUrl(): string | undefined {
     try {
       return this.page.url();
@@ -216,11 +238,14 @@ export abstract class PageObjectBase {
       `Navigated to ${url}`,
       `Error navigating to ${url}`,
       { type: 'navigate', target: url },
+      undefined,
+      false,
     );
   }
 
   public async open(): Promise<void> {
     await this.navigateTo(this.url);
+    await this.ensureInitialized();
   }
 
   public async getTitle(): Promise<string> {
@@ -311,8 +336,15 @@ export abstract class PageObjectBase {
   }
 
   public async close(): Promise<void | null> {
-    return this.safeAction(() => this.page.close(), 'Page closed', 'Error closing page', {
-      type: 'close',
-    });
+    return this.safeAction(
+      () => this.page.close(),
+      'Page closed',
+      'Error closing page',
+      {
+        type: 'close',
+      },
+      undefined,
+      false,
+    );
   }
 }
