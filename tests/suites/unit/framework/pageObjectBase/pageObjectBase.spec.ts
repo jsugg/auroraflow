@@ -8,6 +8,19 @@ class TestPageObject extends PageObjectBase {
   }
 }
 
+class InitializingPageObject extends PageObjectBase {
+  private readonly initializeFn: () => Promise<void>;
+
+  constructor(page: Page, initializeFn: () => Promise<void>) {
+    super(page, 'InitializingPageObject');
+    this.initializeFn = initializeFn;
+  }
+
+  protected override async initialize(): Promise<void> {
+    await this.initializeFn();
+  }
+}
+
 type PageMock = {
   click: ReturnType<typeof vi.fn>;
   close: ReturnType<typeof vi.fn>;
@@ -19,6 +32,20 @@ type PageMock = {
   waitForSelector: ReturnType<typeof vi.fn>;
   waitForTimeout: ReturnType<typeof vi.fn>;
 };
+
+function createDeferred<TValue>(): {
+  promise: Promise<TValue>;
+  resolve: (value: TValue) => void;
+  reject: (error: unknown) => void;
+} {
+  let resolve!: (value: TValue) => void;
+  let reject!: (error: unknown) => void;
+  const promise = new Promise<TValue>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, resolve, reject };
+}
 
 function createPageMock(): PageMock {
   return {
@@ -62,5 +89,60 @@ describe('PageObjectBase error propagation', () => {
     await expect(pageObject.close()).rejects.toThrow('Error closing page: close failed');
 
     expect(pageMock.screenshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('waits for initialization completion before executing page actions', async () => {
+    const deferred = createDeferred<void>();
+    const initializeFn = vi.fn(() => deferred.promise);
+    const initializingPageObject = new InitializingPageObject(
+      pageMock as unknown as Page,
+      initializeFn,
+    );
+
+    const typePromise = initializingPageObject.type('#username', 'alice');
+    await Promise.resolve();
+
+    expect(pageMock.fill).not.toHaveBeenCalled();
+    deferred.resolve(undefined);
+
+    await expect(typePromise).resolves.toBeUndefined();
+    expect(initializeFn).toHaveBeenCalledTimes(1);
+    expect(pageMock.fill).toHaveBeenCalledTimes(1);
+  });
+
+  it('surfaces initialization failures and skips action execution', async () => {
+    const initializeFn = vi.fn(async () => {
+      throw new Error('init failed');
+    });
+    const initializingPageObject = new InitializingPageObject(
+      pageMock as unknown as Page,
+      initializeFn,
+    );
+
+    await expect(initializingPageObject.type('#username', 'alice')).rejects.toThrow(
+      'Error typing in selector #username: init failed',
+    );
+
+    expect(initializeFn).toHaveBeenCalledTimes(1);
+    expect(pageMock.fill).not.toHaveBeenCalled();
+  });
+
+  it('runs open() navigation before initialization', async () => {
+    const callOrder: string[] = [];
+    pageMock.goto.mockImplementation(async () => {
+      callOrder.push('goto');
+      return { ok: () => true, status: () => 200 };
+    });
+    const initializeFn = vi.fn(async () => {
+      callOrder.push('initialize');
+    });
+    const initializingPageObject = new InitializingPageObject(
+      pageMock as unknown as Page,
+      initializeFn,
+    );
+
+    await initializingPageObject.open();
+
+    expect(callOrder).toEqual(['goto', 'initialize']);
   });
 });

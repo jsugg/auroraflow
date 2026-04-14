@@ -5,7 +5,7 @@ import { PageObjectBase } from '../pageObjects/pageObjectBase';
 export class PageFactory {
   private page: Page;
   private logger: Logger;
-  private pageInstances = new Map<string, PageObjectBase>();
+  private pageInstances = new Map<new (page: Page) => PageObjectBase, PageObjectBase>();
 
   /**
    * Constructor for the PageFactory class.
@@ -25,11 +25,11 @@ export class PageFactory {
    */
   getPage<T extends PageObjectBase>(pageClass: new (page: Page) => T): T {
     const className = pageClass.name;
-    if (!this.pageInstances.has(className)) {
+    if (!this.pageInstances.has(pageClass)) {
       const pageInstance = new pageClass(this.page);
-      this.pageInstances.set(className, pageInstance);
+      this.pageInstances.set(pageClass, pageInstance);
       this.logger.info(`Created new instance of ${className}`);
     }
-    return this.pageInstances.get(className) as T;
+    return this.pageInstances.get(pageClass) as T;
   }
 }
