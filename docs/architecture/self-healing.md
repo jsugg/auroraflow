@@ -56,6 +56,20 @@ Guarded validation results are stored in `guardedValidation` with per-candidate 
 candidate metadata when available, plus policy decision details (`actionAllowed`, `domainAllowed`,
 `blockedReason`, `evaluatedDomain`).
 
+### Guarded Auto-Apply (Single Retry)
+
+When guarded validation produces an accepted candidate and the action is supported, AuroraFlow attempts
+one auto-apply retry before surfacing the original failure:
+
+- Supported action retries: `click`, `type`, `read`, and `wait`.
+- Auto-apply is attempted only for confidence-eligible, policy-allowed candidates.
+- Auto-apply never suppresses a failed retry; the original action failure still propagates.
+- Auto-apply outcomes are captured under `guardedAutoHeal`:
+  - `attempted`, `succeeded`
+  - `locator` (accepted locator expression)
+  - `skippedReason` when no attempt is made
+  - `errorMessage` when retry fails
+
 ## CI Governance and Triage
 
 AuroraFlow includes a governance pass for self-healing artifacts in CI:

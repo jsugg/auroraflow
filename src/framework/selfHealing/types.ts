@@ -71,6 +71,19 @@ export type GuardedValidationPolicyBlockReason =
   | 'domain_not_allowed'
   | 'missing_or_invalid_url';
 
+export type GuardedAutoHealSkipReason =
+  | 'no_accepted_locator'
+  | 'unsupported_action'
+  | 'unsupported_locator_expression';
+
+export interface GuardedAutoHealSummary {
+  attempted: boolean;
+  succeeded: boolean;
+  locator?: string;
+  skippedReason?: GuardedAutoHealSkipReason;
+  errorMessage?: string;
+}
+
 export interface GuardedValidationPolicyDecision {
   actionAllowed: boolean;
   domainAllowed: boolean;
@@ -115,4 +128,5 @@ export interface CapturedFailureEvent {
   error: CapturedFailureError;
   suggestions: SelfHealingSuggestion[];
   guardedValidation?: GuardedValidationSummary;
+  guardedAutoHeal?: GuardedAutoHealSummary;
 }
