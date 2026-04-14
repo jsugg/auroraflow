@@ -32,6 +32,7 @@ When mode is `suggest` or `guarded`, failed actions emit structured JSON artifac
 Each artifact includes:
 
 - `eventId`, `timestamp`, and schema version.
+- correlation metadata: `runId`, optional `testId`, `component`, and `errorCode`.
 - mode and confidence threshold used at runtime.
 - safety policy used at runtime (`allowedActions`, `allowedDomains`).
 - page object context and current URL (when available).
@@ -79,6 +80,11 @@ AuroraFlow includes a governance pass for self-healing artifacts in CI:
 - Governance outputs:
   - JSON summary: `test-results/self-healing-governance-summary.json`
   - Markdown summary: `test-results/self-healing-governance-summary.md`
+- Governance telemetry aggregates:
+  - event counts by mode.
+  - event counts by action type.
+  - event counts by error code.
+  - guarded auto-heal attempted/succeeded/failed/skipped counters.
 
 ### Acknowledgement Gate
 

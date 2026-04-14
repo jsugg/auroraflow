@@ -10,6 +10,17 @@ type SelfHealingArtifactAnalysis = {
   parsedArtifacts: number;
   malformedArtifacts: Array<{ fileName: string; error: string }>;
   guardedArtifacts: number;
+  telemetry: {
+    modes: Record<string, number>;
+    actions: Record<string, number>;
+    errorCodes: Record<string, number>;
+    guardedAutoHeal: {
+      attempted: number;
+      succeeded: number;
+      failed: number;
+      skipped: number;
+    };
+  };
   guardedAccepted: Array<{
     eventId: string;
     pageObjectName: string;
@@ -101,6 +112,14 @@ describe('self-healing governance script', () => {
       eventId: 'evt-001',
       mode: 'guarded',
       pageObjectName: 'ExamplePage',
+      action: {
+        type: 'click',
+      },
+      errorCode: 'page_action_click_failed',
+      guardedAutoHeal: {
+        attempted: true,
+        succeeded: true,
+      },
       currentUrl: 'https://example.test/page',
       guardedValidation: {
         acceptedLocator: "page.getByRole('button', { name: /submit/i })",
@@ -118,8 +137,28 @@ describe('self-healing governance script', () => {
 
     expect(exitCode).toBe(1);
 
-    const summary = JSON.parse(await readFile(summaryJsonPath, 'utf8')) as { status: string };
+    const summary = JSON.parse(await readFile(summaryJsonPath, 'utf8')) as {
+      status: string;
+      telemetry: {
+        actions: Record<string, number>;
+        errorCodes: Record<string, number>;
+        guardedAutoHeal: {
+          attempted: number;
+          succeeded: number;
+          failed: number;
+          skipped: number;
+        };
+      };
+    };
     expect(summary.status).toBe('blocked_acknowledgement_required');
+    expect(summary.telemetry.actions.click).toBe(1);
+    expect(summary.telemetry.errorCodes.page_action_click_failed).toBe(1);
+    expect(summary.telemetry.guardedAutoHeal).toEqual({
+      attempted: 1,
+      succeeded: 1,
+      failed: 0,
+      skipped: 0,
+    });
   });
 
   it('passes when guarded accepted candidates are explicitly acknowledged', async () => {
@@ -197,6 +236,17 @@ describe('self-healing governance script', () => {
       parsedArtifacts: 1,
       malformedArtifacts: [],
       guardedArtifacts: 1,
+      telemetry: {
+        modes: { guarded: 1 },
+        actions: { click: 1 },
+        errorCodes: { page_action_click_failed: 1 },
+        guardedAutoHeal: {
+          attempted: 1,
+          succeeded: 0,
+          failed: 1,
+          skipped: 0,
+        },
+      },
       guardedAccepted: [],
     };
 
@@ -210,5 +260,12 @@ describe('self-healing governance script', () => {
     expect(summary.status).toBe('pass');
     expect(summary.triageRequired).toBe(false);
     expect(summary.generatedAt).toBe('2026-04-14T00:00:00.000Z');
+    expect(summary).toMatchObject({
+      telemetry: {
+        modes: { guarded: 1 },
+        actions: { click: 1 },
+        errorCodes: { page_action_click_failed: 1 },
+      },
+    });
   });
 });

@@ -21,6 +21,13 @@ function parseBooleanFlag(rawValue, defaultValue) {
   return defaultValue;
 }
 
+function incrementCounter(counter, key) {
+  if (!key || typeof key !== 'string') {
+    return;
+  }
+  counter[key] = (counter[key] ?? 0) + 1;
+}
+
 function normalizeEventRecord(rawEvent, fileName) {
   if (typeof rawEvent !== 'object' || rawEvent === null) {
     throw new Error('Artifact root must be an object.');
@@ -40,6 +47,24 @@ function normalizeEventRecord(rawEvent, fileName) {
     guardedValidation && typeof guardedValidation.acceptedScore === 'number'
       ? guardedValidation.acceptedScore
       : undefined;
+  const action =
+    typeof event.action === 'object' && event.action !== null
+      ? /** @type {Record<string, unknown>} */ (event.action)
+      : null;
+  const actionType = action && typeof action.type === 'string' ? action.type : undefined;
+  const errorCode = typeof event.errorCode === 'string' ? event.errorCode : undefined;
+  const guardedAutoHeal =
+    typeof event.guardedAutoHeal === 'object' && event.guardedAutoHeal !== null
+      ? /** @type {Record<string, unknown>} */ (event.guardedAutoHeal)
+      : null;
+  const guardedAutoHealAttempted =
+    guardedAutoHeal && typeof guardedAutoHeal.attempted === 'boolean'
+      ? guardedAutoHeal.attempted
+      : undefined;
+  const guardedAutoHealSucceeded =
+    guardedAutoHeal && typeof guardedAutoHeal.succeeded === 'boolean'
+      ? guardedAutoHeal.succeeded
+      : undefined;
 
   return {
     fileName,
@@ -48,6 +73,10 @@ function normalizeEventRecord(rawEvent, fileName) {
     pageObjectName:
       typeof event.pageObjectName === 'string' ? event.pageObjectName : 'UnknownPageObject',
     currentUrl: typeof event.currentUrl === 'string' ? event.currentUrl : undefined,
+    actionType,
+    errorCode,
+    guardedAutoHealAttempted,
+    guardedAutoHealSucceeded,
     acceptedLocator,
     acceptedScore,
   };
@@ -61,6 +90,17 @@ export async function analyzeSelfHealingArtifacts(artifactsDir = DEFAULT_ARTIFAC
     malformedArtifacts: [],
     guardedArtifacts: 0,
     guardedAccepted: [],
+    telemetry: {
+      modes: {},
+      actions: {},
+      errorCodes: {},
+      guardedAutoHeal: {
+        attempted: 0,
+        succeeded: 0,
+        failed: 0,
+        skipped: 0,
+      },
+    },
   };
 
   try {
@@ -84,6 +124,20 @@ export async function analyzeSelfHealingArtifacts(artifactsDir = DEFAULT_ARTIFAC
       const parsed = JSON.parse(content);
       const normalized = normalizeEventRecord(parsed, fileName);
       analysis.parsedArtifacts += 1;
+      incrementCounter(analysis.telemetry.modes, normalized.mode);
+      incrementCounter(analysis.telemetry.actions, normalized.actionType);
+      incrementCounter(analysis.telemetry.errorCodes, normalized.errorCode);
+
+      if (normalized.guardedAutoHealAttempted === true) {
+        analysis.telemetry.guardedAutoHeal.attempted += 1;
+        if (normalized.guardedAutoHealSucceeded === true) {
+          analysis.telemetry.guardedAutoHeal.succeeded += 1;
+        } else {
+          analysis.telemetry.guardedAutoHeal.failed += 1;
+        }
+      } else if (normalized.guardedAutoHealAttempted === false) {
+        analysis.telemetry.guardedAutoHeal.skipped += 1;
+      }
 
       if (normalized.mode === 'guarded') {
         analysis.guardedArtifacts += 1;
@@ -111,6 +165,15 @@ function toMarkdownTableRows(guardedAccepted) {
         `| ${event.eventId} | ${event.pageObjectName} | ${event.currentUrl ?? 'n/a'} | ${event.acceptedLocator ?? 'n/a'} | ${event.acceptedScore ?? 'n/a'} |`,
     )
     .join('\n');
+}
+
+function toMarkdownCounterRows(counter) {
+  const entries = Object.entries(counter).sort(([left], [right]) => left.localeCompare(right));
+  if (entries.length === 0) {
+    return '| _None_ | 0 |\n';
+  }
+
+  return entries.map(([key, value]) => `| ${key} | ${value} |`).join('\n');
 }
 
 export function buildGovernanceSummary({
@@ -144,6 +207,7 @@ export function buildGovernanceSummary({
     guardedArtifacts: analysis.guardedArtifacts,
     guardedAcceptedCount,
     guardedAccepted: analysis.guardedAccepted,
+    telemetry: analysis.telemetry,
   };
 
   const markdown = [
@@ -159,6 +223,31 @@ export function buildGovernanceSummary({
     `- Malformed Artifacts: ${summary.malformedArtifacts.length}`,
     `- Guarded Artifacts: ${summary.guardedArtifacts}`,
     `- Guarded Accepted Count: ${summary.guardedAcceptedCount}`,
+    '',
+    '## Telemetry Aggregates',
+    '',
+    '### Event Modes',
+    '',
+    '| Mode | Count |',
+    '|---|---|',
+    toMarkdownCounterRows(summary.telemetry.modes),
+    '',
+    '### Action Types',
+    '',
+    '| Action | Count |',
+    '|---|---|',
+    toMarkdownCounterRows(summary.telemetry.actions),
+    '',
+    '### Error Codes',
+    '',
+    '| Error Code | Count |',
+    '|---|---|',
+    toMarkdownCounterRows(summary.telemetry.errorCodes),
+    '',
+    `- Guarded Auto-Heal Attempted: ${summary.telemetry.guardedAutoHeal.attempted}`,
+    `- Guarded Auto-Heal Succeeded: ${summary.telemetry.guardedAutoHeal.succeeded}`,
+    `- Guarded Auto-Heal Failed: ${summary.telemetry.guardedAutoHeal.failed}`,
+    `- Guarded Auto-Heal Skipped: ${summary.telemetry.guardedAutoHeal.skipped}`,
     '',
     '## Guarded Accepted Events',
     '',

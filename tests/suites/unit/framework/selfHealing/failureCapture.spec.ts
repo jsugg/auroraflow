@@ -51,6 +51,7 @@ describe('captureFailureEvent', () => {
       },
       error: new Error('fill failed'),
       writer,
+      env: {},
       now: () => fixedNow,
       randomSuffix: () => 'abc123',
     });
@@ -59,6 +60,9 @@ describe('captureFailureEvent', () => {
     expect(result).toMatchObject({
       mode: 'suggest',
       pageObjectName: 'ExamplePage',
+      component: 'ExamplePage',
+      runId: 'local-run',
+      errorCode: 'page_action_error',
       currentUrl: 'https://example.test',
       safetyPolicy: {
         allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
@@ -84,6 +88,42 @@ describe('captureFailureEvent', () => {
       result?.suggestions[1]?.score ?? 0,
     );
     expect(writer).toHaveBeenCalledTimes(1);
+  });
+
+  it('supports explicit correlation identifiers and error code', async () => {
+    const writer = vi.fn<(_: unknown) => Promise<void>>().mockResolvedValue();
+
+    const result = await captureFailureEvent({
+      config: {
+        mode: 'suggest',
+        minConfidence: 0.92,
+        safetyPolicy: {
+          allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+          allowedDomains: [],
+        },
+      },
+      pageObjectName: 'ExamplePage',
+      action: {
+        type: 'click',
+        target: '#submit',
+        description: 'Error clicking selector #submit',
+      },
+      error: new Error('click failed'),
+      writer,
+      correlation: {
+        runId: 'ci-run-101',
+        testId: 'spec-5',
+        component: 'CheckoutPage',
+        errorCode: 'page_action_click_failed',
+      },
+    });
+
+    expect(result).toMatchObject({
+      runId: 'ci-run-101',
+      testId: 'spec-5',
+      component: 'CheckoutPage',
+      errorCode: 'page_action_click_failed',
+    });
   });
 
   it('applies event decoration before persisting artifacts', async () => {

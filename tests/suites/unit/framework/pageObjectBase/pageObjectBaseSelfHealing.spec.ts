@@ -77,6 +77,7 @@ describe('PageObjectBase self-healing integration', () => {
   const artifactsDir = path.join(process.cwd(), 'test-results', 'self-healing');
 
   beforeEach(async () => {
+    process.env.AURORAFLOW_RUN_ID = 'local-run';
     process.env.SELF_HEAL_MODE = 'suggest';
     process.env.SELF_HEAL_MIN_CONFIDENCE = '0.95';
     delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
@@ -87,6 +88,7 @@ describe('PageObjectBase self-healing integration', () => {
   });
 
   afterEach(async () => {
+    delete process.env.AURORAFLOW_RUN_ID;
     delete process.env.SELF_HEAL_MODE;
     delete process.env.SELF_HEAL_MIN_CONFIDENCE;
     delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
@@ -108,6 +110,9 @@ describe('PageObjectBase self-healing integration', () => {
     const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
       mode: string;
       pageObjectName: string;
+      component: string;
+      runId: string;
+      errorCode: string;
       minConfidence: number;
       safetyPolicy: {
         allowedActions: string[];
@@ -120,6 +125,9 @@ describe('PageObjectBase self-healing integration', () => {
 
     expect(content.mode).toBe('suggest');
     expect(content.pageObjectName).toBe('TestPageObject');
+    expect(content.component).toBe('TestPageObject');
+    expect(content.runId).toBe('local-run');
+    expect(content.errorCode).toBe('page_action_type_failed');
     expect(content.minConfidence).toBe(0.95);
     expect(content.safetyPolicy).toEqual({
       allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],

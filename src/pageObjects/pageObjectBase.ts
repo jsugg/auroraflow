@@ -160,6 +160,10 @@ export abstract class PageObjectBase {
           description: errorMessage,
         },
         error,
+        correlation: {
+          component: this.pageObjectName,
+          errorCode: `page_action_${actionContext.type}_failed`,
+        },
         decorateEvent: async (event) => {
           if (guardedValidation) {
             event.guardedValidation = guardedValidation;
