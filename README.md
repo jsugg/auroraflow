@@ -8,6 +8,24 @@
 
 This document outlines an advanced blueprint for a Test Automation Framework (TAF) that incorporates AI-driven Selector Analysis Tooling (SAT), dynamic test data management, real-time monitoring, and more. It begins with a clean architecture and meticulous, professional software design. With an emphasis on scalability, reliability, adaptability, and observability, the framework leverages Docker, Redis, Prometheus, Grafana, the ELK stack, and machine learning technologies. Its purpose is to automate UI, end-to-end, and accessibility testing and offer self-healing capabilities efficiently across a variety of web applications, with a special focus on developer experience.
 
+## Current Repository Status (April 2026)
+
+AuroraFlow currently provides a hardened foundation and examples-first blueprint. The full platform vision in this README remains the target architecture and is not fully implemented yet.
+
+Implemented now:
+
+- Playwright + TypeScript framework core with Page Object + Page Factory patterns.
+- Quality/security CI workflows (`quality.yml`, `security.yml`, `examples.yml`, full matrix in `ci.yml`).
+- Guarded self-healing foundation with artifact capture, candidate ranking, dry-run validation, and guarded auto-apply retry controls.
+- Redis data-layer primitives (`RedisClient`, selector registry repository) and Testcontainers integration tests.
+- Runnable examples for quickstart, reliability, data-provider abstractions, observability patterns, and CI templates.
+
+Planned/roadmap (not fully implemented yet):
+
+- SAT ML pipeline and autonomous selector optimization lifecycle.
+- Full production observability stack (Prometheus/Grafana/ELK/Jaeger) and trend dashboards.
+- Extended platform governance automation and release/signing workflows.
+
 ## Architectural Overview
 
 ```mermaid
