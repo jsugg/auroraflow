@@ -2,8 +2,12 @@ import { ElementHandle, Page, Response } from 'playwright';
 import { Logger, createChildLogger } from '../utils/logger';
 import { resolveSelfHealingConfig } from '../framework/selfHealing/config';
 import { captureFailureEvent } from '../framework/selfHealing/failureCapture';
-import { evaluateGuardedSuggestionsDryRun } from '../framework/selfHealing/guardedValidation';
-import { SelfHealingActionType } from '../framework/selfHealing/types';
+import { generateRankedLocatorSuggestions } from '../framework/selfHealing/suggestionEngine';
+import {
+  evaluateGuardedSuggestionsDryRun,
+  resolveLocatorExpression,
+} from '../framework/selfHealing/guardedValidation';
+import { GuardedAutoHealSummary, SelfHealingActionType } from '../framework/selfHealing/types';
 
 interface NavigationOptions {
   waitUntil?: 'load' | 'domcontentloaded' | 'networkidle';
@@ -18,6 +22,8 @@ interface ActionContext {
   type: SelfHealingActionType;
   target?: string;
 }
+
+type GuardedAutoHealAction<T> = (acceptedLocator: string) => Promise<T>;
 
 // Custom Error for Page Actions
 class PageActionError extends Error {
@@ -56,6 +62,7 @@ export abstract class PageObjectBase {
     successMessage: string,
     errorMessage: string,
     actionContext: ActionContext = { type: 'unknown' },
+    guardedAutoHealAction?: GuardedAutoHealAction<T>,
   ): Promise<T> {
     try {
       const result = await action();
@@ -76,6 +83,67 @@ export abstract class PageObjectBase {
         );
 
       const selfHealingConfig = resolveSelfHealingConfig(process.env);
+      const rankedSuggestions = generateRankedLocatorSuggestions({
+        actionType: actionContext.type,
+        failedTarget: actionContext.target,
+      });
+      let guardedValidation:
+        | Awaited<ReturnType<typeof evaluateGuardedSuggestionsDryRun>>
+        | undefined;
+      let guardedAutoHeal: GuardedAutoHealSummary | undefined;
+      let guardedAutoHealResult: T | undefined;
+
+      if (selfHealingConfig.mode === 'guarded') {
+        guardedValidation = await evaluateGuardedSuggestionsDryRun({
+          page: this.page,
+          actionType: actionContext.type,
+          minConfidence: selfHealingConfig.minConfidence,
+          suggestions: rankedSuggestions,
+          currentUrl,
+          safetyPolicy: selfHealingConfig.safetyPolicy,
+        });
+
+        if (guardedValidation.acceptedLocator && guardedAutoHealAction) {
+          guardedAutoHeal = {
+            attempted: true,
+            succeeded: false,
+            locator: guardedValidation.acceptedLocator,
+          };
+
+          try {
+            guardedAutoHealResult = await guardedAutoHealAction(guardedValidation.acceptedLocator);
+            guardedAutoHeal.succeeded = true;
+            this.logger.warn('Guarded auto-heal apply succeeded.', {
+              actionType: actionContext.type,
+              acceptedLocator: guardedValidation.acceptedLocator,
+            });
+          } catch (guardedAutoHealError: unknown) {
+            guardedAutoHeal.errorMessage =
+              guardedAutoHealError instanceof Error
+                ? guardedAutoHealError.message
+                : 'Unknown guarded auto-heal apply error.';
+            this.logger.error('Guarded auto-heal apply failed.', {
+              guardedAutoHealError,
+              actionType: actionContext.type,
+              acceptedLocator: guardedValidation.acceptedLocator,
+            });
+          }
+        } else if (guardedValidation.acceptedLocator) {
+          guardedAutoHeal = {
+            attempted: false,
+            succeeded: false,
+            locator: guardedValidation.acceptedLocator,
+            skippedReason: 'unsupported_action',
+          };
+        } else if (guardedAutoHealAction) {
+          guardedAutoHeal = {
+            attempted: false,
+            succeeded: false,
+            skippedReason: 'no_accepted_locator',
+          };
+        }
+      }
+
       await captureFailureEvent({
         config: selfHealingConfig,
         pageObjectName: this.pageObjectName,
@@ -88,21 +156,20 @@ export abstract class PageObjectBase {
         },
         error,
         decorateEvent: async (event) => {
-          if (selfHealingConfig.mode !== 'guarded') {
-            return;
+          if (guardedValidation) {
+            event.guardedValidation = guardedValidation;
           }
-          event.guardedValidation = await evaluateGuardedSuggestionsDryRun({
-            page: this.page,
-            actionType: actionContext.type,
-            minConfidence: selfHealingConfig.minConfidence,
-            suggestions: event.suggestions,
-            currentUrl,
-            safetyPolicy: selfHealingConfig.safetyPolicy,
-          });
+          if (guardedAutoHeal) {
+            event.guardedAutoHeal = guardedAutoHeal;
+          }
         },
       }).catch((captureError) =>
         this.logger.error('Failed to capture self-healing failure artifact.', { captureError }),
       );
+
+      if (guardedAutoHeal?.attempted && guardedAutoHeal.succeeded) {
+        return guardedAutoHealResult as T;
+      }
 
       throw new PageActionError(
         `${errorMessage}: ${error instanceof Error ? error.message : 'Unknown Error'}`,
@@ -123,6 +190,14 @@ export abstract class PageObjectBase {
     } catch {
       return undefined;
     }
+  }
+
+  private resolveGuardedLocator(locatorExpression: string) {
+    const locator = resolveLocatorExpression(this.page, locatorExpression);
+    if (!locator) {
+      throw new Error(`Unsupported guarded locator expression: ${locatorExpression}`);
+    }
+    return locator;
   }
 
   // Navigation method utilizing safeAction for error handling
@@ -158,6 +233,11 @@ export abstract class PageObjectBase {
       `Clicked on selector: ${selector}`,
       `Error clicking on selector ${selector}`,
       { type: 'click', target: selector },
+      async (acceptedLocator) => {
+        const locator = this.resolveGuardedLocator(acceptedLocator);
+        await locator.first().click(options);
+        return null;
+      },
     );
   }
 
@@ -177,6 +257,11 @@ export abstract class PageObjectBase {
       `Typed text in selector: ${selector}`,
       `Error typing in selector ${selector}`,
       { type: 'type', target: selector },
+      async (acceptedLocator) => {
+        const locator = this.resolveGuardedLocator(acceptedLocator);
+        await locator.first().fill(text, options);
+        return null;
+      },
     );
   }
 
@@ -186,6 +271,10 @@ export abstract class PageObjectBase {
       `Retrieved text from selector: ${selector}`,
       `Error retrieving text from selector ${selector}`,
       { type: 'read', target: selector },
+      async (acceptedLocator) => {
+        const locator = this.resolveGuardedLocator(acceptedLocator);
+        return locator.first().textContent(options);
+      },
     );
   }
 
@@ -198,6 +287,11 @@ export abstract class PageObjectBase {
       `Waited for selector: ${selector}`,
       `Error waiting for selector ${selector}`,
       { type: 'wait', target: selector },
+      async (acceptedLocator) => {
+        const locator = this.resolveGuardedLocator(acceptedLocator).first();
+        await locator.waitFor({ state: 'attached', timeout: options.timeout });
+        return locator.elementHandle();
+      },
     );
   }
 

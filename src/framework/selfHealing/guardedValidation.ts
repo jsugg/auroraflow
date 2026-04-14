@@ -38,7 +38,7 @@ function resolveNameOption(rawValue: string): string | RegExp {
   return rawValue.replace(/^['"`]|['"`]$/g, '');
 }
 
-function resolveLocatorFromExpression(page: Page, expression: string): Locator | null {
+export function resolveLocatorExpression(page: Page, expression: string): Locator | null {
   const trimmedExpression = expression.trim();
 
   const testIdMatch = trimmedExpression.match(/^page\.getByTestId\((['"`])([^'"`]+)\1\)$/);
@@ -200,7 +200,7 @@ export async function evaluateGuardedSuggestionsDryRun({
       continue;
     }
 
-    const locator = resolveLocatorFromExpression(page, suggestion.locator);
+    const locator = resolveLocatorExpression(page, suggestion.locator);
     if (!locator) {
       candidates.push({
         locator: suggestion.locator,

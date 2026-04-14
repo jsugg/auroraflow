@@ -120,6 +120,12 @@ describe('captureFailureEvent', () => {
           acceptedScore: 0.93,
           candidates: [],
         };
+        event.guardedAutoHeal = {
+          attempted: true,
+          succeeded: false,
+          locator: "page.getByRole('button', { name: /submit/i })",
+          errorMessage: 'guarded apply failed',
+        };
       },
     });
 
@@ -128,11 +134,20 @@ describe('captureFailureEvent', () => {
       actionType: 'click',
       acceptedScore: 0.93,
     });
+    expect(result?.guardedAutoHeal).toMatchObject({
+      attempted: true,
+      succeeded: false,
+      errorMessage: 'guarded apply failed',
+    });
     expect(writer).toHaveBeenCalledWith(
       expect.objectContaining({
         guardedValidation: expect.objectContaining({
           mode: 'dry-run',
           actionType: 'click',
+        }),
+        guardedAutoHeal: expect.objectContaining({
+          attempted: true,
+          succeeded: false,
         }),
       }),
     );

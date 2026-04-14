@@ -27,14 +27,28 @@ type PageMock = {
   url: ReturnType<typeof vi.fn>;
   waitForSelector: ReturnType<typeof vi.fn>;
   waitForTimeout: ReturnType<typeof vi.fn>;
+  locatorFirst: {
+    click: ReturnType<typeof vi.fn>;
+    fill: ReturnType<typeof vi.fn>;
+    textContent: ReturnType<typeof vi.fn>;
+    waitFor: ReturnType<typeof vi.fn>;
+    elementHandle: ReturnType<typeof vi.fn>;
+    isVisible: ReturnType<typeof vi.fn>;
+  };
 };
 
 function createPageMock(): PageMock {
+  const locatorFirst = {
+    click: vi.fn().mockResolvedValue(undefined),
+    fill: vi.fn().mockResolvedValue(undefined),
+    textContent: vi.fn().mockResolvedValue('healed text'),
+    waitFor: vi.fn().mockResolvedValue(undefined),
+    elementHandle: vi.fn().mockResolvedValue(null),
+    isVisible: vi.fn().mockResolvedValue(true),
+  };
   const locatorMock = {
     count: vi.fn().mockResolvedValue(1),
-    first: vi.fn().mockReturnValue({
-      isVisible: vi.fn().mockResolvedValue(true),
-    }),
+    first: vi.fn().mockReturnValue(locatorFirst),
   };
 
   return {
@@ -53,6 +67,7 @@ function createPageMock(): PageMock {
     url: vi.fn().mockReturnValue('https://example.test/page'),
     waitForSelector: vi.fn().mockResolvedValue(null),
     waitForTimeout: vi.fn().mockResolvedValue(undefined),
+    locatorFirst,
   };
 }
 
@@ -125,9 +140,7 @@ describe('PageObjectBase self-healing integration', () => {
     process.env.SELF_HEAL_ALLOWED_DOMAINS = 'example.test';
     pageMock.fill.mockRejectedValueOnce(new Error('fill failed'));
 
-    await expect(pageObject.type('#username', 'alice')).rejects.toThrow(
-      'Error typing in selector #username: fill failed',
-    );
+    await expect(pageObject.type('#username', 'alice')).resolves.toBeNull();
 
     const artifacts = await readdir(artifactsDir);
     expect(artifacts).toHaveLength(1);
@@ -152,6 +165,11 @@ describe('PageObjectBase self-healing integration', () => {
           status: string;
         }>;
       };
+      guardedAutoHeal?: {
+        attempted: boolean;
+        succeeded: boolean;
+        locator?: string;
+      };
     };
 
     expect(content.mode).toBe('guarded');
@@ -170,5 +188,101 @@ describe('PageObjectBase self-healing integration', () => {
     expect(
       content.guardedValidation?.candidates.some((candidate) => candidate.status === 'accepted'),
     ).toBe(true);
+    expect(content.guardedAutoHeal).toMatchObject({
+      attempted: true,
+      succeeded: true,
+    });
+  });
+
+  it('auto-applies accepted guarded click candidates and records success in artifact', async () => {
+    process.env.SELF_HEAL_MODE = 'guarded';
+    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
+    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
+    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'example.test';
+    pageMock.click.mockRejectedValueOnce(new Error('click failed'));
+
+    await expect(pageObject.click('#submit')).resolves.toBeNull();
+    expect(pageMock.locatorFirst.click).toHaveBeenCalledTimes(1);
+
+    const artifacts = await readdir(artifactsDir);
+    const artifactPath = path.join(artifactsDir, artifacts[0]);
+    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+      guardedAutoHeal?: {
+        attempted: boolean;
+        succeeded: boolean;
+        locator?: string;
+      };
+    };
+
+    expect(content.guardedAutoHeal).toMatchObject({
+      attempted: true,
+      succeeded: true,
+    });
+    expect(content.guardedAutoHeal?.locator).toBeTruthy();
+  });
+
+  it('records guarded auto-heal apply failures without swallowing the original action error', async () => {
+    process.env.SELF_HEAL_MODE = 'guarded';
+    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
+    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
+    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'example.test';
+    pageMock.click.mockRejectedValueOnce(new Error('click failed'));
+    pageMock.locatorFirst.click.mockRejectedValueOnce(new Error('healed click failed'));
+
+    await expect(pageObject.click('#submit')).rejects.toThrow(
+      'Error clicking on selector #submit: click failed',
+    );
+
+    const artifacts = await readdir(artifactsDir);
+    const artifactPath = path.join(artifactsDir, artifacts[0]);
+    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+      guardedAutoHeal?: {
+        attempted: boolean;
+        succeeded: boolean;
+        errorMessage?: string;
+      };
+    };
+
+    expect(content.guardedAutoHeal).toMatchObject({
+      attempted: true,
+      succeeded: false,
+    });
+    expect(content.guardedAutoHeal?.errorMessage).toContain('healed click failed');
+  });
+
+  it('skips guarded auto-heal application when policy blocks candidate validation', async () => {
+    process.env.SELF_HEAL_MODE = 'guarded';
+    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
+    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
+    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'allowed.test';
+    pageMock.click.mockRejectedValueOnce(new Error('click failed'));
+
+    await expect(pageObject.click('#submit')).rejects.toThrow(
+      'Error clicking on selector #submit: click failed',
+    );
+
+    expect(pageMock.locatorFirst.click).not.toHaveBeenCalled();
+
+    const artifacts = await readdir(artifactsDir);
+    const artifactPath = path.join(artifactsDir, artifacts[0]);
+    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+      guardedValidation?: {
+        policy: {
+          blockedReason?: string;
+        };
+      };
+      guardedAutoHeal?: {
+        attempted: boolean;
+        succeeded: boolean;
+        skippedReason?: string;
+      };
+    };
+
+    expect(content.guardedValidation?.policy.blockedReason).toBe('domain_not_allowed');
+    expect(content.guardedAutoHeal).toMatchObject({
+      attempted: false,
+      succeeded: false,
+      skippedReason: 'no_accepted_locator',
+    });
   });
 });
