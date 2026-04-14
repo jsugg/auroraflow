@@ -61,5 +61,8 @@
     "*.sh": [
       "shellcheck"
     ]
+  },
+  "dependencies": {
+    "redis": "^5.11.0"
   }
 }
