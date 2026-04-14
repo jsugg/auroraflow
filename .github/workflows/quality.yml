@@ -74,6 +74,16 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install --yes shellcheck
 
+      - name: Install actionlint
+        run: |
+          ACTIONLINT_VERSION='1.7.11'
+          curl --fail --location --silent --show-error \
+            --output /tmp/actionlint.tgz \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          tar -xzf /tmp/actionlint.tgz -C /tmp actionlint
+          sudo install -m 0755 /tmp/actionlint /usr/local/bin/actionlint
+          actionlint -version
+
       - name: Run quality gates
         run: npm run verify
 
@@ -82,8 +92,14 @@ jobs:
     runs-on: ubuntu-latest
     needs: [preflight, verify]
     timeout-minutes: 8
+    outputs:
+      self_heal_triage_required: ${{ steps.self-heal-governance.outputs.triage_required }}
+      self_heal_acknowledged: ${{ steps.self-heal-governance.outputs.acknowledged }}
+      self_heal_guarded_accepted_count: ${{ steps.self-heal-governance.outputs.guarded_accepted_count }}
+      self_heal_summary_markdown_path: ${{ steps.self-heal-governance.outputs.summary_markdown_path }}
     permissions:
       contents: read
+      issues: write
     env:
       SHOULD_RUN_SMOKE: ${{ github.ref == 'refs/heads/main' || needs.preflight.outputs.run_smoke == 'true' }}
     steps:
@@ -117,6 +133,42 @@ jobs:
       - name: Run smoke test
         if: env.SHOULD_RUN_SMOKE == 'true'
         run: npm run test:smoke
+
+      - name: Evaluate self-healing governance
+        id: self-heal-governance
+        if: env.SHOULD_RUN_SMOKE == 'true' && always()
+        env:
+          SELF_HEAL_ARTIFACTS_DIR: test-results/self-healing
+          SELF_HEAL_REQUIRE_ACK_FOR_ACCEPTED: 'true'
+          SELF_HEAL_ACKNOWLEDGED: ${{ vars.SELF_HEAL_ACKNOWLEDGED }}
+          SELF_HEAL_GOVERNANCE_SUMMARY_JSON: test-results/self-healing-governance-summary.json
+          SELF_HEAL_GOVERNANCE_SUMMARY_MD: test-results/self-healing-governance-summary.md
+        run: npm run self-heal:governance
+
+      - name: Auto-open self-healing triage issue
+        if: env.SHOULD_RUN_SMOKE == 'true' && always() && github.ref == 'refs/heads/main' && vars.SELF_HEAL_AUTO_OPEN_TRIAGE_ISSUE == 'true' && steps.self-heal-governance.outputs.triage_required == 'true' && steps.self-heal-governance.outputs.acknowledged != 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          SUMMARY_MARKDOWN_PATH: ${{ steps.self-heal-governance.outputs.summary_markdown_path }}
+        run: |
+          if [ ! -f "${SUMMARY_MARKDOWN_PATH}" ]; then
+            echo "Self-healing governance summary not found at ${SUMMARY_MARKDOWN_PATH}"
+            exit 1
+          fi
+
+          {
+            echo ""
+            echo "## CI Context"
+            echo "- Workflow Run: ${RUN_URL}"
+            echo "- Commit: ${GITHUB_SHA}"
+          } >> "${SUMMARY_MARKDOWN_PATH}"
+
+          gh issue create \
+            --repo "${REPO}" \
+            --title "Self-healing guarded acceptance review (${GITHUB_SHA::7})" \
+            --body-file "${SUMMARY_MARKDOWN_PATH}"
 
       - name: Upload smoke artifacts
         if: env.SHOULD_RUN_SMOKE == 'true' && always()
