@@ -74,6 +74,16 @@ jobs:
       - name: Install shellcheck
         run: sudo apt-get update && sudo apt-get install --yes shellcheck
 
+      - name: Install actionlint
+        run: |
+          ACTIONLINT_VERSION='1.7.11'
+          curl --fail --location --silent --show-error \
+            --output /tmp/actionlint.tgz \
+            "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          tar -xzf /tmp/actionlint.tgz -C /tmp actionlint
+          sudo install -m 0755 /tmp/actionlint /usr/local/bin/actionlint
+          actionlint -version
+
       - name: Run quality gates
         run: npm run verify
 
