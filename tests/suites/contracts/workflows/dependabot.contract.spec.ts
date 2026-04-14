@@ -18,4 +18,15 @@ describe('dependabot configuration contract', () => {
     expect(config).toMatch(/directory:\s*['"]\/['"]/);
     expect(config).toMatch(/schedule:\s*\n\s*interval:\s*['"]weekly['"]/);
   });
+
+  it('ignores semver-major eslint lane updates that are incompatible with the current toolchain', () => {
+    const config = readFileSync(DEPENDABOT_PATH, 'utf8');
+
+    expect(config).toMatch(
+      /dependency-name:\s*['"]eslint['"]\s*\n\s*update-types:\s*\n\s*-\s*['"]version-update:semver-major['"]/,
+    );
+    expect(config).toMatch(
+      /dependency-name:\s*['"]@eslint\/js['"]\s*\n\s*update-types:\s*\n\s*-\s*['"]version-update:semver-major['"]/,
+    );
+  });
 });

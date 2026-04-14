@@ -69,5 +69,10 @@
   },
   "dependencies": {
     "redis": "^5.11.0"
+  },
+  "overrides": {
+    "archiver-utils": {
+      "glob": "^13.0.6"
+    }
   }
 }

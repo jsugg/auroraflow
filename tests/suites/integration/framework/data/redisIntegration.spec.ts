@@ -17,6 +17,8 @@ const runtime: IntegrationRuntime = {
   client: null,
   skipReason: null,
 };
+const CONTAINER_STARTUP_TIMEOUT_MS = 45_000;
+const INTEGRATION_SETUP_TIMEOUT_MS = 60_000;
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -44,7 +46,7 @@ beforeAll(async () => {
     runtime.container = await new GenericContainer('redis:7.2-alpine')
       .withExposedPorts(6379)
       .withWaitStrategy(Wait.forLogMessage('Ready to accept connections'))
-      .withStartupTimeout(120_000)
+      .withStartupTimeout(CONTAINER_STARTUP_TIMEOUT_MS)
       .start();
 
     runtime.client = new RedisClient({
@@ -72,7 +74,7 @@ beforeAll(async () => {
       runtime.container = null;
     }
   }
-});
+}, INTEGRATION_SETUP_TIMEOUT_MS);
 
 afterAll(async () => {
   if (runtime.client !== null) {

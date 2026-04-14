@@ -8,6 +8,13 @@ updates:
       time: '04:00'
       timezone: 'UTC'
     open-pull-requests-limit: 10
+    ignore:
+      - dependency-name: 'eslint'
+        update-types:
+          - 'version-update:semver-major'
+      - dependency-name: '@eslint/js'
+        update-types:
+          - 'version-update:semver-major'
     groups:
       npm-production:
         dependency-type: 'production'
