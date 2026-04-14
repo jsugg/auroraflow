@@ -78,3 +78,30 @@ Behavior notes:
 
 - When Docker is available, tests validate real Redis connectivity, namespaced key behavior, TTL handling, and selector registry versioning.
 - When Docker/Testcontainers is unavailable, tests skip with an explicit reason rather than hanging.
+
+## Local Redis Orchestration (Docker Compose)
+
+When you want a persistent local Redis instance for manual debugging or iterative integration runs:
+
+```bash
+npm run infra:redis:up
+npm run test:integration
+```
+
+Or use the convenience wrapper:
+
+```bash
+npm run test:integration:local
+```
+
+Inspect Redis service logs:
+
+```bash
+npm run infra:redis:logs
+```
+
+Cleanup local runtime side effects:
+
+```bash
+npm run infra:redis:down
+```
