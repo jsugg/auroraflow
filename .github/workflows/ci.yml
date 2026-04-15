@@ -37,16 +37,22 @@ jobs:
         include:
           - project: Google Chrome
             install_args: chrome
+            project_slug: google-chrome
           - project: Firefox
             install_args: firefox
+            project_slug: firefox
           - project: Safari
             install_args: webkit
+            project_slug: safari
           - project: Microsoft Edge
             install_args: msedge
+            project_slug: microsoft-edge
           - project: Mobile Chrome
             install_args: chromium
+            project_slug: mobile-chrome
           - project: Mobile Safari
             install_args: webkit
+            project_slug: mobile-safari
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
@@ -73,6 +79,8 @@ jobs:
         run: npx playwright install --with-deps ${{ matrix.install_args }}
 
       - name: Run full E2E suite
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/playwright-results-${{ matrix.project_slug }}-shard-${{ matrix.shard }}.json
         run: npx playwright test --config=configs/playwright.config.ts --project="${{ matrix.project }}" --shard=${{ matrix.shard }}/2
 
       - name: Upload E2E artifacts
@@ -84,3 +92,46 @@ jobs:
           path: |
             test-results/
             test-reports/
+
+  flakiness-report:
+    name: Flakiness Report
+    runs-on: ubuntu-latest
+    if: always()
+    needs: e2e
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download E2E matrix artifacts
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          pattern: e2e-matrix-artifacts-*
+          path: aggregated-e2e-artifacts
+          merge-multiple: true
+
+      - name: Generate flakiness summary
+        run: npm run flakiness:report -- --input-dir aggregated-e2e-artifacts/test-results --output-json aggregated-e2e-artifacts/flakiness-summary.json --output-md aggregated-e2e-artifacts/flakiness-summary.md
+
+      - name: Upload flakiness report artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: flakiness-report
+          retention-days: 14
+          path: |
+            aggregated-e2e-artifacts/flakiness-summary.json
+            aggregated-e2e-artifacts/flakiness-summary.md

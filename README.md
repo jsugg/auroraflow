@@ -16,6 +16,7 @@ Implemented now:
 
 - Playwright + TypeScript framework core with Page Object + Page Factory patterns.
 - Quality/security CI workflows (`quality.yml`, `security.yml`, `examples.yml`, full matrix in `ci.yml`).
+- E2E matrix flakiness analytics artifacts (`flakiness-summary.json` and `flakiness-summary.md`).
 - Guarded self-healing foundation with artifact capture, candidate ranking, dry-run validation, and guarded auto-apply retry controls.
 - Redis data-layer primitives (`RedisClient`, selector registry repository) and Testcontainers integration tests.
 - Runnable examples for quickstart, reliability, data-provider abstractions, observability patterns, and CI templates.

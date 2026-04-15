@@ -22,6 +22,7 @@
     "test:integration:local": "npm run infra:redis:up && npm run test:integration",
     "test-report": "npx playwright show-report test-reports",
     "self-heal:governance": "node scripts/self-healing-governance.mjs",
+    "flakiness:report": "node -r ts-node/register scripts/flakiness-report.ts",
     "workflows:lint": "node scripts/workflows-lint.mjs",
     "workflows:security": "pipx run zizmor .github/workflows",
     "shellcheck": "shellcheck scripts/*.sh",
