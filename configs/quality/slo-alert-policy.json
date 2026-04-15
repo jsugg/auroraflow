@@ -1,0 +1,50 @@
+{
+  "version": "1.0.0",
+  "alerts": [
+    {
+      "id": "pass-rate-slo-breach",
+      "metric": "passRate",
+      "operator": "lt",
+      "threshold": 0.98,
+      "severity": "warning",
+      "description": "Pass rate dropped below 98% SLO.",
+      "blockOnBreach": false
+    },
+    {
+      "id": "failure-rate-slo-breach",
+      "metric": "failureRate",
+      "operator": "gt",
+      "threshold": 0.02,
+      "severity": "critical",
+      "description": "Failure rate exceeded 2% SLO.",
+      "blockOnBreach": false
+    },
+    {
+      "id": "flake-rate-slo-breach",
+      "metric": "flakeRate",
+      "operator": "gt",
+      "threshold": 0.02,
+      "severity": "critical",
+      "description": "Flake rate exceeded 2% SLO.",
+      "blockOnBreach": false
+    },
+    {
+      "id": "retry-pressure-slo-breach",
+      "metric": "retryFailureRate",
+      "operator": "gt",
+      "threshold": 0.1,
+      "severity": "warning",
+      "description": "Failed-attempt pressure exceeded 10% of total attempts.",
+      "blockOnBreach": false
+    },
+    {
+      "id": "guarded-auto-heal-failure-slo-breach",
+      "metric": "guardedAutoHealFailureRate",
+      "operator": "gt",
+      "threshold": 0.05,
+      "severity": "warning",
+      "description": "Guarded auto-heal failure rate exceeded 5% threshold.",
+      "blockOnBreach": false
+    }
+  ]
+}

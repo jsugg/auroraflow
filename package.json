@@ -23,6 +23,8 @@
     "test-report": "npx playwright show-report test-reports",
     "self-heal:governance": "node scripts/self-healing-governance.mjs",
     "flakiness:report": "node -r ts-node/register scripts/flakiness-report.ts",
+    "slo:dashboard": "node -r ts-node/register scripts/slo-dashboard.ts",
+    "slo:alerts": "node -r ts-node/register scripts/slo-alerts.ts",
     "workflows:lint": "node scripts/workflows-lint.mjs",
     "workflows:security": "pipx run zizmor .github/workflows",
     "shellcheck": "shellcheck scripts/*.sh",

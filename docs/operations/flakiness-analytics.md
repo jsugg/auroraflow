@@ -37,3 +37,12 @@ Use this artifact to identify:
 - flaky cases (`failed attempt(s)` followed by `passed` final status),
 - hard failures,
 - retry pressure by project and test.
+
+## Downstream SLO and Alerting
+
+The flakiness summary is also the upstream data source for:
+
+- `npm run slo:dashboard` (SLO KPI dashboard),
+- `npm run slo:alerts` (threshold-based alert policy evaluation).
+
+See `docs/operations/slo-dashboard-alerting.md` for command and CI wiring details.
