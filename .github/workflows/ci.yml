@@ -135,3 +135,57 @@ jobs:
           path: |
             aggregated-e2e-artifacts/flakiness-summary.json
             aggregated-e2e-artifacts/flakiness-summary.md
+
+  slo-dashboard:
+    name: SLO Dashboard and Alerts
+    runs-on: ubuntu-latest
+    needs: flakiness-report
+    if: always()
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download flakiness report artifact
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: flakiness-report
+          path: observability-input
+
+      - name: Generate SLO dashboard
+        run: npm run slo:dashboard -- --flakiness-json observability-input/flakiness-summary.json --output-json observability-output/slo-dashboard.json --output-md observability-output/slo-dashboard.md
+
+      - name: Evaluate SLO alert policies
+        env:
+          SLO_ALERT_FAIL_ON_BREACH: ${{ vars.SLO_ALERT_FAIL_ON_BREACH }}
+        run: |
+          if [ "${SLO_ALERT_FAIL_ON_BREACH}" = "true" ]; then
+            npm run slo:alerts -- --dashboard-json observability-output/slo-dashboard.json --policy-file configs/quality/slo-alert-policy.json --output-json observability-output/slo-alerts.json --output-md observability-output/slo-alerts.md --fail-on-breach
+          else
+            npm run slo:alerts -- --dashboard-json observability-output/slo-dashboard.json --policy-file configs/quality/slo-alert-policy.json --output-json observability-output/slo-alerts.json --output-md observability-output/slo-alerts.md
+          fi
+
+      - name: Upload SLO dashboard and alert artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        if: always()
+        with:
+          name: slo-dashboard-alerts
+          retention-days: 14
+          path: |
+            observability-output/slo-dashboard.json
+            observability-output/slo-dashboard.md
+            observability-output/slo-alerts.json
+            observability-output/slo-alerts.md
