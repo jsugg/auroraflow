@@ -126,6 +126,38 @@ describe('captureFailureEvent', () => {
     });
   });
 
+  it('falls back to GitHub and Playwright identifiers when AuroraFlow identifiers are absent', async () => {
+    const writer = vi.fn<(_: unknown) => Promise<void>>().mockResolvedValue();
+
+    const result = await captureFailureEvent({
+      config: {
+        mode: 'suggest',
+        minConfidence: 0.92,
+        safetyPolicy: {
+          allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+          allowedDomains: [],
+        },
+      },
+      pageObjectName: 'ExamplePage',
+      action: {
+        type: 'click',
+        target: '#submit',
+        description: 'Error clicking selector #submit',
+      },
+      error: new Error('click failed'),
+      writer,
+      env: {
+        GITHUB_RUN_ID: 'github-run-42',
+        PLAYWRIGHT_TEST_ID: 'playwright-test-42',
+      },
+    });
+
+    expect(result).toMatchObject({
+      runId: 'github-run-42',
+      testId: 'playwright-test-42',
+    });
+  });
+
   it('applies event decoration before persisting artifacts', async () => {
     const writer = vi.fn<(_: unknown) => Promise<void>>().mockResolvedValue();
     const result = await captureFailureEvent({

@@ -78,6 +78,7 @@ describe('PageObjectBase self-healing integration', () => {
 
   beforeEach(async () => {
     process.env.AURORAFLOW_RUN_ID = 'local-run';
+    process.env.AURORAFLOW_TEST_ID = 'spec-1';
     process.env.SELF_HEAL_MODE = 'suggest';
     process.env.SELF_HEAL_MIN_CONFIDENCE = '0.95';
     delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
@@ -89,6 +90,7 @@ describe('PageObjectBase self-healing integration', () => {
 
   afterEach(async () => {
     delete process.env.AURORAFLOW_RUN_ID;
+    delete process.env.AURORAFLOW_TEST_ID;
     delete process.env.SELF_HEAL_MODE;
     delete process.env.SELF_HEAL_MIN_CONFIDENCE;
     delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
@@ -112,6 +114,7 @@ describe('PageObjectBase self-healing integration', () => {
       pageObjectName: string;
       component: string;
       runId: string;
+      testId?: string;
       errorCode: string;
       minConfidence: number;
       safetyPolicy: {
@@ -127,6 +130,7 @@ describe('PageObjectBase self-healing integration', () => {
     expect(content.pageObjectName).toBe('TestPageObject');
     expect(content.component).toBe('TestPageObject');
     expect(content.runId).toBe('local-run');
+    expect(content.testId).toBe('spec-1');
     expect(content.errorCode).toBe('page_action_type_failed');
     expect(content.minConfidence).toBe(0.95);
     expect(content.safetyPolicy).toEqual({

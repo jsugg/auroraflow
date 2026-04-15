@@ -4,6 +4,10 @@ import path from 'node:path';
 import { CapturedFailureError, CapturedFailureEvent, SelfHealingActionContext } from './types';
 import { SelfHealingConfig } from './types';
 import { generateRankedLocatorSuggestions } from './suggestionEngine';
+import {
+  normalizeOptionalIdentifier,
+  resolveCorrelationIdentifiers,
+} from '../observability/correlation';
 
 export type FailureArtifactWriter = (event: CapturedFailureEvent) => Promise<void>;
 
@@ -48,43 +52,6 @@ function buildEventId(now: Date, randomSuffix: string): string {
   return `${timestamp}_${suffix || 'event'}`;
 }
 
-function normalizeOptionalIdentifier(rawValue: string | undefined): string | undefined {
-  if (!rawValue) {
-    return undefined;
-  }
-  const normalized = rawValue.trim();
-  return normalized === '' ? undefined : normalized;
-}
-
-function resolveRunId({
-  correlationRunId,
-  env,
-}: {
-  correlationRunId: string | undefined;
-  env: Readonly<Record<string, string | undefined>>;
-}): string {
-  return (
-    normalizeOptionalIdentifier(correlationRunId) ??
-    normalizeOptionalIdentifier(env.AURORAFLOW_RUN_ID) ??
-    normalizeOptionalIdentifier(env.GITHUB_RUN_ID) ??
-    'local-run'
-  );
-}
-
-function resolveTestId({
-  correlationTestId,
-  env,
-}: {
-  correlationTestId: string | undefined;
-  env: Readonly<Record<string, string | undefined>>;
-}): string | undefined {
-  return (
-    normalizeOptionalIdentifier(correlationTestId) ??
-    normalizeOptionalIdentifier(env.AURORAFLOW_TEST_ID) ??
-    normalizeOptionalIdentifier(env.PLAYWRIGHT_TEST_ID)
-  );
-}
-
 export function createFileFailureArtifactWriter(
   outputDirectory: string = path.join('test-results', 'self-healing'),
 ): FailureArtifactWriter {
@@ -118,12 +85,11 @@ export async function captureFailureEvent({
     actionType: action.type,
     failedTarget: action.target,
   });
-  const runId = resolveRunId({
-    correlationRunId: correlation?.runId,
-    env,
-  });
-  const testId = resolveTestId({
-    correlationTestId: correlation?.testId,
+  const { runId, testId } = resolveCorrelationIdentifiers({
+    correlation: {
+      runId: correlation?.runId,
+      testId: correlation?.testId,
+    },
     env,
   });
   const component = normalizeOptionalIdentifier(correlation?.component) ?? pageObjectName;
