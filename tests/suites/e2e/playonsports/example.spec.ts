@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { PageFactory } from '../../../../src/helpers/pageFactory';
 import ExamplePage from '../../../../src/pageObjects/examplePage';
 
-test('verify navigation menu links are correct', async ({ page }) => {
+test('@external verify navigation menu links are correct', async ({ page }) => {
   const pageFactory: PageFactory = new PageFactory(page);
   const homePage: ExamplePage = pageFactory.getPage(ExamplePage);
 

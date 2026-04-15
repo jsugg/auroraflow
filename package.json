@@ -13,7 +13,7 @@
     "test": "npm run test:e2e",
     "test:unit": "vitest run tests/suites/unit tests/suites/framework --passWithNoTests",
     "test:integration": "vitest run tests/suites/integration tests/suites/contracts --passWithNoTests",
-    "test:smoke": "npx playwright test --config=configs/playwright.config.ts --project='Google Chrome'",
+    "test:smoke": "npx playwright test --config=configs/playwright.config.ts --project='Google Chrome' --grep @smoke",
     "test:examples": "npx playwright test --config=configs/playwright.config.ts tests/suites/e2e/examples --project='Google Chrome'",
     "test:e2e": "npx playwright test --config=configs/playwright.config.ts",
     "infra:redis:up": "docker compose up -d redis",
