@@ -8,6 +8,7 @@ import {
   resolveLocatorExpression,
 } from '../framework/selfHealing/guardedValidation';
 import { GuardedAutoHealSummary, SelfHealingActionType } from '../framework/selfHealing/types';
+import { resolveCorrelationIdentifiers } from '../framework/observability/correlation';
 
 interface NavigationOptions {
   waitUntil?: 'load' | 'domcontentloaded' | 'networkidle';
@@ -42,13 +43,21 @@ export abstract class PageObjectBase {
   protected logger: Logger;
   protected url: string;
   protected pageObjectName: string;
+  protected runId: string;
+  protected testId?: string;
   private initialized = false;
   private initializationPromise: Promise<void> | null = null;
 
   constructor(page: Page, pageObjectName: string = new.target.name) {
     this.page = page;
     this.pageObjectName = pageObjectName;
-    this.logger = createChildLogger(pageObjectName);
+    const correlationIdentifiers = resolveCorrelationIdentifiers({});
+    this.runId = correlationIdentifiers.runId;
+    this.testId = correlationIdentifiers.testId;
+    this.logger = createChildLogger(pageObjectName, {
+      runId: this.runId,
+      testId: this.testId,
+    });
     this.url = '#';
   }
 
@@ -161,6 +170,8 @@ export abstract class PageObjectBase {
         },
         error,
         correlation: {
+          runId: this.runId,
+          testId: this.testId,
           component: this.pageObjectName,
           errorCode: `page_action_${actionContext.type}_failed`,
         },

@@ -30,8 +30,32 @@ export interface Logger {
   debug(message: string, ...params: unknown[]): void;
 }
 
-export function createChildLogger(name: string): Logger {
-  return mainLogger.child({ component: name });
+function buildChildBindings({
+  component,
+  metadata,
+}: {
+  component: string;
+  metadata: Readonly<Record<string, string | undefined>>;
+}): Record<string, string> {
+  const bindings: Record<string, string> = { component };
+  for (const [key, value] of Object.entries(metadata)) {
+    if (value !== undefined) {
+      bindings[key] = value;
+    }
+  }
+  return bindings;
+}
+
+export function createChildLogger(
+  name: string,
+  metadata: Readonly<Record<string, string | undefined>> = {},
+): Logger {
+  return mainLogger.child(
+    buildChildBindings({
+      component: name,
+      metadata,
+    }),
+  );
 }
 
 export function setLogLevel(level: string): void {

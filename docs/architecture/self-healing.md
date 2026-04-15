@@ -42,6 +42,13 @@ Each artifact includes:
 - ranked locator suggestions with weighted scoring signals
   (`roleSignal`, `accessibleNameSignal`, `uniquenessSignal`, `historicalSignal`, `similaritySignal`).
 
+### Correlation Identifier Resolution
+
+- `runId` resolution order: explicit correlation input -> `AURORAFLOW_RUN_ID` -> `GITHUB_RUN_ID` -> `local-run`.
+- `testId` resolution order: explicit correlation input -> `AURORAFLOW_TEST_ID` -> `PLAYWRIGHT_TEST_ID`.
+- Page object runtime loggers and self-healing artifacts share this resolution contract to keep triage
+  metadata consistent across logs and JSON artifacts.
+
 ### Guarded Mode Dry-Run Validation
 
 When mode is `guarded`, AuroraFlow evaluates ranked locator suggestions in dry-run mode before writing
