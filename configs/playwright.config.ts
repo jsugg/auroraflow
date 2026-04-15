@@ -1,5 +1,12 @@
 import { PlaywrightTestConfig, devices } from '@playwright/test';
 
+const reporters: NonNullable<PlaywrightTestConfig['reporter']> = [
+  ['html', { outputFolder: '../test-reports' }],
+];
+if (process.env.PLAYWRIGHT_JSON_OUTPUT_FILE) {
+  reporters.push(['json', { outputFile: process.env.PLAYWRIGHT_JSON_OUTPUT_FILE }]);
+}
+
 const config: PlaywrightTestConfig = {
   retries: process.env.CI ? 1 : 0,
   use: {
@@ -38,7 +45,7 @@ const config: PlaywrightTestConfig = {
   outputDir: '../test-results',
   testDir: '../tests/suites/e2e',
   fullyParallel: true,
-  reporter: [['html', { outputFolder: '../test-reports' }]],
+  reporter: reporters,
 };
 
 export default config;
