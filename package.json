@@ -42,8 +42,8 @@
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@eslint/js": "^9.39.4",
-    "@playwright/test": "^1.59.1",
-    "@types/node": "^25.6.0",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.8.0",
     "actionlint": "^2.0.6",
     "eslint": "^9.39.4",
     "eslint-config-prettier": "^10.1.8",
@@ -56,8 +56,8 @@
     "testcontainers": "^11.14.0",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.0",
-    "vitest": "^4.1.5"
+    "typescript-eslint": "^8.59.3",
+    "vitest": "^4.1.6"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}": [
