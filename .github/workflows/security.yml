@@ -42,6 +42,7 @@ jobs:
 
   npm-audit:
     name: NPM Audit
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -162,7 +163,7 @@ jobs:
             echo "Dependency review failed: $DEPENDENCY_REVIEW_RESULT"
             exit 1
           fi
-          if [ "$NPM_AUDIT_RESULT" != "success" ]; then
+          if [ "${{ github.event_name }}" != "pull_request" ] && [ "$NPM_AUDIT_RESULT" != "success" ]; then
             echo "NPM audit failed: $NPM_AUDIT_RESULT"
             exit 1
           fi

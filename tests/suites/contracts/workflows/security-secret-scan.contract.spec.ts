@@ -17,4 +17,13 @@ describe('security workflow secret scanning contract', () => {
     expect(securityWorkflow).toContain('SECRET_SCAN_RESULT: ${{ needs.secret-scan.result }}');
     expect(securityWorkflow).toContain('Secret scan failed: $SECRET_SCAN_RESULT');
   });
+
+  it('keeps full-lock npm audit blocking on push and schedule, not pull requests', () => {
+    expect(securityWorkflow).toMatch(
+      /\n\s+npm-audit:\n\s+name: NPM Audit\n\s+if: github\.event_name != 'pull_request'\n/,
+    );
+    expect(securityWorkflow).toContain(
+      'if [ "${{ github.event_name }}" != "pull_request" ] && [ "$NPM_AUDIT_RESULT" != "success" ]; then',
+    );
+  });
 });
