@@ -42,12 +42,18 @@ async function main() {
     findings.push(...runLinter(content, filePath));
   }
 
-  if (findings.length === 0) {
+  const actionableFindings = findings.filter(
+    (finding) =>
+      // The WASM fallback lags native actionlint's supported GitHub contexts.
+      !(finding.kind === 'expression' && finding.message.includes('undefined variable "vars"')),
+  );
+
+  if (actionableFindings.length === 0) {
     console.log('Workflow lint passed.');
     return;
   }
 
-  for (const finding of findings) {
+  for (const finding of actionableFindings) {
     console.error(
       `${finding.file}:${finding.line}:${finding.column} [${finding.kind}] ${finding.message}`,
     );
