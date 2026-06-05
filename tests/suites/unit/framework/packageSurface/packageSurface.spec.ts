@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   AlertPolicyValidationError,
   DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
+  LoggerConfigError,
   PageFactory,
   PageObjectBase,
   RedisClient,
@@ -11,17 +12,21 @@ import {
   buildSloDashboard,
   captureFailureEvent,
   createChildLogger,
+  createConfiguredLogger,
   evaluateAlertPolicy,
   evaluateGuardedSuggestionsDryRun,
   generateRankedLocatorSuggestions,
   parseAlertPolicy,
   resolveCorrelationIdentifiers,
+  resolveLoggerRuntimeConfig,
   resolveRedisRuntimeConfig,
   resolveSelfHealingConfig,
   retry,
   type AlertPolicy,
   type CapturedFailureEvent,
   type FlakinessSummary,
+  type LogDestination,
+  type LoggerRuntimeConfig,
   type RedisRuntimeConfig,
   type SelfHealingConfig,
   type SelectorRecord,
@@ -36,17 +41,20 @@ describe('public package surface', () => {
     expect(RedisConfigError).toBeTypeOf('function');
     expect(SelectorRegistryRepository).toBeTypeOf('function');
     expect(AlertPolicyValidationError).toBeTypeOf('function');
+    expect(LoggerConfigError).toBeTypeOf('function');
     expect(DEFAULT_SELF_HEAL_MIN_CONFIDENCE).toBe(0.92);
 
     expect(buildFlakinessSummary).toBeTypeOf('function');
     expect(buildSloDashboard).toBeTypeOf('function');
     expect(captureFailureEvent).toBeTypeOf('function');
     expect(createChildLogger).toBeTypeOf('function');
+    expect(createConfiguredLogger).toBeTypeOf('function');
     expect(evaluateAlertPolicy).toBeTypeOf('function');
     expect(evaluateGuardedSuggestionsDryRun).toBeTypeOf('function');
     expect(generateRankedLocatorSuggestions).toBeTypeOf('function');
     expect(parseAlertPolicy).toBeTypeOf('function');
     expect(resolveCorrelationIdentifiers).toBeTypeOf('function');
+    expect(resolveLoggerRuntimeConfig).toBeTypeOf('function');
     expect(resolveRedisRuntimeConfig).toBeTypeOf('function');
     expect(resolveSelfHealingConfig).toBeTypeOf('function');
     expect(retry).toBeTypeOf('function');
@@ -63,6 +71,15 @@ describe('public package surface', () => {
       baseBackoffMs: number;
       maxBackoffMs: number;
       keyPrefix: string;
+    }>();
+    expectTypeOf<LogDestination>().toEqualTypeOf<'both' | 'console' | 'file' | 'silent'>();
+    expectTypeOf<LoggerRuntimeConfig>().toMatchTypeOf<{
+      level: string;
+      destination: LogDestination;
+      filePath: string;
+      redactEnabled: boolean;
+      redactPaths: string[];
+      redactCensor: string;
     }>();
     expectTypeOf<SelfHealingConfig['mode']>().toEqualTypeOf<'off' | 'suggest' | 'guarded'>();
     expectTypeOf<SelectorRecord>().toMatchTypeOf<{
