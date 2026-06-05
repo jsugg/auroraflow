@@ -20,7 +20,7 @@ Implemented now:
 - SLO dashboard and alert policy artifacts from matrix telemetry (`slo-dashboard*.{json,md}`, `slo-alerts*.{json,md}`).
 - Guarded self-healing foundation with artifact capture, candidate ranking, dry-run validation, and guarded auto-apply retry controls.
 - Redis data-layer primitives (`RedisClient`, selector registry repository) and Testcontainers integration tests.
-- Runnable examples for quickstart, reliability, data-provider abstractions, observability patterns, and CI templates.
+- Runnable deterministic examples for page objects, quickstart, reliability, data-provider abstractions, observability patterns, and CI templates.
 
 Planned/roadmap (not fully implemented yet):
 

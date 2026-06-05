@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
 
@@ -20,6 +20,7 @@ describe('smoke selection contract', () => {
   it('keeps deterministic example e2e tests tagged for smoke runs', () => {
     const exampleSpecs = [
       'tests/suites/e2e/examples/accessibility.spec.ts',
+      'tests/suites/e2e/examples/example-page.spec.ts',
       'tests/suites/e2e/examples/quickstart.spec.ts',
       'tests/suites/e2e/examples/deterministic-network-mock.spec.ts',
       'tests/suites/e2e/examples/retries-and-timeouts.spec.ts',
@@ -44,10 +45,16 @@ describe('smoke selection contract', () => {
     expect(accessibilityAssertions).toContain('@axe-core/playwright');
   });
 
-  it('keeps the external playonsports scenario out of smoke tagging', () => {
-    const playonsportsSpec = read('tests/suites/e2e/playonsports/example.spec.ts');
+  it('keeps example coverage fixture-backed instead of live external-site backed', () => {
+    const examplePageSpec = read('tests/suites/e2e/examples/example-page.spec.ts');
+    const legacyExternalSpecPath = path.join(
+      REPO_ROOT,
+      'tests/suites/e2e/playonsports/example.spec.ts',
+    );
 
-    expect(playonsportsSpec).toContain('@external verify navigation menu links are correct');
-    expect(playonsportsSpec).not.toContain('@smoke');
+    expect(existsSync(legacyExternalSpecPath)).toBe(false);
+    expect(examplePageSpec).toContain('deterministic demo fixture');
+    expect(examplePageSpec).not.toContain('@external');
+    expect(examplePageSpec).not.toContain('playonsports.com');
   });
 });

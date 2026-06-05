@@ -9,6 +9,7 @@ This directory contains runnable examples that demonstrate framework patterns an
 
 ## Quickstart
 - Open the quickstart fixture-based example in `examples/quickstart/`.
+- Open the page-object demo in `examples/demo/` for a fixture-backed `PageFactory` walkthrough.
 - Open reliability examples in `examples/reliability/` for deterministic network mocking and targeted retries.
 - Open data-provider examples in `examples/data/` for in-memory and Redis-backed contracts.
 - Open observability examples in `examples/observability/` for correlation and instrumentation patterns.
@@ -31,3 +32,4 @@ npm run security:check
 ## Notes
 - Examples are validated in CI by `.github/workflows/examples.yml`.
 - Example tests are organized under `tests/suites/e2e/examples/`.
+- Examples are documentation and test fixtures. They are not production integrations and must not depend on live external websites.
