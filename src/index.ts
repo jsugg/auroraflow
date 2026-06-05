@@ -20,6 +20,7 @@ export {
   resolveRedisRuntimeConfig,
   type RedisClientDriver,
   type RedisRuntimeConfig,
+  type RedisScanOptions,
   type RedisSetOptions,
 } from './utils/redisClient';
 

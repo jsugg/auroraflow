@@ -41,9 +41,15 @@ class FakeRedisDriver implements RedisClientDriver {
     void key;
     return 0;
   });
-  public readonly keys = vi.fn(async (pattern: string) => {
-    void pattern;
-    return [] as string[];
+  public readonly mGet = vi.fn(async (keys: string[]) => {
+    void keys;
+    return [] as Array<string | null>;
+  });
+  public readonly scanIterator: ReturnType<
+    typeof vi.fn<(options: { MATCH: string; COUNT?: number }) => AsyncIterable<string | string[]>>
+  > = vi.fn((options: { MATCH: string; COUNT?: number }) => {
+    void options;
+    return (async function* scanEmpty(): AsyncGenerator<string | string[], void, void> {})();
   });
 
   private readonly listeners: ErrorListener[] = [];
@@ -187,11 +193,12 @@ describe('RedisClient', () => {
     expect(fakeDriver.set).toHaveBeenCalledTimes(3);
   });
 
-  it('supports key prefix stripping on keys() results', async () => {
-    fakeDriver.keys.mockResolvedValue([
-      'aurora:selector-registry:one',
-      'aurora:selector-registry:two',
-    ]);
+  it('supports key prefix stripping on keys() results from cursor scans', async () => {
+    fakeDriver.scanIterator.mockReturnValue(
+      (async function* scanKeys(): AsyncGenerator<string | string[], void, void> {
+        yield ['aurora:selector-registry:two', 'aurora:selector-registry:one'];
+      })(),
+    );
 
     const client = new RedisClient({
       config: {
@@ -218,8 +225,89 @@ describe('RedisClient', () => {
 
     const keys = await client.keys('selector-registry:*');
 
-    expect(fakeDriver.keys).toHaveBeenCalledWith('aurora:selector-registry:*');
+    expect(fakeDriver.scanIterator).toHaveBeenCalledWith({
+      MATCH: 'aurora:selector-registry:*',
+    });
     expect(keys).toEqual(['selector-registry:one', 'selector-registry:two']);
+  });
+
+  it('supports batched mget with namespaced keys', async () => {
+    fakeDriver.mGet.mockResolvedValue(['one', null, 'three']);
+
+    const client = new RedisClient({
+      config: {
+        host: '127.0.0.1',
+        port: 6379,
+        database: 0,
+        tls: false,
+        connectTimeoutMs: 1000,
+        maxRetries: 0,
+        baseBackoffMs: 5,
+        maxBackoffMs: 10,
+        keyPrefix: 'aurora',
+      },
+      createClient: () => fakeDriver,
+      sleep: async () => {},
+      random: () => 0,
+      logger: {
+        info: () => {},
+        error: () => {},
+        warn: () => {},
+        debug: () => {},
+      },
+    });
+
+    const values = await client.mget([
+      'selector-registry:one',
+      'selector-registry:two',
+      'selector-registry:three',
+    ]);
+
+    expect(fakeDriver.mGet).toHaveBeenCalledWith([
+      'aurora:selector-registry:one',
+      'aurora:selector-registry:two',
+      'aurora:selector-registry:three',
+    ]);
+    expect(values).toEqual(['one', null, 'three']);
+  });
+
+  it('passes bounded count hints to scanIterator', async () => {
+    fakeDriver.scanIterator.mockReturnValue(
+      (async function* scanKeys(): AsyncGenerator<string, void, void> {
+        yield 'aurora:selector-registry:one';
+      })(),
+    );
+
+    const client = new RedisClient({
+      config: {
+        host: '127.0.0.1',
+        port: 6379,
+        database: 0,
+        tls: false,
+        connectTimeoutMs: 1000,
+        maxRetries: 0,
+        baseBackoffMs: 5,
+        maxBackoffMs: 10,
+        keyPrefix: 'aurora',
+      },
+      createClient: () => fakeDriver,
+      sleep: async () => {},
+      random: () => 0,
+      logger: {
+        info: () => {},
+        error: () => {},
+        warn: () => {},
+        debug: () => {},
+      },
+    });
+
+    const keys = await client.keys('selector-registry:*', { count: 250 });
+
+    expect(fakeDriver.scanIterator).toHaveBeenCalledWith({
+      MATCH: 'aurora:selector-registry:*',
+      COUNT: 250,
+    });
+    expect(keys).toEqual(['selector-registry:one']);
   });
 
   it('disconnects cleanly when the client is open', async () => {

@@ -9,9 +9,19 @@ import {
 
 class InMemorySelectorStore implements SelectorStore {
   private readonly records = new Map<string, string>();
+  public getCalls = 0;
+  public getManyCalls = 0;
+  public keysCalls = 0;
+  public scanKeysCalls = 0;
 
   public async get(key: string): Promise<string | null> {
+    this.getCalls += 1;
     return this.records.get(key) ?? null;
+  }
+
+  public async getMany(keys: readonly string[]): Promise<Array<string | null>> {
+    this.getManyCalls += 1;
+    return keys.map((key) => this.records.get(key) ?? null);
   }
 
   public async set(key: string, value: string): Promise<void> {
@@ -24,10 +34,18 @@ class InMemorySelectorStore implements SelectorStore {
   }
 
   public async keys(pattern: string): Promise<string[]> {
+    this.keysCalls += 1;
     const matcher = new RegExp(
       `^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`,
     );
     return [...this.records.keys()].filter((key) => matcher.test(key));
+  }
+
+  public async *scanKeys(pattern: string): AsyncGenerator<string, void, void> {
+    this.scanKeysCalls += 1;
+    for (const key of await this.keys(pattern)) {
+      yield key;
+    }
   }
 
   public rawSetUnsafe(key: string, value: string): void {
@@ -100,8 +118,12 @@ describe('SelectorRegistryRepository', () => {
       locator: '#other',
     });
 
+    const getCallsBeforeList = store.getCalls;
     const records = await repository.listByPageObject('SettingsPage');
     expect(records.map((record: SelectorRecord) => record.id)).toEqual(['a.field', 'b.field']);
+    expect(store.scanKeysCalls).toBe(1);
+    expect(store.getManyCalls).toBe(1);
+    expect(store.getCalls).toBe(getCallsBeforeList);
   });
 
   it('rejects invalid confidence and empty locators', async () => {
