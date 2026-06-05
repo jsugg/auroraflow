@@ -14,6 +14,19 @@ function fixtureUrl(): string {
   return pathToFileURL(fixturePath).toString();
 }
 
+async function fetchMessageAndReadSettledStatus(
+  reliabilityPage: ReliabilityAppPage,
+): Promise<string> {
+  await reliabilityPage.clickFetchMessage();
+  await expect
+    .poll(() => reliabilityPage.statusText(), {
+      timeout: 1_000,
+      intervals: [50, 100, 200],
+    })
+    .not.toBe('Loading...');
+  return reliabilityPage.statusText();
+}
+
 test('@smoke targeted retry recovers from transient API failures', async ({ page }) => {
   let attempts = 0;
   const reliabilityPage = new ReliabilityAppPage(page);
@@ -40,14 +53,7 @@ test('@smoke targeted retry recovers from transient API failures', async ({ page
 
   await retry({
     fn: async () => {
-      await Promise.all([
-        page.waitForResponse((response) => response.url() === MESSAGE_ENDPOINT, {
-          timeout: 1_000,
-        }),
-        reliabilityPage.clickFetchMessage(),
-      ]);
-
-      const status = await reliabilityPage.statusText();
+      const status = await fetchMessageAndReadSettledStatus(reliabilityPage);
       if (status !== 'Recovered on attempt 3') {
         throw new Error(`Unexpected status during retry loop: ${status}`);
       }
