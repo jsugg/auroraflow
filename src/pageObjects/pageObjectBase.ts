@@ -1,4 +1,4 @@
-import { ElementHandle, Page, Response } from 'playwright';
+import type { ElementHandle, Page, Response } from 'playwright';
 import { Logger, createChildLogger } from '../utils/logger';
 import { resolveSelfHealingConfig } from '../framework/selfHealing/config';
 import { captureFailureEvent } from '../framework/selfHealing/failureCapture';
@@ -7,30 +7,29 @@ import {
   evaluateGuardedSuggestionsDryRun,
   resolveLocatorExpression,
 } from '../framework/selfHealing/guardedValidation';
-import { GuardedAutoHealSummary, SelfHealingActionType } from '../framework/selfHealing/types';
+import type { GuardedAutoHealSummary, SelfHealingActionType } from '../framework/selfHealing/types';
 import { resolveCorrelationIdentifiers } from '../framework/observability/correlation';
 
-interface NavigationOptions {
+export interface NavigationOptions {
   waitUntil?: 'load' | 'domcontentloaded' | 'networkidle';
   timeout?: number;
 }
 
-interface ActionOptions {
+export interface ActionOptions {
   timeout?: number;
 }
 
-interface ActionContext {
+export interface ActionContext {
   type: SelfHealingActionType;
   target?: string;
 }
 
 type GuardedAutoHealAction<T> = (acceptedLocator: string) => Promise<T>;
 
-// Custom Error for Page Actions
-class PageActionError extends Error {
+export class PageActionError extends Error {
   constructor(
     message: string,
-    public originalError?: Error,
+    public readonly originalError?: Error,
   ) {
     super(message);
     this.name = 'PageActionError';

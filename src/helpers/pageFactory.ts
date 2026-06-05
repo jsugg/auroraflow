@@ -1,11 +1,15 @@
-import { Page } from 'playwright';
+import type { Page } from 'playwright';
 import { Logger, createChildLogger } from '../utils/logger';
 import { PageObjectBase } from '../pageObjects/pageObjectBase';
+
+export type PageObjectConstructor<T extends PageObjectBase = PageObjectBase> = new (
+  page: Page,
+) => T;
 
 export class PageFactory {
   private page: Page;
   private logger: Logger;
-  private pageInstances = new Map<new (page: Page) => PageObjectBase, PageObjectBase>();
+  private pageInstances = new Map<PageObjectConstructor, PageObjectBase>();
 
   /**
    * Constructor for the PageFactory class.
@@ -20,10 +24,10 @@ export class PageFactory {
   /**
    * Retrieves or creates an instance of the specified page class and returns it.
    *
-   * @param {new (page: Page) => T} pageClass - The class of the page to retrieve or create an instance of.
+   * @param {PageObjectConstructor<T>} pageClass - The page object constructor to retrieve or create.
    * @return {T} The instance of the specified page class.
    */
-  getPage<T extends PageObjectBase>(pageClass: new (page: Page) => T): T {
+  getPage<T extends PageObjectBase>(pageClass: PageObjectConstructor<T>): T {
     const className = pageClass.name;
     if (!this.pageInstances.has(pageClass)) {
       const pageInstance = new pageClass(this.page);
