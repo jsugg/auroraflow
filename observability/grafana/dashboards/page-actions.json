@@ -1,0 +1,73 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "sum(rate(auroraflow_page_actions_total[5m])) by (action_type, page_object, status)",
+          "legendFormat": "{{page_object}} {{action_type}} {{status}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Page Actions",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(auroraflow_page_action_duration_ms_bucket[5m])) by (le, action_type))",
+          "legendFormat": "{{action_type}} p95",
+          "refId": "A"
+        }
+      ],
+      "title": "Page Action Latency P95",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 40,
+  "tags": ["auroraflow", "page-actions"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "title": "Page Action Performance",
+  "uid": "auroraflow-page-actions",
+  "version": 1
+}

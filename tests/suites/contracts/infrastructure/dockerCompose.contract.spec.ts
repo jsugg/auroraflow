@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 
 const REPO_ROOT = process.cwd();
 const DOCKER_COMPOSE_PATH = path.join(REPO_ROOT, 'docker-compose.yml');
+const OBSERVABILITY_COMPOSE_PATH = path.join(REPO_ROOT, 'docker-compose.observability.yml');
 const PACKAGE_JSON_PATH = path.join(REPO_ROOT, 'package.json');
 
 describe('docker compose infrastructure contract', () => {
@@ -32,8 +33,44 @@ describe('docker compose infrastructure contract', () => {
     expect(scripts['infra:redis:up']).toBe('docker compose up -d redis');
     expect(scripts['infra:redis:down']).toBe('docker compose down --remove-orphans');
     expect(scripts['infra:redis:logs']).toBe('docker compose logs --tail=200 redis');
+    expect(scripts['observability:up']).toBe(
+      'docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d',
+    );
+    expect(scripts['observability:down']).toBe(
+      'docker compose -f docker-compose.yml -f docker-compose.observability.yml down --remove-orphans',
+    );
+    expect(scripts['observability:logs']).toContain('docker compose -f docker-compose.yml');
+    expect(scripts['observability:smoke']).toContain('AURORAFLOW_OBSERVABILITY_ENABLED=true');
     expect(scripts['test:integration:local']).toBe(
       'npm run infra:redis:up && npm run test:integration',
     );
+  });
+
+  it('defines the local observability stack services and health checks', () => {
+    expect(existsSync(OBSERVABILITY_COMPOSE_PATH)).toBe(true);
+
+    const composeContent = readFileSync(OBSERVABILITY_COMPOSE_PATH, 'utf8');
+    const requiredServices = [
+      'otel-collector',
+      'prometheus',
+      'grafana',
+      'jaeger',
+      'elasticsearch',
+      'logstash',
+      'kibana',
+    ] as const;
+
+    for (const serviceName of requiredServices) {
+      expect(composeContent).toContain(`${serviceName}:`);
+    }
+
+    expect(composeContent).toContain('127.0.0.1:4318:4318');
+    expect(composeContent).toContain('127.0.0.1:9464:9464');
+    expect(composeContent).toContain('127.0.0.1:3000:3000');
+    expect(composeContent).toContain('127.0.0.1:16686:16686');
+    expect(composeContent).toContain('127.0.0.1:5601:5601');
+    expect(composeContent).toContain('healthcheck:');
+    expect(composeContent).toContain('./observability/otel-collector/config.yaml');
+    expect(composeContent).toContain('./observability/grafana/provisioning');
   });
 });

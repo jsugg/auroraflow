@@ -1,0 +1,73 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "panels": [
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "targets": [
+        {
+          "expr": "sum(rate(auroraflow_test_cases_total[5m])) by (project, shard)",
+          "legendFormat": "{{project}} {{shard}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Test Cases By Project And Shard",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "Prometheus"
+      },
+      "fieldConfig": {
+        "defaults": {},
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 0
+      },
+      "id": 2,
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(auroraflow_test_case_duration_ms_bucket[5m])) by (le, project, shard))",
+          "legendFormat": "{{project}} {{shard}} p95",
+          "refId": "A"
+        }
+      ],
+      "title": "Test Case Duration P95",
+      "type": "timeseries"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 40,
+  "tags": ["auroraflow", "ci"],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "title": "CI Matrix and Sharding",
+  "uid": "auroraflow-ci-matrix",
+  "version": 1
+}
