@@ -3,8 +3,10 @@ import {
   AlertPolicyValidationError,
   DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
   LoggerConfigError,
+  METRIC_NAMES,
   PageFactory,
   PageObjectBase,
+  RESOURCE_ATTRIBUTE_NAMES,
   RedisClient,
   RedisConfigError,
   SelectorRegistryRepository,
@@ -16,13 +18,17 @@ import {
   evaluateAlertPolicy,
   evaluateGuardedSuggestionsDryRun,
   generateRankedLocatorSuggestions,
+  getTelemetry,
+  initializeTelemetry,
   parseAlertPolicy,
+  resolveTelemetryConfig,
   resolveCorrelationIdentifiers,
   resolveLoggerRuntimeConfig,
   resolveRedisRuntimeConfig,
   resolveSelfHealingConfig,
   retry,
   type AlertPolicy,
+  type AuroraFlowTelemetry,
   type CapturedFailureEvent,
   type FlakinessSummary,
   type LogDestination,
@@ -43,6 +49,8 @@ describe('public package surface', () => {
     expect(AlertPolicyValidationError).toBeTypeOf('function');
     expect(LoggerConfigError).toBeTypeOf('function');
     expect(DEFAULT_SELF_HEAL_MIN_CONFIDENCE).toBe(0.92);
+    expect(METRIC_NAMES.pageActionsTotal).toBe('auroraflow_page_actions_total');
+    expect(RESOURCE_ATTRIBUTE_NAMES).toContain('service.name');
 
     expect(buildFlakinessSummary).toBeTypeOf('function');
     expect(buildSloDashboard).toBeTypeOf('function');
@@ -52,11 +60,14 @@ describe('public package surface', () => {
     expect(evaluateAlertPolicy).toBeTypeOf('function');
     expect(evaluateGuardedSuggestionsDryRun).toBeTypeOf('function');
     expect(generateRankedLocatorSuggestions).toBeTypeOf('function');
+    expect(getTelemetry).toBeTypeOf('function');
+    expect(initializeTelemetry).toBeTypeOf('function');
     expect(parseAlertPolicy).toBeTypeOf('function');
     expect(resolveCorrelationIdentifiers).toBeTypeOf('function');
     expect(resolveLoggerRuntimeConfig).toBeTypeOf('function');
     expect(resolveRedisRuntimeConfig).toBeTypeOf('function');
     expect(resolveSelfHealingConfig).toBeTypeOf('function');
+    expect(resolveTelemetryConfig).toBeTypeOf('function');
     expect(retry).toBeTypeOf('function');
   });
 
@@ -93,5 +104,9 @@ describe('public package surface', () => {
     expectTypeOf<SloDashboard['overallStatus']>().toEqualTypeOf<
       'healthy' | 'degraded' | 'insufficient_data'
     >();
+    expectTypeOf<AuroraFlowTelemetry>().toMatchTypeOf<{
+      isEnabled(): boolean;
+      shutdown(): Promise<void>;
+    }>();
   });
 });

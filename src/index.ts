@@ -53,6 +53,45 @@ export {
 } from './framework/observability/correlation';
 
 export {
+  SPAN_NAMES,
+  buildPageActionMetricAttributes,
+  buildPageActionSpanAttributes,
+  hashTelemetryValue,
+  type PageActionMetricStatus,
+  type PageActionMetricInput,
+  type PageActionTelemetryInput,
+} from './framework/observability/attributes';
+
+export {
+  METRIC_NAMES,
+  REQUIRED_METRIC_NAMES,
+  type MetricName,
+} from './framework/observability/metricNames';
+
+export {
+  initializeTelemetry,
+  getTelemetry,
+  shutdownTelemetry,
+  type AuroraFlowTelemetry,
+  type TelemetryAttributes,
+  type TelemetryAttributeValue,
+  type TelemetryDiagnosticLogger,
+  type TelemetryLogCorrelation,
+  type TelemetryOperationOptions,
+  type TelemetrySpan,
+  type TelemetrySpanStatus,
+} from './framework/observability/telemetry';
+
+export {
+  TelemetryConfigError,
+  RESOURCE_ATTRIBUTE_NAMES,
+  resolveTelemetryConfig,
+  type ObservabilityEnvironment,
+  type ResourceAttributeName,
+  type TelemetryRuntimeConfig,
+} from './framework/observability/telemetryConfig';
+
+export {
   PLAYWRIGHT_REPORT_FILE_PREFIX,
   buildFlakinessMarkdown,
   buildFlakinessSummary,

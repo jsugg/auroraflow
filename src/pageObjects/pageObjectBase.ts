@@ -1,3 +1,4 @@
+import { performance } from 'node:perf_hooks';
 import type { ElementHandle, Page, Response } from 'playwright';
 import { Logger, createChildLogger } from '../utils/logger';
 import { resolveSelfHealingConfig } from '../framework/selfHealing/config';
@@ -9,6 +10,14 @@ import {
 } from '../framework/selfHealing/guardedValidation';
 import type { GuardedAutoHealSummary, SelfHealingActionType } from '../framework/selfHealing/types';
 import { resolveCorrelationIdentifiers } from '../framework/observability/correlation';
+import {
+  SPAN_NAMES,
+  buildPageActionMetricAttributes,
+  buildPageActionSpanAttributes,
+  type PageActionMetricStatus,
+} from '../framework/observability/attributes';
+import { METRIC_NAMES } from '../framework/observability/metricNames';
+import { getTelemetry, type TelemetrySpan } from '../framework/observability/telemetry';
 
 export interface NavigationOptions {
   waitUntil?: 'load' | 'domcontentloaded' | 'networkidle';
@@ -83,14 +92,65 @@ export abstract class PageObjectBase {
     guardedAutoHealAction?: GuardedAutoHealAction<T>,
     requiresInitialization: boolean = true,
   ): Promise<T> {
+    const telemetry = getTelemetry();
+    return telemetry.runSpan({
+      name: SPAN_NAMES.pageAction,
+      attributes: buildPageActionSpanAttributes({
+        pageObjectName: this.pageObjectName,
+        actionType: actionContext.type,
+        target: actionContext.target,
+        runId: this.runId,
+        testId: this.testId,
+        exportRawTarget: telemetry.config.exportRawSelectors,
+      }),
+      task: (span) =>
+        this.safeActionWithTelemetry({
+          action,
+          successMessage,
+          errorMessage,
+          actionContext,
+          guardedAutoHealAction,
+          requiresInitialization,
+          span,
+        }),
+    });
+  }
+
+  private async safeActionWithTelemetry<T>({
+    action,
+    successMessage,
+    errorMessage,
+    actionContext,
+    guardedAutoHealAction,
+    requiresInitialization,
+    span,
+  }: {
+    action: () => Promise<T>;
+    successMessage: string;
+    errorMessage: string;
+    actionContext: ActionContext;
+    guardedAutoHealAction?: GuardedAutoHealAction<T>;
+    requiresInitialization: boolean;
+    span: TelemetrySpan;
+  }): Promise<T> {
+    const telemetry = getTelemetry();
+    const startedAt = performance.now();
+    let actionStatus: PageActionMetricStatus = 'failed';
+    let errorCode: string | undefined;
+    let actionError: Error | undefined;
+
     try {
       if (requiresInitialization) {
         await this.ensureInitialized();
       }
       const result = await action();
+      actionStatus = 'succeeded';
       this.logger.info(successMessage, { result });
       return result;
     } catch (error) {
+      actionError = error instanceof Error ? error : new Error(String(error));
+      errorCode = `page_action_${actionContext.type}_failed`;
+      span.recordException(actionError);
       this.logger.error(errorMessage, { error });
       const screenshotPath = this.buildFailureScreenshotPath(errorMessage);
       const currentUrl = this.resolveCurrentUrl();
@@ -196,6 +256,7 @@ export abstract class PageObjectBase {
       );
 
       if (guardedAutoHeal?.attempted && guardedAutoHeal.succeeded) {
+        actionStatus = 'self_healed';
         return guardedAutoHealResult as T;
       }
 
@@ -203,6 +264,28 @@ export abstract class PageObjectBase {
         `${errorMessage}: ${error instanceof Error ? error.message : 'Unknown Error'}`,
         error instanceof Error ? error : undefined,
       );
+    } finally {
+      const durationMs = performance.now() - startedAt;
+      span.setAttribute('auroraflow.action.succeeded', actionStatus !== 'failed');
+      span.setAttribute('auroraflow.action.status', actionStatus);
+      span.setAttribute('auroraflow.action.duration_ms', durationMs);
+      if (errorCode !== undefined) {
+        span.setAttribute('error.code', errorCode);
+      }
+      if (actionError !== undefined) {
+        span.setAttribute('error.type', actionError.name);
+      }
+      const metricAttributes = buildPageActionMetricAttributes({
+        pageObjectName: this.pageObjectName,
+        actionType: actionContext.type,
+        status: actionStatus,
+        errorCode,
+      });
+      telemetry.recordCounter(METRIC_NAMES.pageActionsTotal, 1, metricAttributes);
+      telemetry.recordHistogram(METRIC_NAMES.pageActionDurationMs, durationMs, metricAttributes);
+      if (actionStatus === 'failed') {
+        telemetry.recordCounter(METRIC_NAMES.pageActionFailuresTotal, 1, metricAttributes);
+      }
     }
   }
 
