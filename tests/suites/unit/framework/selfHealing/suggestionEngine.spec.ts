@@ -1,8 +1,20 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
+import { METRIC_NAMES } from '../../../../../src/framework/observability/metricNames';
+import {
+  resetTelemetryForTests,
+  setTelemetryForTests,
+} from '../../../../../src/framework/observability/telemetry';
 import { generateRankedLocatorSuggestions } from '../../../../../src/framework/selfHealing/suggestionEngine';
+import { CapturingTelemetry } from '../observability/capturingTelemetry';
 
 describe('generateRankedLocatorSuggestions', () => {
+  afterEach(() => {
+    resetTelemetryForTests();
+  });
+
   it('prefers accessibility-oriented candidates for common click selectors', () => {
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
     const suggestions = generateRankedLocatorSuggestions({
       actionType: 'click',
       failedTarget: '#joinOurTeamButton',
@@ -12,6 +24,14 @@ describe('generateRankedLocatorSuggestions', () => {
     expect(suggestions[0]?.score).toBeGreaterThanOrEqual(suggestions[1]?.score ?? 0);
     expect(suggestions.some((item) => item.strategy === 'roleName')).toBe(true);
     expect(suggestions.some((item) => item.strategy === 'testId')).toBe(true);
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.selfHealingSuggestionsTotal,
+      value: 1,
+      attributes: {
+        'auroraflow.self_heal.strategy': 'roleName',
+      },
+    });
+    expect(telemetry.counters).toHaveLength(suggestions.length);
   });
 
   it('uses historical success rates as a ranking signal', () => {

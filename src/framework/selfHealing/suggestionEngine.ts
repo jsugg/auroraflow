@@ -4,6 +4,9 @@ import {
   SelfHealingSuggestionSignals,
   SelfHealingSuggestionStrategy,
 } from './types';
+import { buildSelfHealingSuggestionMetricAttributes } from '../observability/attributes';
+import { METRIC_NAMES } from '../observability/metricNames';
+import { getTelemetry } from '../observability/telemetry';
 
 export interface SuggestionEngineInput {
   actionType: SelfHealingActionType;
@@ -300,5 +303,15 @@ export function generateRankedLocatorSuggestions({
     return left.locator.localeCompare(right.locator);
   });
 
-  return suggestions.slice(0, boundedMax);
+  const selectedSuggestions = suggestions.slice(0, boundedMax);
+  const telemetry = getTelemetry();
+  for (const suggestion of selectedSuggestions) {
+    telemetry.recordCounter(
+      METRIC_NAMES.selfHealingSuggestionsTotal,
+      1,
+      buildSelfHealingSuggestionMetricAttributes({ strategy: suggestion.strategy }),
+    );
+  }
+
+  return selectedSuggestions;
 }

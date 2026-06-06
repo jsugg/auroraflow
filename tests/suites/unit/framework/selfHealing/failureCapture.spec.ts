@@ -1,7 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { METRIC_NAMES } from '../../../../../src/framework/observability/metricNames';
+import {
+  resetTelemetryForTests,
+  setTelemetryForTests,
+} from '../../../../../src/framework/observability/telemetry';
 import { captureFailureEvent } from '../../../../../src/framework/selfHealing/failureCapture';
+import { CapturingTelemetry } from '../observability/capturingTelemetry';
 
 describe('captureFailureEvent', () => {
+  afterEach(() => {
+    resetTelemetryForTests();
+  });
+
   it('returns null and does not write artifacts when self-heal mode is off', async () => {
     const writer = vi.fn<(_: unknown) => Promise<void>>().mockResolvedValue();
 
@@ -29,6 +39,8 @@ describe('captureFailureEvent', () => {
   });
 
   it('captures and writes structured artifacts when mode is suggest', async () => {
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
     const writer = vi.fn<(_: unknown) => Promise<void>>().mockResolvedValue();
     const fixedNow = new Date('2026-04-13T12:00:00.000Z');
 
@@ -88,6 +100,37 @@ describe('captureFailureEvent', () => {
       result?.suggestions[1]?.score ?? 0,
     );
     expect(writer).toHaveBeenCalledTimes(1);
+    expect(telemetry.spans[0]).toMatchObject({
+      name: 'auroraflow.self_healing.capture',
+      status: { code: 'ok' },
+      attributes: expect.objectContaining({
+        'auroraflow.self_heal.mode': 'suggest',
+        'auroraflow.action.type': 'type',
+        'auroraflow.page_object': 'ExamplePage',
+        'auroraflow.action.target_kind': 'css',
+        'auroraflow.run_id': 'local-run',
+        'auroraflow.self_heal.artifact_written': true,
+      }),
+    });
+    expect(telemetry.spans[0]?.attributes['auroraflow.action.target_hash']).toBeTypeOf('string');
+    expect(Object.values(telemetry.spans[0]?.attributes ?? {})).not.toContain('#username');
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.selfHealingArtifactsTotal,
+      value: 1,
+      attributes: {
+        'auroraflow.self_heal.mode': 'suggest',
+        'auroraflow.action.type': 'type',
+      },
+    });
+    expect(telemetry.counters).toContainEqual(
+      expect.objectContaining({
+        name: METRIC_NAMES.selfHealingSuggestionsTotal,
+        value: 1,
+        attributes: expect.objectContaining({
+          'auroraflow.self_heal.strategy': expect.any(String) as string,
+        }) as Record<string, string>,
+      }),
+    );
   });
 
   it('supports explicit correlation identifiers and error code', async () => {

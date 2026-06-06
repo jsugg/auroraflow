@@ -3,7 +3,13 @@ import { readFileSync } from 'node:fs';
 import { readdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { METRIC_NAMES } from '../../../../../src/framework/observability/metricNames';
+import {
+  resetTelemetryForTests,
+  setTelemetryForTests,
+} from '../../../../../src/framework/observability/telemetry';
 import { PageObjectBase } from '../../../../../src/pageObjects/pageObjectBase';
+import { CapturingTelemetry } from '../observability/capturingTelemetry';
 
 class TestPageObject extends PageObjectBase {
   constructor(page: Page) {
@@ -95,6 +101,7 @@ describe('PageObjectBase self-healing integration', () => {
     delete process.env.SELF_HEAL_MIN_CONFIDENCE;
     delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
     delete process.env.SELF_HEAL_ALLOWED_DOMAINS;
+    resetTelemetryForTests();
     await rm(artifactsDir, { recursive: true, force: true });
   });
 
@@ -207,6 +214,8 @@ describe('PageObjectBase self-healing integration', () => {
   });
 
   it('auto-applies accepted guarded click candidates and records success in artifact', async () => {
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
     process.env.SELF_HEAL_MODE = 'guarded';
     process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
     process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
@@ -231,9 +240,25 @@ describe('PageObjectBase self-healing integration', () => {
       succeeded: true,
     });
     expect(content.guardedAutoHeal?.locator).toBeTruthy();
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.guardedAutoHealTotal,
+      value: 1,
+      attributes: {
+        'auroraflow.action.type': 'click',
+        'auroraflow.self_heal.status': 'succeeded',
+      },
+    });
+    expect(
+      telemetry.spans.find((span) => span.name === 'auroraflow.page_action')?.attributes,
+    ).toMatchObject({
+      'auroraflow.self_heal.auto_apply.status': 'succeeded',
+      'auroraflow.self_heal.accepted_locator_strategy': expect.any(String) as string,
+    });
   });
 
   it('records guarded auto-heal apply failures without swallowing the original action error', async () => {
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
     process.env.SELF_HEAL_MODE = 'guarded';
     process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
     process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
@@ -260,9 +285,19 @@ describe('PageObjectBase self-healing integration', () => {
       succeeded: false,
     });
     expect(content.guardedAutoHeal?.errorMessage).toContain('healed click failed');
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.guardedAutoHealTotal,
+      value: 1,
+      attributes: {
+        'auroraflow.action.type': 'click',
+        'auroraflow.self_heal.status': 'failed',
+      },
+    });
   });
 
   it('skips guarded auto-heal application when policy blocks candidate validation', async () => {
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
     process.env.SELF_HEAL_MODE = 'guarded';
     process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
     process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
@@ -295,6 +330,15 @@ describe('PageObjectBase self-healing integration', () => {
       attempted: false,
       succeeded: false,
       skippedReason: 'no_accepted_locator',
+    });
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.guardedAutoHealTotal,
+      value: 1,
+      attributes: {
+        'auroraflow.action.type': 'click',
+        'auroraflow.self_heal.status': 'skipped',
+        'auroraflow.self_heal.skip_reason': 'no_accepted_locator',
+      },
     });
   });
 });

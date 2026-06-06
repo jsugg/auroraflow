@@ -12,8 +12,10 @@ import type { GuardedAutoHealSummary, SelfHealingActionType } from '../framework
 import { resolveCorrelationIdentifiers } from '../framework/observability/correlation';
 import {
   SPAN_NAMES,
+  buildGuardedAutoHealMetricAttributes,
   buildPageActionMetricAttributes,
   buildPageActionSpanAttributes,
+  type GuardedAutoHealMetricStatus,
   type PageActionMetricStatus,
 } from '../framework/observability/attributes';
 import { METRIC_NAMES } from '../framework/observability/metricNames';
@@ -138,6 +140,8 @@ export abstract class PageObjectBase {
     let actionStatus: PageActionMetricStatus = 'failed';
     let errorCode: string | undefined;
     let actionError: Error | undefined;
+    let guardedValidation: Awaited<ReturnType<typeof evaluateGuardedSuggestionsDryRun>> | undefined;
+    let guardedAutoHeal: GuardedAutoHealSummary | undefined;
 
     try {
       if (requiresInitialization) {
@@ -165,14 +169,11 @@ export abstract class PageObjectBase {
         );
 
       const selfHealingConfig = resolveSelfHealingConfig(process.env);
+      span.setAttribute('auroraflow.self_heal.mode', selfHealingConfig.mode);
       const rankedSuggestions = generateRankedLocatorSuggestions({
         actionType: actionContext.type,
         failedTarget: actionContext.target,
       });
-      let guardedValidation:
-        | Awaited<ReturnType<typeof evaluateGuardedSuggestionsDryRun>>
-        | undefined;
-      let guardedAutoHeal: GuardedAutoHealSummary | undefined;
       let guardedAutoHealResult: T | undefined;
 
       if (selfHealingConfig.mode === 'guarded') {
@@ -184,6 +185,15 @@ export abstract class PageObjectBase {
           currentUrl,
           safetyPolicy: selfHealingConfig.safetyPolicy,
         });
+        const acceptedCandidate = guardedValidation.candidates.find(
+          (candidate) => candidate.locator === guardedValidation?.acceptedLocator,
+        );
+        if (acceptedCandidate !== undefined) {
+          span.setAttribute(
+            'auroraflow.self_heal.accepted_locator_strategy',
+            acceptedCandidate.strategy,
+          );
+        }
 
         if (guardedValidation.acceptedLocator && guardedAutoHealAction) {
           guardedAutoHeal = {
@@ -285,6 +295,23 @@ export abstract class PageObjectBase {
       telemetry.recordHistogram(METRIC_NAMES.pageActionDurationMs, durationMs, metricAttributes);
       if (actionStatus === 'failed') {
         telemetry.recordCounter(METRIC_NAMES.pageActionFailuresTotal, 1, metricAttributes);
+      }
+      if (guardedAutoHeal !== undefined) {
+        const guardedAutoHealStatus: GuardedAutoHealMetricStatus = guardedAutoHeal.attempted
+          ? guardedAutoHeal.succeeded
+            ? 'succeeded'
+            : 'failed'
+          : 'skipped';
+        span.setAttribute('auroraflow.self_heal.auto_apply.status', guardedAutoHealStatus);
+        telemetry.recordCounter(
+          METRIC_NAMES.guardedAutoHealTotal,
+          1,
+          buildGuardedAutoHealMetricAttributes({
+            actionType: actionContext.type,
+            status: guardedAutoHealStatus,
+            skippedReason: guardedAutoHeal.skippedReason,
+          }),
+        );
       }
     }
   }
