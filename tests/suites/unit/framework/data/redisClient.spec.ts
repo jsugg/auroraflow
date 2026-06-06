@@ -1,4 +1,9 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { METRIC_NAMES } from '../../../../../src/framework/observability/metricNames';
+import {
+  resetTelemetryForTests,
+  setTelemetryForTests,
+} from '../../../../../src/framework/observability/telemetry';
 import {
   RedisClient,
   RedisConfigError,
@@ -6,6 +11,7 @@ import {
   resolveRedisRuntimeConfig,
   type RedisClientDriver,
 } from '../../../../../src/utils/redisClient';
+import { CapturingTelemetry } from '../observability/capturingTelemetry';
 
 type ErrorListener = (error: Error) => void;
 
@@ -113,7 +119,13 @@ describe('RedisClient', () => {
     fakeDriver = new FakeRedisDriver();
   });
 
+  afterEach(() => {
+    resetTelemetryForTests();
+  });
+
   it('retries transient failures and eventually succeeds', async () => {
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
     const sleepDurations: number[] = [];
     let getCallCount = 0;
 
@@ -156,9 +168,46 @@ describe('RedisClient', () => {
     expect(fakeDriver.connect).toHaveBeenCalledTimes(1);
     expect(fakeDriver.get).toHaveBeenCalledTimes(3);
     expect(sleepDurations).toEqual([10, 20]);
+
+    const getSpan = telemetry.spans.find(
+      (span) => span.attributes['auroraflow.redis.operation'] === 'get',
+    );
+    expect(getSpan?.status).toEqual({ code: 'ok' });
+    expect(getSpan?.attributes).toMatchObject({
+      'auroraflow.redis.operation.status': 'succeeded',
+      'auroraflow.redis.operation.attempts': 3,
+      'auroraflow.redis.operation.retries': 2,
+    });
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.redisOperationsTotal,
+      value: 1,
+      attributes: {
+        'auroraflow.redis.operation': 'get',
+        'auroraflow.redis.operation.status': 'succeeded',
+      },
+    });
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.redisOperationRetriesTotal,
+      value: 2,
+      attributes: {
+        'auroraflow.redis.operation': 'get',
+        'auroraflow.redis.operation.status': 'succeeded',
+      },
+    });
+    expect(telemetry.histograms).toContainEqual(
+      expect.objectContaining({
+        name: METRIC_NAMES.redisOperationDurationMs,
+        attributes: {
+          'auroraflow.redis.operation': 'get',
+          'auroraflow.redis.operation.status': 'succeeded',
+        },
+      }),
+    );
   });
 
   it('throws RedisOperationError after retry exhaustion', async () => {
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
     fakeDriver.set.mockRejectedValue(new Error('persistent set failure'));
 
     const client = new RedisClient({
@@ -191,6 +240,32 @@ describe('RedisClient', () => {
     } as Partial<RedisOperationError>);
 
     expect(fakeDriver.set).toHaveBeenCalledTimes(3);
+    const setSpan = telemetry.spans.find(
+      (span) => span.attributes['auroraflow.redis.operation'] === 'set',
+    );
+    expect(setSpan?.status?.code).toBe('error');
+    expect(setSpan?.attributes).toMatchObject({
+      'auroraflow.redis.operation.status': 'failed',
+      'auroraflow.redis.operation.attempts': 3,
+      'auroraflow.redis.operation.retries': 2,
+      'error.type': 'RedisOperationError',
+    });
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.redisOperationsTotal,
+      value: 1,
+      attributes: {
+        'auroraflow.redis.operation': 'set',
+        'auroraflow.redis.operation.status': 'failed',
+      },
+    });
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.redisOperationRetriesTotal,
+      value: 2,
+      attributes: {
+        'auroraflow.redis.operation': 'set',
+        'auroraflow.redis.operation.status': 'failed',
+      },
+    });
   });
 
   it('supports key prefix stripping on keys() results from cursor scans', async () => {

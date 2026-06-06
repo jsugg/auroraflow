@@ -54,12 +54,30 @@ export {
 
 export {
   SPAN_NAMES,
+  buildGuardedAutoHealMetricAttributes,
+  buildGuardedValidationMetricAttributes,
+  buildGuardedValidationSpanAttributes,
   buildPageActionMetricAttributes,
   buildPageActionSpanAttributes,
+  buildRedisOperationMetricAttributes,
+  buildRedisOperationSpanAttributes,
+  buildSelfHealingArtifactMetricAttributes,
+  buildSelfHealingCaptureSpanAttributes,
+  buildSelfHealingSuggestionMetricAttributes,
   hashTelemetryValue,
+  type GuardedAutoHealMetricInput,
+  type GuardedAutoHealMetricStatus,
+  type GuardedValidationMetricInput,
+  type GuardedValidationMetricStatus,
+  type GuardedValidationTelemetryInput,
   type PageActionMetricStatus,
   type PageActionMetricInput,
   type PageActionTelemetryInput,
+  type RedisOperationStatus,
+  type RedisOperationTelemetryInput,
+  type SelfHealingArtifactMetricInput,
+  type SelfHealingCaptureTelemetryInput,
+  type SelfHealingSuggestionMetricInput,
 } from './framework/observability/attributes';
 
 export {

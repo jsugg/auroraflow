@@ -1,4 +1,13 @@
+import { performance } from 'node:perf_hooks';
 import { createClient, type RedisClientOptions } from 'redis';
+import {
+  SPAN_NAMES,
+  buildRedisOperationMetricAttributes,
+  buildRedisOperationSpanAttributes,
+  type RedisOperationStatus,
+} from '../framework/observability/attributes';
+import { METRIC_NAMES } from '../framework/observability/metricNames';
+import { getTelemetry } from '../framework/observability/telemetry';
 import { createChildLogger, type Logger } from './logger';
 
 const DEFAULT_REDIS_HOST = '127.0.0.1';
@@ -464,32 +473,74 @@ export class RedisClient {
     operationName: string,
     operation: () => Promise<TValue>,
   ): Promise<TValue> {
+    const telemetry = getTelemetry();
+    const startedAt = performance.now();
     let attempt = 0;
+    let status: RedisOperationStatus = 'failed';
+    let operationError: Error | undefined;
 
-    while (true) {
-      attempt += 1;
-      try {
-        return await operation();
-      } catch (error: unknown) {
-        if (attempt > this.config.maxRetries) {
-          throw new RedisOperationError(
-            `Redis ${operationName} failed after ${attempt} attempt(s).`,
+    return telemetry.runSpan({
+      name: SPAN_NAMES.redisOperation,
+      attributes: buildRedisOperationSpanAttributes({ operationName }),
+      task: async (span) => {
+        try {
+          while (true) {
+            attempt += 1;
+            try {
+              const value = await operation();
+              status = 'succeeded';
+              return value;
+            } catch (error: unknown) {
+              if (attempt > this.config.maxRetries) {
+                operationError = new RedisOperationError(
+                  `Redis ${operationName} failed after ${attempt} attempt(s).`,
+                  operationName,
+                  attempt,
+                  error,
+                );
+                throw operationError;
+              }
+
+              const delayMs = this.computeBackoffDelay(attempt);
+              this.logger.warn(
+                `Redis ${operationName} attempt ${attempt} failed. Retrying in ${delayMs}ms.`,
+                {
+                  error,
+                },
+              );
+              await this.sleep(delayMs);
+            }
+          }
+        } finally {
+          const durationMs = performance.now() - startedAt;
+          const retryCount = Math.max(0, attempt - 1);
+          const metricAttributes = buildRedisOperationMetricAttributes({
             operationName,
-            attempt,
-            error,
+            status,
+          });
+          span.setAttribute('auroraflow.redis.operation.status', status);
+          span.setAttribute('auroraflow.redis.operation.attempts', attempt);
+          span.setAttribute('auroraflow.redis.operation.retries', retryCount);
+          span.setAttribute('auroraflow.redis.operation.duration_ms', durationMs);
+          if (operationError !== undefined) {
+            span.setAttribute('error.type', operationError.name);
+          }
+          telemetry.recordCounter(METRIC_NAMES.redisOperationsTotal, 1, metricAttributes);
+          telemetry.recordHistogram(
+            METRIC_NAMES.redisOperationDurationMs,
+            durationMs,
+            metricAttributes,
           );
+          if (retryCount > 0) {
+            telemetry.recordCounter(
+              METRIC_NAMES.redisOperationRetriesTotal,
+              retryCount,
+              metricAttributes,
+            );
+          }
         }
-
-        const delayMs = this.computeBackoffDelay(attempt);
-        this.logger.warn(
-          `Redis ${operationName} attempt ${attempt} failed. Retrying in ${delayMs}ms.`,
-          {
-            error,
-          },
-        );
-        await this.sleep(delayMs);
-      }
-    }
+      },
+    });
   }
 
   private computeBackoffDelay(attempt: number): number {

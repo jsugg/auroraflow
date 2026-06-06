@@ -1,7 +1,13 @@
 import type { Page } from 'playwright';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { METRIC_NAMES } from '../../../../../src/framework/observability/metricNames';
+import {
+  resetTelemetryForTests,
+  setTelemetryForTests,
+} from '../../../../../src/framework/observability/telemetry';
 import { evaluateGuardedSuggestionsDryRun } from '../../../../../src/framework/selfHealing/guardedValidation';
 import type { SelfHealingSuggestion } from '../../../../../src/framework/selfHealing/types';
+import { CapturingTelemetry } from '../observability/capturingTelemetry';
 
 type LocatorState = {
   count: number;
@@ -66,7 +72,13 @@ function createSuggestion(
 }
 
 describe('evaluateGuardedSuggestionsDryRun', () => {
+  afterEach(() => {
+    resetTelemetryForTests();
+  });
+
   it('accepts the first confidence-eligible visible candidate and records reasons for skipped candidates', async () => {
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
     const pageMock = createGuardedPageMock();
     const suggestions: SelfHealingSuggestion[] = [
       createSuggestion("page.getByRole('button', { name: /submit/i })", 0.93, 'roleName'),
@@ -106,6 +118,38 @@ describe('evaluateGuardedSuggestionsDryRun', () => {
       status: 'below_confidence_threshold',
       confidenceEligible: false,
     });
+    expect(telemetry.spans[0]).toMatchObject({
+      name: 'auroraflow.self_healing.guarded_validation',
+      status: { code: 'ok' },
+      attributes: expect.objectContaining({
+        'auroraflow.self_heal.mode': 'dry-run',
+        'auroraflow.action.type': 'click',
+        'auroraflow.self_heal.min_confidence': 0.5,
+        'auroraflow.self_heal.candidate_count': 3,
+        'auroraflow.self_heal.accepted': true,
+        'auroraflow.self_heal.accepted_locator_strategy': 'roleName',
+      }),
+    });
+    expect(telemetry.spans[0]?.attributes['auroraflow.current_url_hash']).toBeTypeOf('string');
+    expect(Object.values(telemetry.spans[0]?.attributes ?? {})).not.toContain(
+      'https://example.test/page',
+    );
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.guardedValidationCandidatesTotal,
+      value: 1,
+      attributes: {
+        'auroraflow.self_heal.status': 'accepted',
+        'auroraflow.self_heal.strategy': 'roleName',
+      },
+    });
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.guardedValidationCandidatesTotal,
+      value: 1,
+      attributes: {
+        'auroraflow.self_heal.status': 'below_confidence_threshold',
+        'auroraflow.self_heal.strategy': 'text',
+      },
+    });
   });
 
   it('marks unsupported locator expressions without throwing', async () => {
@@ -139,6 +183,8 @@ describe('evaluateGuardedSuggestionsDryRun', () => {
   });
 
   it('blocks guarded validation when action type is not allowed by policy', async () => {
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
     const pageMock = createGuardedPageMock();
     const suggestions: SelfHealingSuggestion[] = [
       createSuggestion("page.getByRole('button', { name: /submit/i })", 0.93, 'roleName'),
@@ -162,6 +208,18 @@ describe('evaluateGuardedSuggestionsDryRun', () => {
       actionAllowed: false,
       domainAllowed: false,
       blockedReason: 'action_not_allowed',
+    });
+    expect(telemetry.spans[0]?.attributes).toMatchObject({
+      'auroraflow.self_heal.accepted': false,
+      'auroraflow.self_heal.policy_blocked_reason': 'action_not_allowed',
+    });
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.guardedValidationCandidatesTotal,
+      value: 1,
+      attributes: {
+        'auroraflow.self_heal.status': 'action_not_allowed',
+        'auroraflow.self_heal.strategy': 'none',
+      },
     });
   });
 

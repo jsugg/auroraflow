@@ -7,6 +7,13 @@ import type {
   SelfHealingSafetyPolicy,
   SelfHealingSuggestion,
 } from './types';
+import {
+  SPAN_NAMES,
+  buildGuardedValidationMetricAttributes,
+  buildGuardedValidationSpanAttributes,
+} from '../observability/attributes';
+import { METRIC_NAMES } from '../observability/metricNames';
+import { getTelemetry, type AuroraFlowTelemetry } from '../observability/telemetry';
 
 export interface GuardedValidationInput {
   page: Page;
@@ -157,7 +164,71 @@ function createPolicyDecision({
   };
 }
 
-export async function evaluateGuardedSuggestionsDryRun({
+export async function evaluateGuardedSuggestionsDryRun(
+  input: GuardedValidationInput,
+): Promise<GuardedValidationSummary> {
+  const telemetry = getTelemetry();
+  return telemetry.runSpan({
+    name: SPAN_NAMES.guardedValidation,
+    attributes: buildGuardedValidationSpanAttributes({
+      actionType: input.actionType,
+      minConfidence: input.minConfidence,
+      currentUrl: input.currentUrl,
+    }),
+    task: async (span) => {
+      const summary = await evaluateGuardedSuggestionsDryRunInner(input);
+      const acceptedCandidate = summary.candidates.find(
+        (candidate) => candidate.locator === summary.acceptedLocator,
+      );
+      span.setAttribute('auroraflow.self_heal.candidate_count', summary.candidates.length);
+      span.setAttribute('auroraflow.self_heal.accepted', summary.acceptedLocator !== undefined);
+      if (summary.acceptedScore !== undefined) {
+        span.setAttribute('auroraflow.self_heal.accepted_score', summary.acceptedScore);
+      }
+      if (acceptedCandidate !== undefined) {
+        span.setAttribute(
+          'auroraflow.self_heal.accepted_locator_strategy',
+          acceptedCandidate.strategy,
+        );
+      }
+      if (summary.policy.blockedReason !== undefined) {
+        span.setAttribute(
+          'auroraflow.self_heal.policy_blocked_reason',
+          summary.policy.blockedReason,
+        );
+      }
+      recordGuardedValidationMetrics(telemetry, summary);
+      return summary;
+    },
+  });
+}
+
+function recordGuardedValidationMetrics(
+  telemetry: AuroraFlowTelemetry,
+  summary: GuardedValidationSummary,
+): void {
+  if (summary.candidates.length === 0 && summary.policy.blockedReason !== undefined) {
+    telemetry.recordCounter(
+      METRIC_NAMES.guardedValidationCandidatesTotal,
+      1,
+      buildGuardedValidationMetricAttributes({ status: summary.policy.blockedReason }),
+    );
+    return;
+  }
+
+  for (const candidate of summary.candidates) {
+    telemetry.recordCounter(
+      METRIC_NAMES.guardedValidationCandidatesTotal,
+      1,
+      buildGuardedValidationMetricAttributes({
+        status: candidate.status,
+        strategy: candidate.strategy,
+      }),
+    );
+  }
+}
+
+async function evaluateGuardedSuggestionsDryRunInner({
   page,
   actionType,
   minConfidence,

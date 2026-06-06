@@ -13,6 +13,13 @@ import {
   normalizeOptionalIdentifier,
   resolveCorrelationIdentifiers,
 } from '../observability/correlation';
+import {
+  SPAN_NAMES,
+  buildSelfHealingArtifactMetricAttributes,
+  buildSelfHealingCaptureSpanAttributes,
+} from '../observability/attributes';
+import { METRIC_NAMES } from '../observability/metricNames';
+import { getTelemetry } from '../observability/telemetry';
 
 export type FailureArtifactWriter = (event: CapturedFailureEvent) => Promise<void>;
 
@@ -87,14 +94,6 @@ export async function captureFailureEvent({
     return null;
   }
 
-  const occurredAt = now();
-  const suggestions = [
-    ...(inputSuggestions ??
-      generateRankedLocatorSuggestions({
-        actionType: action.type,
-        failedTarget: action.target,
-      })),
-  ];
   const { runId, testId } = resolveCorrelationIdentifiers({
     correlation: {
       runId: correlation?.runId,
@@ -102,31 +101,65 @@ export async function captureFailureEvent({
     },
     env,
   });
-  const component = normalizeOptionalIdentifier(correlation?.component) ?? pageObjectName;
-  const errorCode = normalizeOptionalIdentifier(correlation?.errorCode) ?? 'page_action_error';
-  const event: CapturedFailureEvent = {
-    artifactVersion: '1.0.0',
-    eventId: buildEventId(occurredAt, randomSuffix()),
-    timestamp: occurredAt.toISOString(),
-    runId,
-    testId,
-    component,
-    errorCode,
-    mode: config.mode,
-    minConfidence: config.minConfidence,
-    safetyPolicy: config.safetyPolicy,
-    pageObjectName,
-    currentUrl,
-    screenshotPath,
-    action,
-    error: normalizeError(error),
-    suggestions,
-  };
+  const telemetry = getTelemetry();
 
-  if (decorateEvent) {
-    await decorateEvent(event);
-  }
+  return telemetry.runSpan({
+    name: SPAN_NAMES.selfHealingCapture,
+    attributes: buildSelfHealingCaptureSpanAttributes({
+      mode: config.mode,
+      actionType: action.type,
+      pageObjectName,
+      runId,
+      testId,
+      target: action.target,
+      exportRawTarget: telemetry.config.exportRawSelectors,
+    }),
+    task: async (span) => {
+      const occurredAt = now();
+      const suggestions = [
+        ...(inputSuggestions ??
+          generateRankedLocatorSuggestions({
+            actionType: action.type,
+            failedTarget: action.target,
+          })),
+      ];
+      const component = normalizeOptionalIdentifier(correlation?.component) ?? pageObjectName;
+      const errorCode = normalizeOptionalIdentifier(correlation?.errorCode) ?? 'page_action_error';
+      const event: CapturedFailureEvent = {
+        artifactVersion: '1.0.0',
+        eventId: buildEventId(occurredAt, randomSuffix()),
+        timestamp: occurredAt.toISOString(),
+        runId,
+        testId,
+        component,
+        errorCode,
+        mode: config.mode,
+        minConfidence: config.minConfidence,
+        safetyPolicy: config.safetyPolicy,
+        pageObjectName,
+        currentUrl,
+        screenshotPath,
+        action,
+        error: normalizeError(error),
+        suggestions,
+      };
 
-  await writer(event);
-  return event;
+      if (decorateEvent) {
+        await decorateEvent(event);
+      }
+
+      await writer(event);
+      span.setAttribute('auroraflow.self_heal.suggestion_count', suggestions.length);
+      span.setAttribute('auroraflow.self_heal.artifact_written', true);
+      telemetry.recordCounter(
+        METRIC_NAMES.selfHealingArtifactsTotal,
+        1,
+        buildSelfHealingArtifactMetricAttributes({
+          mode: config.mode,
+          actionType: action.type,
+        }),
+      );
+      return event;
+    },
+  });
 }
