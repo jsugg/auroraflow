@@ -58,8 +58,17 @@ export interface RedisSetOptions {
   ttlSeconds?: number;
 }
 
+export interface RedisScanOptions {
+  count?: number;
+}
+
 interface RedisSetCommandOptions {
   EX: number;
+}
+
+interface RedisScanCommandOptions {
+  MATCH: string;
+  COUNT?: number;
 }
 
 export interface RedisClientDriver {
@@ -73,7 +82,8 @@ export interface RedisClientDriver {
   get(key: string): Promise<string | null>;
   set(key: string, value: string, options?: RedisSetCommandOptions): Promise<string | null>;
   del(key: string): Promise<number>;
-  keys(pattern: string): Promise<string[]>;
+  mGet(keys: string[]): Promise<Array<string | null>>;
+  scanIterator(options: RedisScanCommandOptions): AsyncIterable<string | string[]>;
 }
 
 type RedisClientFactory = (options: RedisClientOptions) => RedisClientDriver;
@@ -346,6 +356,14 @@ export class RedisClient {
     return this.executeCommand('get', (client) => client.get(qualifiedKey));
   }
 
+  public async mget(keys: readonly string[]): Promise<Array<string | null>> {
+    const qualifiedKeys = keys.map((key) => this.qualifyKey(key));
+    if (qualifiedKeys.length === 0) {
+      return [];
+    }
+    return this.executeCommand('mget', (client) => client.mGet(qualifiedKeys));
+  }
+
   public async set(key: string, value: string, options: RedisSetOptions = {}): Promise<void> {
     const qualifiedKey = this.qualifyKey(key);
     const setOptions: RedisSetCommandOptions | undefined =
@@ -363,13 +381,34 @@ export class RedisClient {
     return this.executeCommand('del', (client) => client.del(qualifiedKey));
   }
 
-  public async keys(pattern: string): Promise<string[]> {
+  public async *scanKeys(
+    pattern: string,
+    options: RedisScanOptions = {},
+  ): AsyncGenerator<string, void, void> {
     this.assertValidPattern(pattern);
     const qualifiedPattern = this.qualifyPattern(pattern);
-    const matchedKeys = await this.executeCommand('keys', (client) =>
-      client.keys(qualifiedPattern),
+    const count = this.normalizeScanCount(options.count);
+    const iterator = await this.executeCommand('scanIterator', async (client) =>
+      client.scanIterator({
+        MATCH: qualifiedPattern,
+        ...(count === undefined ? {} : { COUNT: count }),
+      }),
     );
-    return matchedKeys.map((entry) => this.stripPrefix(entry));
+
+    for await (const entry of iterator) {
+      const matchedKeys = Array.isArray(entry) ? entry : [entry];
+      for (const key of matchedKeys) {
+        yield this.stripPrefix(key);
+      }
+    }
+  }
+
+  public async keys(pattern: string, options: RedisScanOptions = {}): Promise<string[]> {
+    const matchedKeys: string[] = [];
+    for await (const key of this.scanKeys(pattern, options)) {
+      matchedKeys.push(key);
+    }
+    return matchedKeys.sort((left, right) => left.localeCompare(right));
   }
 
   private buildClientOptions(): RedisClientOptions {
@@ -468,6 +507,16 @@ export class RedisClient {
       throw new RedisConfigError('ttlSeconds must be an integer between 1 and 2592000.');
     }
     return ttlSeconds;
+  }
+
+  private normalizeScanCount(count: number | undefined): number | undefined {
+    if (count === undefined) {
+      return undefined;
+    }
+    if (!Number.isInteger(count) || count <= 0 || count > 10_000) {
+      throw new RedisConfigError('scan count must be an integer between 1 and 10000.');
+    }
+    return count;
   }
 
   private qualifyKey(key: string): string {

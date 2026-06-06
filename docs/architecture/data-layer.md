@@ -8,11 +8,14 @@ This document defines the current Redis-backed data layer primitives available i
   - strict runtime config parsing from environment variables.
   - bounded retry with exponential backoff + jitter.
   - namespaced key behavior through `AURORAFLOW_REDIS_KEY_PREFIX`.
+  - cursor-based key discovery through `SCAN`/`scanKeys()` instead of blocking `KEYS`.
+  - batched value loading through `mget()` for list/read-heavy registry paths.
   - explicit connection lifecycle with `connect()` and `disconnect()`.
 - `src/data/selectors/selectorRegistry.ts`
   - typed selector record schema.
   - Redis-agnostic repository contract (`SelectorStore`).
   - deterministic `upsert`, `get`, `listAll`, `listByPageObject`, and `delete` behavior.
+  - large-registry listing via cursor key scans plus bounded batched payload reads.
 
 ## Environment Variables
 
@@ -42,9 +45,11 @@ const registry = new SelectorRegistryRepository({
   namespace: 'selector-registry',
   store: {
     get: (key) => redisClient.get(key),
+    getMany: (keys) => redisClient.mget(keys),
     set: (key, value) => redisClient.set(key, value),
     del: (key) => redisClient.del(key),
     keys: (pattern) => redisClient.keys(pattern),
+    scanKeys: (pattern) => redisClient.scanKeys(pattern),
   },
 });
 

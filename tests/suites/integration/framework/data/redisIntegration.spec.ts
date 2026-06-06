@@ -93,13 +93,18 @@ describe('RedisClient integration', () => {
     const client = requireClient(context);
 
     await client.set('integration:user', '{"name":"aurora"}');
+    await client.set('integration:settings', '{"theme":"dark"}');
     const storedValue = await client.get('integration:user');
     const keys = await client.keys('integration:*');
+    const storedValues = await client.mget(['integration:user', 'integration:settings']);
     const deletedCount = await client.del('integration:user');
+    await client.del('integration:settings');
     const valueAfterDelete = await client.get('integration:user');
 
     expect(storedValue).toBe('{"name":"aurora"}');
     expect(keys).toContain('integration:user');
+    expect(keys).toContain('integration:settings');
+    expect(storedValues).toEqual(['{"name":"aurora"}', '{"theme":"dark"}']);
     expect(deletedCount).toBe(1);
     expect(valueAfterDelete).toBeNull();
   });
@@ -120,9 +125,11 @@ describe('SelectorRegistryRepository integration', () => {
     const client = requireClient(context);
     const store: SelectorStore = {
       get: (key: string) => client.get(key),
+      getMany: (keys: readonly string[]) => client.mget(keys),
       set: (key: string, value: string) => client.set(key, value),
       del: (key: string) => client.del(key),
       keys: (pattern: string) => client.keys(pattern),
+      scanKeys: (pattern: string) => client.scanKeys(pattern),
     };
     const repository = new SelectorRegistryRepository({
       store,

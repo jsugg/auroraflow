@@ -40,10 +40,14 @@ export interface SelectorUpsertInput {
 
 export interface SelectorStore {
   get(key: string): Promise<string | null>;
+  getMany?(keys: readonly string[]): Promise<Array<string | null>>;
   set(key: string, value: string): Promise<void>;
   del(key: string): Promise<number>;
   keys(pattern: string): Promise<string[]>;
+  scanKeys?(pattern: string): AsyncIterable<string>;
 }
+
+const DEFAULT_LIST_BATCH_SIZE = 100;
 
 function validateIdentifier(value: string, fieldName: string): string {
   const normalized = value.trim();
@@ -195,18 +199,42 @@ export class SelectorRegistryRepository {
   }
 
   public async listAll(): Promise<SelectorRecord[]> {
-    const keys = await this.store.keys(`${this.namespace}:*`);
+    const keys = await this.listRecordKeys();
     const records: SelectorRecord[] = [];
 
-    for (const key of keys.sort((left, right) => left.localeCompare(right))) {
-      const payload = await this.store.get(key);
-      if (payload === null) {
-        continue;
+    for (let index = 0; index < keys.length; index += DEFAULT_LIST_BATCH_SIZE) {
+      const batchKeys = keys.slice(index, index + DEFAULT_LIST_BATCH_SIZE);
+      const payloads = await this.loadRecordPayloads(batchKeys);
+      for (let offset = 0; offset < batchKeys.length; offset += 1) {
+        const payload = payloads[offset];
+        if (payload === null || payload === undefined) {
+          continue;
+        }
+        records.push(this.deserializeRecord(payload, batchKeys[offset]));
       }
-      records.push(this.deserializeRecord(payload, key));
     }
 
     return records;
+  }
+
+  private async listRecordKeys(): Promise<string[]> {
+    const pattern = `${this.namespace}:*`;
+    const keys: string[] = [];
+    if (this.store.scanKeys) {
+      for await (const key of this.store.scanKeys(pattern)) {
+        keys.push(key);
+      }
+    } else {
+      keys.push(...(await this.store.keys(pattern)));
+    }
+    return keys.sort((left, right) => left.localeCompare(right));
+  }
+
+  private async loadRecordPayloads(keys: readonly string[]): Promise<Array<string | null>> {
+    if (this.store.getMany) {
+      return this.store.getMany(keys);
+    }
+    return Promise.all(keys.map((key) => this.store.get(key)));
   }
 
   private keyFor(id: string): string {
