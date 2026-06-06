@@ -6,6 +6,41 @@ import {
 } from '../../../../../src/framework/observability/telemetry';
 import { captureFailureEvent } from '../../../../../src/framework/selfHealing/failureCapture';
 import { CapturingTelemetry } from '../observability/capturingTelemetry';
+import type {
+  SelfHealingConfig,
+  SelfHealingMode,
+} from '../../../../../src/framework/selfHealing/types';
+
+function selfHealingConfig(mode: SelfHealingMode): SelfHealingConfig {
+  return {
+    mode,
+    minConfidence: 0.92,
+    safetyPolicy: {
+      allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+      allowedDomains: mode === 'guarded' ? ['example.test'] : [],
+    },
+    sat: {
+      enabled: mode !== 'off',
+      captureDom: mode !== 'off',
+      maxDomNodes: 500,
+      maxCandidates: 10,
+      maxTextLength: 120,
+      allowedAttributes: [
+        'data-testid',
+        'data-test',
+        'id',
+        'name',
+        'aria-label',
+        'placeholder',
+        'title',
+        'role',
+        'type',
+      ],
+      registryMode: 'read',
+      promotionMode: 'manual',
+    },
+  };
+}
 
 describe('captureFailureEvent', () => {
   afterEach(() => {
@@ -16,14 +51,7 @@ describe('captureFailureEvent', () => {
     const writer = vi.fn<(_: unknown) => Promise<void>>().mockResolvedValue();
 
     const result = await captureFailureEvent({
-      config: {
-        mode: 'off',
-        minConfidence: 0.92,
-        safetyPolicy: {
-          allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
-          allowedDomains: [],
-        },
-      },
+      config: selfHealingConfig('off'),
       pageObjectName: 'ExamplePage',
       action: {
         type: 'type',
@@ -45,14 +73,7 @@ describe('captureFailureEvent', () => {
     const fixedNow = new Date('2026-04-13T12:00:00.000Z');
 
     const result = await captureFailureEvent({
-      config: {
-        mode: 'suggest',
-        minConfidence: 0.92,
-        safetyPolicy: {
-          allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
-          allowedDomains: [],
-        },
-      },
+      config: selfHealingConfig('suggest'),
       pageObjectName: 'ExamplePage',
       currentUrl: 'https://example.test',
       screenshotPath: 'test-results/screenshots/failure.png',
@@ -137,14 +158,7 @@ describe('captureFailureEvent', () => {
     const writer = vi.fn<(_: unknown) => Promise<void>>().mockResolvedValue();
 
     const result = await captureFailureEvent({
-      config: {
-        mode: 'suggest',
-        minConfidence: 0.92,
-        safetyPolicy: {
-          allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
-          allowedDomains: [],
-        },
-      },
+      config: selfHealingConfig('suggest'),
       pageObjectName: 'ExamplePage',
       action: {
         type: 'click',
@@ -173,14 +187,7 @@ describe('captureFailureEvent', () => {
     const writer = vi.fn<(_: unknown) => Promise<void>>().mockResolvedValue();
 
     const result = await captureFailureEvent({
-      config: {
-        mode: 'suggest',
-        minConfidence: 0.92,
-        safetyPolicy: {
-          allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
-          allowedDomains: [],
-        },
-      },
+      config: selfHealingConfig('suggest'),
       pageObjectName: 'ExamplePage',
       action: {
         type: 'click',
@@ -204,14 +211,7 @@ describe('captureFailureEvent', () => {
   it('applies event decoration before persisting artifacts', async () => {
     const writer = vi.fn<(_: unknown) => Promise<void>>().mockResolvedValue();
     const result = await captureFailureEvent({
-      config: {
-        mode: 'guarded',
-        minConfidence: 0.92,
-        safetyPolicy: {
-          allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
-          allowedDomains: ['example.test'],
-        },
-      },
+      config: selfHealingConfig('guarded'),
       pageObjectName: 'ExamplePage',
       action: {
         type: 'click',

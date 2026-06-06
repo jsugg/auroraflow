@@ -19,6 +19,7 @@ Implemented now:
 - E2E matrix flakiness analytics artifacts (`flakiness-summary.json` and `flakiness-summary.md`).
 - SLO dashboard and alert policy artifacts from matrix telemetry (`slo-dashboard*.{json,md}`, `slo-alerts*.{json,md}`).
 - Guarded self-healing foundation with artifact capture, candidate ranking, dry-run validation, and guarded auto-apply retry controls.
+- SAT enrichment for failed page actions, including bounded DOM snapshots, allow-listed/redacted attributes, DOM-backed candidate extraction, deterministic candidate IDs, artifact schema parsing, and a deterministic Playwright fixture.
 - Redis data-layer primitives (`RedisClient`, selector registry repository) and Testcontainers integration tests.
 - Opt-in OpenTelemetry telemetry facade with no-op defaults, resource attribute normalization, PageObjectBase action spans/metrics, and trace/span log correlation.
 - Configurable structured logging with default secret redaction and selectable console/file/silent destinations.
@@ -26,7 +27,7 @@ Implemented now:
 
 Planned/roadmap (not fully implemented yet):
 
-- SAT ML pipeline and autonomous selector optimization lifecycle.
+- SAT history-backed scoring, promotion workflows, ML pipeline, and autonomous selector optimization lifecycle.
 - Version-controlled local/production observability stack configuration (OpenTelemetry Collector, Prometheus, Grafana, ELK, Jaeger) and trend dashboards.
 - Extended platform governance automation and release/signing workflows.
 
@@ -157,7 +158,9 @@ This diagram represents the target data-management workflow. Current source incl
 
 ### SAT Development and Integration
 
-- Develop SAT as an independent, AI-driven tool that runs in parallel to TAF executions. It should analyze the application's UI, automatically identify changes in selectors, and update Redis accordingly. For separation of concerns, it resides on a separate repository.
+- Current SAT support runs inside the self-healing failure path. When `SELF_HEAL_MODE=suggest` or `SELF_HEAL_MODE=guarded`, SAT can capture a bounded DOM snapshot through Playwright, redact sensitive attributes, extract resilient candidates, score them deterministically, and persist the compact analysis under the failure artifact's `sat` field.
+- Runtime SAT controls include `SELF_HEAL_SAT_ENABLED`, `SELF_HEAL_SAT_CAPTURE_DOM`, `SELF_HEAL_MAX_DOM_NODES`, `SELF_HEAL_MAX_CANDIDATES`, `SELF_HEAL_MAX_TEXT_LENGTH`, `SELF_HEAL_ALLOWED_ATTRIBUTES`, `SELF_HEAL_REGISTRY_MODE`, and `SELF_HEAL_PROMOTION_MODE`.
+- Future SAT phases can run as an independent, AI-driven tool in parallel to TAF executions. They should analyze the application's UI, identify selector changes, and promote reviewed selector updates into Redis-backed registry data.
 - Utilize TensorFlow.js for building or customizing ML models, trained on historical test data and web application changes. Incorporate NLP techniques for improved page context understanding.
 
 ### CI/CD Pipeline Enhancements

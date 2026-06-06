@@ -1,7 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { CapturedFailureError, CapturedFailureEvent, SelfHealingActionContext } from './types';
+import {
+  CapturedFailureError,
+  CapturedFailureEvent,
+  SelfHealingActionContext,
+  SelfHealingSuggestion,
+} from './types';
 import { SelfHealingConfig } from './types';
 import { generateRankedLocatorSuggestions } from './suggestionEngine';
 import {
@@ -25,6 +30,7 @@ export interface CaptureFailureEventInput {
   error: unknown;
   currentUrl?: string;
   screenshotPath?: string;
+  suggestions?: ReadonlyArray<SelfHealingSuggestion>;
   writer?: FailureArtifactWriter;
   decorateEvent?: (event: CapturedFailureEvent) => Promise<void> | void;
   correlation?: {
@@ -76,6 +82,7 @@ export async function captureFailureEvent({
   error,
   currentUrl,
   screenshotPath,
+  suggestions: inputSuggestions,
   writer = createFileFailureArtifactWriter(),
   decorateEvent,
   correlation,
@@ -109,10 +116,13 @@ export async function captureFailureEvent({
     }),
     task: async (span) => {
       const occurredAt = now();
-      const suggestions = generateRankedLocatorSuggestions({
-        actionType: action.type,
-        failedTarget: action.target,
-      });
+      const suggestions = [
+        ...(inputSuggestions ??
+          generateRankedLocatorSuggestions({
+            actionType: action.type,
+            failedTarget: action.target,
+          })),
+      ];
       const component = normalizeOptionalIdentifier(correlation?.component) ?? pageObjectName;
       const errorCode = normalizeOptionalIdentifier(correlation?.errorCode) ?? 'page_action_error';
       const event: CapturedFailureEvent = {

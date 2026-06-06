@@ -147,9 +147,48 @@ export {
 } from './framework/observability/alertPolicies';
 
 export {
+  DEFAULT_SELF_HEAL_MAX_CANDIDATES,
+  DEFAULT_SELF_HEAL_MAX_DOM_NODES,
+  DEFAULT_SELF_HEAL_MAX_TEXT_LENGTH,
   DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
   resolveSelfHealingConfig,
 } from './framework/selfHealing/config';
+
+export {
+  analyzeSelfHealingFailure,
+  type SelfHealingAnalysisResult,
+  type SelfHealingFailureContext,
+} from './framework/selfHealing/analyzer';
+
+export {
+  SelfHealingArtifactSchemaError,
+  parseCapturedFailureEvent,
+  parseDomSnapshot,
+  parsePendingSelectorPromotion,
+  parseSelectorCandidateHistory,
+} from './framework/selfHealing/artifactSchema';
+
+export {
+  buildSelfHealingCandidateId,
+  rankSelfHealingCandidates,
+  type CandidateScoringInput,
+} from './framework/selfHealing/candidateScoring';
+
+export { type SelfHealingCandidateSeed } from './framework/selfHealing/candidateTypes';
+
+export {
+  extractDomCandidateSeeds,
+  type DomCandidateExtractionInput,
+} from './framework/selfHealing/domCandidateExtraction';
+
+export {
+  captureDomSnapshot,
+  normalizeAllowedAttributes,
+  normalizeDomText,
+  redactDomAttributeValue,
+  summarizeDomSnapshot,
+  type DomSnapshotOptions,
+} from './framework/selfHealing/domSnapshot';
 
 export {
   captureFailureEvent,
@@ -172,6 +211,10 @@ export {
 export type {
   CapturedFailureError,
   CapturedFailureEvent,
+  CandidateEvidence,
+  DomElementSummary,
+  DomSnapshot,
+  DomSnapshotSummary,
   GuardedAutoHealSkipReason,
   GuardedAutoHealSummary,
   GuardedValidationCandidate,
@@ -179,11 +222,19 @@ export type {
   GuardedValidationPolicyDecision,
   GuardedValidationStatus,
   GuardedValidationSummary,
+  PendingSelectorPromotion,
+  RankedSelfHealingCandidate,
+  SelectorCandidateHistory,
+  SelectorCandidateHistorySummary,
   SelfHealingActionContext,
   SelfHealingActionType,
   SelfHealingConfig,
   SelfHealingMode,
+  SelfHealingPromotionMode,
+  SelfHealingRegistryMode,
   SelfHealingSafetyPolicy,
+  SelfHealingSatAnalysis,
+  SelfHealingSatConfig,
   SelfHealingSuggestion,
   SelfHealingSuggestionSignals,
   SelfHealingSuggestionStrategy,

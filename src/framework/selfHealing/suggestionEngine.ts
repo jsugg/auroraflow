@@ -34,6 +34,8 @@ const STRATEGY_BASE_SIGNAL: Readonly<Record<SelfHealingSuggestionStrategy, numbe
     text: 0.58,
     cssFallback: 0.42,
     fallback: 0.2,
+    registry: 0.88,
+    domEvidence: 0.68,
   },
 );
 
