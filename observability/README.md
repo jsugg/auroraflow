@@ -44,6 +44,12 @@ npm run test:smoke
 
 Logstash reads JSON lines from `logs/*.ndjson` and self-healing artifacts from `test-results/self-healing/*.json`. Known secret-like `message` fragments are redacted before indexing. Shared environments need stronger upstream redaction, TLS, authentication, and retention policies before persistent indexing is enabled.
 
+## CI Collector Smoke
+
+Pull-request CI runs a lightweight collector-only smoke lane for observability-related changes unless the repository variable `AURORAFLOW_OBSERVABILITY_CI_ENABLED` is set to `false`. The lane uses `docker-compose.observability-ci.yml` and `observability/otel-collector/ci-config.yaml`, emits one synthetic trace/metric/log event, and uploads collector health, metrics, logs, and the local NDJSON log as diagnostics.
+
+The collector-only lane does not start Grafana, Prometheus, Jaeger, Elasticsearch, Logstash, or Kibana. The artifact-based SLO reports remain the merge-gate authority, and remote export secrets are not required.
+
 ## Stop
 
 ```bash

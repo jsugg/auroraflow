@@ -35,6 +35,7 @@ describe('observability contract documentation', () => {
   it('provides collector, Prometheus, Grafana, and ELK configuration files', () => {
     const requiredPaths = [
       'otel-collector/config.yaml',
+      'otel-collector/ci-config.yaml',
       'prometheus/prometheus.yml',
       'prometheus/rules/auroraflow.yml',
       'grafana/provisioning/datasources/datasources.yml',
@@ -75,6 +76,28 @@ describe('observability contract documentation', () => {
     expect(dataSourcesConfig).toContain('type: prometheus');
     expect(dataSourcesConfig).toContain('type: elasticsearch');
     expect(dataSourcesConfig).toContain('type: jaeger');
+  });
+
+  it('provides a collector-only CI smoke lane with diagnostics', () => {
+    const ciCompose = readFileSync(
+      path.join(process.cwd(), 'docker-compose.observability-ci.yml'),
+      'utf8',
+    );
+    const workflow = readFileSync(
+      path.join(process.cwd(), '.github', 'workflows', 'quality.yml'),
+      'utf8',
+    );
+    const packageJson = readFileSync(path.join(process.cwd(), 'package.json'), 'utf8');
+
+    expect(ciCompose).toContain('otel-collector:');
+    expect(ciCompose).toContain('ci-config.yaml');
+    expect(ciCompose).not.toContain('elasticsearch:');
+    expect(ciCompose).not.toContain('grafana:');
+    expect(ciCompose).not.toContain('jaeger:');
+    expect(workflow).toContain('observability_stack:');
+    expect(workflow).toContain('AURORAFLOW_OBSERVABILITY_CI_ENABLED');
+    expect(workflow).toContain('observability-output/ci');
+    expect(packageJson).toContain('"observability:ci:smoke"');
   });
 
   it('ships valid Grafana dashboard JSON files', () => {
