@@ -14,6 +14,37 @@ AuroraFlow supports a mode-gated self-healing failure-capture foundation for fai
 - Accepted range is `0` to `1`.
 - Invalid or missing values default to `0.92`.
 
+## SAT Enrichment
+
+Selector Analysis Tooling (SAT) enriches `suggest` and `guarded` artifacts with bounded DOM evidence and
+deterministic candidate scoring. SAT is diagnostic in this implementation; selector registry writes and
+source-code rewrites remain out of scope.
+
+- `SELF_HEAL_SAT_ENABLED` defaults to enabled for `suggest` and `guarded`, disabled for `off`.
+- `SELF_HEAL_SAT_CAPTURE_DOM` defaults to true when SAT is enabled.
+- `SELF_HEAL_MAX_DOM_NODES` defaults to `500` and is capped at `5000`.
+- `SELF_HEAL_MAX_CANDIDATES` defaults to `10` and is capped at `50`.
+- `SELF_HEAL_MAX_TEXT_LENGTH` defaults to `120` and is capped at `500`.
+- `SELF_HEAL_ALLOWED_ATTRIBUTES` defaults to
+  `data-testid,data-test,id,name,aria-label,placeholder,title,role,type`.
+- `SELF_HEAL_REGISTRY_MODE` accepts `off`, `read`, or `write_pending`; current runtime SAT uses read-only
+  history scaffolding and does not write registry records.
+- `SELF_HEAL_PROMOTION_MODE` accepts `manual` or `ci_acknowledged`; promotion workflows remain manual.
+
+DOM snapshots are captured inside the browser through `page.evaluate` and serialized as compact summaries:
+
+- skipped tags: `script`, `style`, `noscript`, and `template`.
+- hidden elements are skipped from candidate extraction.
+- attributes are allow-listed and sensitive attribute names containing `password`, `token`, `secret`,
+  `key`, `authorization`, `cookie`, or `session` are redacted.
+- input values are not captured by default.
+- text is whitespace-normalized and capped by `SELF_HEAL_MAX_TEXT_LENGTH`.
+
+SAT candidate sources include current heuristic suggestions plus DOM-backed `getByTestId`, role/name,
+label, text, and bounded CSS fallback candidates. Candidate IDs are deterministic:
+
+`<pageObjectName>::<actionType>::<failedTargetHash>::<strategy>::<locatorHash>`
+
 ## Guarded Safety Policy
 
 - `SELF_HEAL_ALLOWED_ACTIONS` controls which action types may run guarded validation.
@@ -41,6 +72,8 @@ Each artifact includes:
 - screenshot path captured for the failure.
 - ranked locator suggestions with weighted scoring signals
   (`roleSignal`, `accessibleNameSignal`, `uniquenessSignal`, `historicalSignal`, `similaritySignal`).
+- optional `sat` payload with snapshot summary, ranked DOM/heuristic candidates, selected candidate ID,
+  history summary, and analysis warnings.
 
 ### Correlation Identifier Resolution
 
