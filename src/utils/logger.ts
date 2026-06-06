@@ -1,4 +1,5 @@
 import pino from 'pino';
+import { getTelemetryLogCorrelation } from '../framework/observability/logCorrelation';
 
 const DEFAULT_LOG_LEVEL = 'info';
 const DEFAULT_LOG_FILE_PATH = './logs/test-runs.log';
@@ -205,6 +206,9 @@ function buildTransportTargets(config: LoggerRuntimeConfig): pino.TransportTarge
 function buildLoggerOptions(config: LoggerRuntimeConfig): pino.LoggerOptions {
   return {
     level: config.level,
+    mixin() {
+      return getTelemetryLogCorrelation();
+    },
     ...(config.redactEnabled
       ? {
           redact: {
