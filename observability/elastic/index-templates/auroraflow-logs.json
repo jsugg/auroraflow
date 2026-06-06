@@ -1,0 +1,37 @@
+{
+  "index_patterns": ["auroraflow-logs-*"],
+  "template": {
+    "settings": {
+      "index.lifecycle.name": "auroraflow-local-retention",
+      "index.number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": true,
+      "properties": {
+        "@timestamp": { "type": "date" },
+        "level": { "type": "keyword" },
+        "message": { "type": "text" },
+        "msg": { "type": "text" },
+        "component": { "type": "keyword" },
+        "runId": { "type": "keyword" },
+        "testId": { "type": "keyword" },
+        "traceId": { "type": "keyword" },
+        "spanId": { "type": "keyword" },
+        "workflow": { "type": "keyword" },
+        "branch": { "type": "keyword" },
+        "commit": { "type": "keyword" },
+        "auroraflow": {
+          "properties": {
+            "ingest_schema_version": { "type": "keyword" },
+            "source_kind": { "type": "keyword" }
+          }
+        }
+      }
+    }
+  },
+  "priority": 200,
+  "version": 1,
+  "_meta": {
+    "description": "AuroraFlow structured runtime logs."
+  }
+}

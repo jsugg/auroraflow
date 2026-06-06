@@ -1,0 +1,3 @@
+{"type":"index-pattern","id":"auroraflow-logs","attributes":{"title":"auroraflow-logs-*","timeFieldName":"@timestamp","name":"AuroraFlow Logs"},"references":[],"migrationVersion":{"index-pattern":"8.0.0"}}
+{"type":"index-pattern","id":"auroraflow-self-healing","attributes":{"title":"auroraflow-self-healing-*","timeFieldName":"@timestamp","name":"AuroraFlow Self-Healing"},"references":[],"migrationVersion":{"index-pattern":"8.0.0"}}
+{"type":"index-pattern","id":"auroraflow-ingest-dead-letter","attributes":{"title":"auroraflow-ingest-dead-letter-*","timeFieldName":"@timestamp","name":"AuroraFlow Ingestion Dead Letter"},"references":[],"migrationVersion":{"index-pattern":"8.0.0"}}

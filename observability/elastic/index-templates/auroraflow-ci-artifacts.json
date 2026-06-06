@@ -1,0 +1,27 @@
+{
+  "index_patterns": ["auroraflow-ci-artifacts-*"],
+  "template": {
+    "settings": {
+      "index.lifecycle.name": "auroraflow-local-retention",
+      "index.number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": true,
+      "properties": {
+        "@timestamp": { "type": "date" },
+        "workflow": { "type": "keyword" },
+        "branch": { "type": "keyword" },
+        "commit": { "type": "keyword" },
+        "runId": { "type": "keyword" },
+        "project": { "type": "keyword" },
+        "shard": { "type": "keyword" },
+        "artifactType": { "type": "keyword" }
+      }
+    }
+  },
+  "priority": 200,
+  "version": 1,
+  "_meta": {
+    "description": "AuroraFlow normalized CI artifact events."
+  }
+}

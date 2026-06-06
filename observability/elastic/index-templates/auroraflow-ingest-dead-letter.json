@@ -1,0 +1,29 @@
+{
+  "index_patterns": ["auroraflow-ingest-dead-letter-*"],
+  "template": {
+    "settings": {
+      "index.lifecycle.name": "auroraflow-local-retention",
+      "index.number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": true,
+      "properties": {
+        "@timestamp": { "type": "date" },
+        "message": { "type": "text" },
+        "tags": { "type": "keyword" },
+        "auroraflow": {
+          "properties": {
+            "ingest_error": { "type": "keyword" },
+            "ingest_schema_version": { "type": "keyword" },
+            "source_kind": { "type": "keyword" }
+          }
+        }
+      }
+    }
+  },
+  "priority": 200,
+  "version": 1,
+  "_meta": {
+    "description": "AuroraFlow ingestion records that could not be normalized."
+  }
+}
