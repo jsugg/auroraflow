@@ -6,7 +6,7 @@
 
 ## Objective
 
-This document outlines an advanced blueprint for a Test Automation Framework (TAF) that incorporates AI-driven Selector Analysis Tooling (SAT), dynamic test data management, real-time monitoring, and more. It begins with a clean architecture and meticulous, professional software design. With an emphasis on scalability, reliability, adaptability, and observability, the framework leverages Docker, Redis, Prometheus, Grafana, the ELK stack, and machine learning technologies. Its purpose is to automate UI, end-to-end, and accessibility testing and offer self-healing capabilities efficiently across a variety of web applications, with a special focus on developer experience.
+This document describes AuroraFlow's current Test Automation Framework (TAF) foundation and the target architecture it is growing toward. The implemented repository currently centers on Playwright, TypeScript, Redis data primitives, guarded self-healing artifacts, and JSON/Markdown observability reports. AI-driven Selector Analysis Tooling (SAT), Dockerized SAT services, Prometheus/Grafana/ELK/Jaeger infrastructure, encrypted Redis dump lifecycle, and autonomous selector optimization remain roadmap capabilities until corresponding services and workflows exist in source.
 
 ## Current Repository Status (April 2026)
 
@@ -28,46 +28,46 @@ Planned/roadmap (not fully implemented yet):
 - Full production observability stack (Prometheus/Grafana/ELK/Jaeger) and trend dashboards.
 - Extended platform governance automation and release/signing workflows.
 
-## Architectural Overview
+## Target Architecture (Roadmap)
 
 ```mermaid
 graph TD;
     CI[CI/CD Pipeline]-->|Triggers|TAF[Test Automation Framework];
     TAF-->|Uses|Redis[Redis for Test Data];
     TAF-->|Interacts with|Browser[Browsers via Playwright];
-    Redis-->|Data Source|SAT[Selector Analysis Tooling];
-    SAT-->|Updates|Redis;
-    TAF-->|Generates|Reports[Reports & Logs];
-    Reports-->|Monitored by|Monitoring[Monitoring Tools];
-    Monitoring-->Prometheus;
-    Monitoring-->Grafana;
-    Monitoring-->ELK[Elasticsearch, Logstash, Kibana];
-    TAF-->|Utilizes|Docker[Docker Compose/Swarm];
-    Docker-->|Manages|Redis;
-    Docker-->|Manages|SAT;
+    Redis-.->|Planned data source|SAT[Selector Analysis Tooling];
+    SAT-.->|Planned selector updates|Redis;
+    TAF-->|Generates|Reports[JSON/Markdown Reports & Logs];
+    Reports-.->|Planned production monitoring|Monitoring[Monitoring Tools];
+    Monitoring-.->Prometheus;
+    Monitoring-.->Grafana;
+    Monitoring-.->ELK[Elasticsearch, Logstash, Kibana];
+    TAF-->|Uses today|Docker[Docker Compose];
+    Docker-->|Manages local Redis|Redis;
+    Docker-.->|Planned service|SAT;
 ```
 
-This diagram illustrates the core components of the TAF ecosystem, showing the relationships between the CI pipeline, the Test Automation Framework, Redis, the Selector Analysis Tooling, browsers, and the monitoring tools.
+This roadmap diagram separates the implemented foundation from planned services. Today, Docker Compose manages local Redis only; SAT and the Prometheus/Grafana/ELK monitoring stack are target architecture, not current runtime infrastructure.
 
 ### Core Components
 
 - **Node.js and TypeScript:** Serve as the backbone for the TAF, offering asynchronous execution and strong typing for robust, maintainable code.
 - **Playwright:** Enables automated, cross-browser UI interactions and assertions, facilitating comprehensive test coverage.
 - **Page Object Model (POM) & Page Factory:** Encapsulates UI element interactions, improving test maintenance and reducing redundancy.
-- **Redis:** Acts as a central repository for storing and managing UI selectors and other test data, allowing for real-time updates and retrieval.
-- **Docker Compose (migrating to Swarm):** Orchestrates containerized deployments of the TAF, SAT, and Redis, ensuring consistency across testing environments.
-- **AI-Driven SAT:** Utilizes TensorFlow.js and NLP for dynamic identification and updating of UI selectors based on DOM analysis, minimizing manual intervention.
-- **Monitoring and Logging:** Integrates Prometheus, Grafana, and the ELK stack for real-time monitoring, logging, and analysis of the test infrastructure.
-- **Computer Vision:** Employs open-source computer vision models to enhance UI testing capabilities, particularly for complex or dynamic UI elements.
+- **Redis:** Provides implemented data-layer primitives for namespaced keys and selector registry records; autonomous selector updates are planned.
+- **Docker Compose:** Currently orchestrates local Redis only. Dockerized SAT, TAF services, and Docker Swarm are not implemented yet.
+- **AI-Driven SAT:** Planned capability for dynamic selector identification and updates based on DOM analysis.
+- **Monitoring and Logging:** Currently implemented as structured logs plus JSON/Markdown flakiness, SLO, and alert artifacts. Prometheus, Grafana, ELK, and tracing backends are planned integrations.
+- **Computer Vision:** Planned capability for complex or dynamic UI elements.
 
 ### Enhanced Features
 
-- **Docker Compose for CI/CD Pipelines:** Facilitates Redis and SAT service management, ensuring isolated, reproducible test environments.
-- **Redis Persistence:** Utilizes encrypted Redis dump files as a persistent data source across CI runs, safeguarded with GitHub secrets.
-- **Machine Learning for SAT:** Leverages custom-built or open-source ML models for efficient DOM analysis and selector optimization.
-- **Advanced Monitoring and Visualization:** Employs Prometheus and Grafana for infrastructure monitoring, combined with ELK for in-depth log analysis.
-- **Failover Mechanisms & Robust Error Handling:** Implements sophisticated error handling and failover strategies to enhance the resilience of the test infrastructure.
-- **Tracing with Jaeger or Zipkin:** Offers detailed tracing of test executions and interactions within the infrastructure for pinpointing issues.
+- **Current Docker Compose support:** Provides a local Redis service with healthcheck and persistent volume for development and integration testing.
+- **Current observability artifacts:** Generates flakiness summaries, SLO dashboards, and SLO alert evaluations as JSON/Markdown artifacts.
+- **Planned Redis persistence:** Encrypted Redis dump backup/restore across CI runs.
+- **Planned SAT ML:** Custom-built or open-source ML models for DOM analysis and selector optimization.
+- **Planned monitoring stack:** Prometheus/Grafana metrics, ELK log analysis, and Jaeger or Zipkin tracing.
+- **Failover Mechanisms & Robust Error Handling:** Implemented in framework action wrappers and Redis retry primitives; broader infrastructure failover remains planned.
 
 ### TAF Design Best Practices
 
@@ -75,8 +75,8 @@ This diagram illustrates the core components of the TAF ecosystem, showing the r
 - **Asynchronous Programming:** Playwright's asynchronous API is fully leveraged, ensuring non-blocking operations and efficient execution.
 - **Error Handling:** Custom error handling in page actions, with logging and screenshots on failure, enhances debugging and accountability.
 - **Retry Mechanisms:** Implement retry logic with exponential backoff for flaky operations, improving test reliability.
-- **Security:** Strong encryption for Redis dump and GitHub secrets for sensitive data ensure security best practices.
-- **Test Isolation:** Docker containers provide isolated environments for each test run, reducing data pollution and ensuring consistent test conditions.
+- **Security:** CI includes dependency review, npm audit, CodeQL, gitleaks, and workflow security checks; encrypted Redis dump handling is planned.
+- **Test Isolation:** Docker Compose and Testcontainers provide Redis isolation for local/integration scenarios; full Dockerized TAF/SAT isolation is planned.
 
 ### Project Structure and Setup
 
@@ -126,7 +126,7 @@ sequenceDiagram
     end
 ```
 
-This sequence diagram details the test execution flow, highlighting the interactions between the CI pipeline, TAF, Redis, SAT, and browsers during a test run.
+This sequence diagram represents the target SAT-integrated flow. Current CI runs TAF test suites and artifact generation; it does not yet clone, run, or wait for a SAT job.
 
 ## Data Management and SAT Workflow
 
@@ -140,14 +140,14 @@ graph LR;
     DB_Dump --> |Restored For Next Test Run| Redis;
 ```
 
-This diagram focuses on the data management aspect, showing how the Selector Analysis Tooling updates test data in Redis, which is then used by the TAF for test execution. It also depicts the backup and restoration process of Redis data as an encrypted Redis dump, ensuring secure and reliable Test Data management and persistence across test runs.
+This diagram represents the target data-management workflow. Current source includes Redis client and selector registry primitives, but not SAT-driven Redis updates or encrypted Redis dump backup/restore.
 
 ## Implementation Details
 
 ### Docker Compose and Redis Configuration
 
-- Use Docker Compose to spin up Redis in GitHub Actions, ensuring a consistent, isolated environment. Plan for future migration to Docker Swarm for enhanced scalability and management.
-- Manage Redis as the dynamic data store for test selectors and URLs, with automated updates via SAT. Encrypt Redis dumps for security, decrypting them in CI pipelines with GitHub secrets.
+- Use Docker Compose to spin up local Redis for development and integration testing. Current GitHub Actions rely on Testcontainers for Redis integration tests, not a Dockerized SAT stack.
+- Manage Redis as the dynamic data store foundation for test selectors and URLs. Automated SAT updates and encrypted Redis dump backup/restore are planned.
 
 ### SAT Development and Integration
 
@@ -156,50 +156,41 @@ This diagram focuses on the data management aspect, showing how the Selector Ana
 
 ### CI/CD Pipeline Enhancements
 
-- Implement GitHub Actions workflows to manage TAF and SAT operations, including Docker Compose setups and Redis data management.
-- Encrypt the Redis dump file for secure storage in the TAF repository. Automatically decrypt and load this dump in Redis at the start of test runs.
+- Implement GitHub Actions workflows to manage future TAF/SAT operations, Dockerized services, and Redis data lifecycle.
+- Encrypt the Redis dump file for secure storage in the TAF repository and automatically decrypt/load it in Redis at the start of test runs.
 
 ### Monitoring, Logging, and Tracing Setup
 
-- Configure Prometheus and Grafana for real-time monitoring, setting up dashboards to display key metrics from test runs and infrastructure health.
-- Utilize the ELK stack for comprehensive logging and analysis, ensuring that all test execution and system logs are indexed and searchable.
-- Integrate Jaeger or Zipkin for tracing, enabling detailed analysis of test executions and system interactions to quickly identify bottlenecks or failures.
+- Current observability emits JSON/Markdown flakiness, SLO dashboard, and alert artifacts from Playwright report data.
+- Configure Prometheus and Grafana for real-time monitoring once metrics exporters and dashboards exist.
+- Utilize the ELK stack for comprehensive log analysis once log shipping/indexing infrastructure exists.
+- Integrate Jaeger or Zipkin for tracing once tracing instrumentation and collectors exist.
 
 ### Best Practices and Security Measures
 
 - Encapsulate UI interactions within page objects, using the Page Factory for instance management, to ensure code modularity and reusability.
 - Implement robust error handling and custom exceptions within page actions, including screenshots on failure for enhanced debugging.
-- Secure test data management with encrypted Redis dumps and GitHub secrets, adhering to security best practices for CI pipelines.
+- Secure test data management with validated Redis configuration and GitHub secret scanning today; encrypted Redis dump handling remains planned.
 
-## Infrastructure and Monitoring
+## Current Infrastructure and Monitoring Status
 
 ```mermaid
 graph TD;
-    Docker{Docker Compose/Swarm}-->Redis[Redis];
-    Docker-->SAT[Selector Analysis Tooling];
-    Docker-->TAF[Test Automation Framework];
-    
-    TAF-->|Generates|LogsTAF[Logs & Metrics - TAF];
-    SAT-->|Generates|LogsSAT[Logs & Metrics - SAT];
-    
-    LogsTAF-->Prometheus[Prometheus];
-    LogsSAT-->Prometheus;
-    
-    LogsTAF-->Grafana[Grafana];
-    LogsSAT-->Grafana;
-    
-    LogsTAF-->ELK[Elasticsearch, Logstash, Kibana];
-    LogsSAT-->ELK;
-    
-    Prometheus-->|Monitors|Grafana;
-    ELK-->|Visualizes|Grafana;
+    Docker[Docker Compose]-->|Current local service|Redis[Redis];
+    Tests[Test Suites]-->|Use via RedisClient/Testcontainers|Redis;
+    Tests-->|Generate|PlaywrightReports[Playwright JSON Reports];
+    PlaywrightReports-->|Aggregate|Flakiness[Flakiness Summary JSON/MD];
+    Flakiness-->|Feeds|SLO[SLO Dashboard JSON/MD];
+    SLO-->|Evaluates|Alerts[SLO Alerts JSON/MD];
+    SAT[Dockerized SAT]-.->|Planned|Redis;
+    Monitoring[Prometheus/Grafana/ELK/Jaeger]-.->|Planned|Alerts;
 ```
 
-This diagram showcases the infrastructure setup using Docker Compose/Swarm for container management and the integration of Prometheus, Grafana, and ELK for monitoring logs and metrics generated by the TAF and SAT.
+Current infrastructure consists of local Redis orchestration, Testcontainers-backed Redis integration tests, and artifact-based observability. Dockerized SAT services and Prometheus/Grafana/ELK/Jaeger are intentionally documented as planned until the corresponding runtime services, exporters, dashboards, and workflows are implemented.
 
 ## Rationale Behind Architectural Choices
 
-The proposed TAF architecture is designed to address the challenges of dynamic web UI testing at scale. By leveraging Docker for environment consistency, Redis for flexible data management, and AI for automatic selector updates, the framework reduces manual maintenance and increases test reliability. The integration of advanced monitoring, logging, and tracing tools ensures comprehensive visibility into test executions and infrastructure performance, facilitating quick issue resolution and continuous improvement.
+The proposed TAF architecture is designed to address the challenges of dynamic web UI testing at scale. The current implementation establishes the Playwright framework, Redis data primitives, guarded self-healing artifacts, and CI observability reports first. Dockerized SAT, autonomous selector updates, and production monitoring/tracing are planned follow-on layers that should be claimed as implemented only after the corresponding source, services, and CI workflows exist.
 
 ## Contributing
 
