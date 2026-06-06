@@ -26,6 +26,15 @@ export interface ActionContext {
 
 type GuardedAutoHealAction<T> = (acceptedLocator: string) => Promise<T>;
 
+function requiresHttpNavigationResponse(url: string): boolean {
+  try {
+    const protocol = new URL(url).protocol;
+    return protocol === 'http:' || protocol === 'https:';
+  } catch {
+    return true;
+  }
+}
+
 export class PageActionError extends Error {
   constructor(
     message: string,
@@ -240,12 +249,18 @@ export abstract class PageObjectBase {
   public async navigateTo(
     url: string,
     options: NavigationOptions = { waitUntil: 'domcontentloaded' },
-  ): Promise<Response> {
+  ): Promise<Response | null> {
     return this.safeAction(
       async () => {
         const response: Response | null = await this.page.goto(url, options);
-        if (!response || !response.ok()) {
-          throw new Error(`Navigation to ${url} failed with status: ${response?.status()}`);
+        if (!response) {
+          if (requiresHttpNavigationResponse(url)) {
+            throw new Error(`Navigation to ${url} failed without a main resource response`);
+          }
+          return null;
+        }
+        if (!response.ok()) {
+          throw new Error(`Navigation to ${url} failed with status: ${response.status()}`);
         }
         return response;
       },
