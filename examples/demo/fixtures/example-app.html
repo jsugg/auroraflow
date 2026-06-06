@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AuroraFlow Example Fixture</title>
+    <style>
+      body {
+        color: #1f2933;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        line-height: 1.45;
+        margin: 2rem;
+      }
+
+      main {
+        max-width: 720px;
+      }
+
+      nav ul {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 1rem;
+        list-style: none;
+        padding: 0;
+      }
+
+      .hero-video {
+        align-items: center;
+        background: #e5f4f2;
+        border: 1px solid #b4d6d2;
+        display: flex;
+        font-weight: 600;
+        height: 8rem;
+        justify-content: center;
+        margin: 1rem 0;
+      }
+
+      #cta-status {
+        font-weight: 600;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Example Demo App</h1>
+      <nav aria-label="Primary">
+        <ul>
+          <li><a href="#brands">Our Brands</a></li>
+          <li><a href="#news">Featured in the News</a></li>
+          <li><a href="#careers">Careers</a></li>
+        </ul>
+      </nav>
+
+      <section aria-labelledby="hero-heading">
+        <h2 id="hero-heading">Reliable local UI fixture</h2>
+        <div
+          class="hero-video"
+          data-testid="hero-video"
+          role="img"
+          aria-label="Demo video placeholder"
+        >
+          Demo video placeholder
+        </div>
+      </section>
+
+      <section id="news" aria-labelledby="news-heading">
+        <h2 id="news-heading">Featured in the News</h2>
+        <p>Fixture content keeps example page-object tests deterministic.</p>
+      </section>
+
+      <section id="careers" aria-labelledby="careers-heading">
+        <h2 id="careers-heading">Join Our Team</h2>
+        <button type="button" id="join-team">Join Our Team</button>
+        <p id="cta-status" aria-live="polite">No call to action selected.</p>
+      </section>
+    </main>
+
+    <script>
+      document.getElementById('join-team').addEventListener('click', () => {
+        document.getElementById('cta-status').textContent = 'Team CTA selected.';
+      });
+    </script>
+  </body>
+</html>

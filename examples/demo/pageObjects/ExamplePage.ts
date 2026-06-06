@@ -1,35 +1,43 @@
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { Page } from 'playwright';
-import { PageObjectBase } from './pageObjectBase';
+import { PageObjectBase } from '../../../src/pageObjects/pageObjectBase';
 
-class ExamplePage extends PageObjectBase {
-  private readonly navigationMenuLinksSelector = '.hhs-nav-grid__menu >> a';
-  private readonly heroVideoSelector = '.hhs-hero-mod video';
-  private readonly featuredNewsSelector = 'text=Featured in the News';
-  private readonly joinOurTeamSelector = 'text=Join Our Team';
+function defaultFixtureUrl(): string {
+  const fixturePath = path.join(process.cwd(), 'examples/demo/fixtures/example-app.html');
+  return pathToFileURL(fixturePath).toString();
+}
 
-  constructor(page: Page) {
+export class ExamplePage extends PageObjectBase {
+  private readonly navigationMenuLinksSelector = 'nav[aria-label="Primary"] a';
+  private readonly heroVideoSelector = '[data-testid="hero-video"]';
+  private readonly featuredNewsSelector = '#news-heading';
+  private readonly joinOurTeamSelector = '#join-team';
+  private readonly callToActionStatusSelector = '#cta-status';
+
+  constructor(page: Page, url: string = defaultFixtureUrl()) {
     super(page);
-    this.url = 'https://www.playonsports.com';
+    this.url = url;
   }
 
-  // Selectors
   private get navigationMenuLinks() {
     return this.page.locator(this.navigationMenuLinksSelector);
   }
+
   private get heroVideo() {
     return this.page.locator(this.heroVideoSelector);
   }
+
   private get featuredNewsSection() {
     return this.page.locator(this.featuredNewsSelector);
   }
 
   public async navigateToSection(linkText: string): Promise<void> {
     await this.click(`text=${linkText}`);
-    await this.page.waitForLoadState('networkidle');
   }
 
-  public async clickOnJoinOurTeam(): Promise<void> {
-    await this.click(this.joinOurTeamSelector);
+  public async clickOnJoinOurTeam(): Promise<void | null> {
+    return this.click(this.joinOurTeamSelector);
   }
 
   public async getNavigationMenuLinksTexts(): Promise<string[]> {
@@ -58,6 +66,10 @@ class ExamplePage extends PageObjectBase {
       { type: 'read', target: this.featuredNewsSelector },
     );
   }
-}
 
-export default ExamplePage;
+  public async callToActionStatusText(): Promise<string> {
+    return (
+      (await this.getText(this.callToActionStatusSelector)) ?? 'Call to action status unavailable.'
+    ).trim();
+  }
+}
