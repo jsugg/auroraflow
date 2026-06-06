@@ -17,7 +17,7 @@ Not implemented yet:
 - CI observability stack jobs and backend snapshot uploads.
 - Remote telemetry export workflow and secret-backed authentication.
 - Production manifests, TLS, authentication, retention policy, and dashboard drift controls.
-- Kibana saved objects and hardened Elasticsearch index lifecycle management.
+- Production-grade Kibana saved searches and hardened Elasticsearch index lifecycle automation.
 
 ## Signal Flow
 
@@ -37,7 +37,7 @@ flowchart LR
   Jaeger --> Grafana
 ```
 
-The Collector receives OTLP over HTTP and gRPC, batches signals, exposes metrics for Prometheus scrape, and exports traces to Jaeger. Logstash tails local JSON logs and self-healing artifacts, applies initial redaction, and writes local Elasticsearch indices.
+The Collector receives OTLP over HTTP and gRPC, batches signals, exposes metrics for Prometheus scrape, and exports traces to Jaeger. Logstash tails local JSON logs and self-healing artifacts, applies recursive redaction for known secret-shaped fields, routes malformed log records to a dead-letter index, and writes local Elasticsearch indices.
 
 ## Local Operation
 

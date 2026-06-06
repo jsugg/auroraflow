@@ -43,7 +43,13 @@ describe('observability contract documentation', () => {
       'logstash/config/logstash.yml',
       'logstash/pipeline/auroraflow.conf',
       'elastic/elasticsearch.yml',
+      'elastic/ilm/auroraflow-local-retention.json',
+      'elastic/index-templates/auroraflow-logs.json',
+      'elastic/index-templates/auroraflow-self-healing.json',
+      'elastic/index-templates/auroraflow-ci-artifacts.json',
+      'elastic/index-templates/auroraflow-ingest-dead-letter.json',
       'kibana/kibana.yml',
+      'kibana/saved-objects/auroraflow-log-exploration.ndjson',
       'README.md',
     ] as const;
 
@@ -130,5 +136,69 @@ describe('observability contract documentation', () => {
       expect(Array.isArray(dashboard.panels)).toBe(true);
       expect(dashboard.panels?.length).toBeGreaterThan(0);
     }
+  });
+
+  it('hardens ELK ingestion with redaction, dead-letter routing, and templates', () => {
+    const logstashPipeline = readFileSync(
+      path.join(OBSERVABILITY_ROOT, 'logstash', 'pipeline', 'auroraflow.conf'),
+      'utf8',
+    );
+
+    expect(logstashPipeline).toContain('_jsonparsefailure');
+    expect(logstashPipeline).toContain('auroraflow-ingestion-dead-letter');
+    expect(logstashPipeline).toContain('auroraflow-ingest-dead-letter-%{+YYYY.MM.dd}');
+    expect(logstashPipeline).toContain('secret_key_pattern');
+    expect(logstashPipeline).toContain('authorization|cookie|session');
+    expect(logstashPipeline).toContain('auroraflow.ingest_schema_version');
+
+    const templatesPath = path.join(OBSERVABILITY_ROOT, 'elastic', 'index-templates');
+    for (const templateFile of readdirSync(templatesPath).filter((fileName) =>
+      fileName.endsWith('.json'),
+    )) {
+      const template = JSON.parse(readFileSync(path.join(templatesPath, templateFile), 'utf8')) as {
+        index_patterns?: string[];
+        template?: {
+          mappings?: unknown;
+          settings?: Record<string, string | number>;
+        };
+      };
+
+      expect(template.index_patterns?.[0]).toMatch(/^auroraflow-.+\*$/);
+      expect(template.template?.mappings).toBeDefined();
+      expect(template.template?.settings?.['index.lifecycle.name']).toBe(
+        'auroraflow-local-retention',
+      );
+    }
+
+    const retentionPolicy = JSON.parse(
+      readFileSync(
+        path.join(OBSERVABILITY_ROOT, 'elastic', 'ilm', 'auroraflow-local-retention.json'),
+        'utf8',
+      ),
+    ) as {
+      policy?: { phases?: { hot?: unknown; delete?: unknown } };
+    };
+    expect(retentionPolicy.policy?.phases?.hot).toBeDefined();
+    expect(retentionPolicy.policy?.phases?.delete).toBeDefined();
+  });
+
+  it('ships importable Kibana saved-object NDJSON', () => {
+    const savedObjects = readFileSync(
+      path.join(OBSERVABILITY_ROOT, 'kibana', 'saved-objects', 'auroraflow-log-exploration.ndjson'),
+      'utf8',
+    )
+      .trim()
+      .split('\n')
+      .map((line) => JSON.parse(line) as { type?: string; attributes?: { title?: string } });
+
+    expect(savedObjects).toHaveLength(3);
+    expect(savedObjects.map((savedObject) => savedObject.attributes?.title)).toEqual(
+      expect.arrayContaining([
+        'auroraflow-logs-*',
+        'auroraflow-self-healing-*',
+        'auroraflow-ingest-dead-letter-*',
+      ]),
+    );
+    expect(savedObjects.every((savedObject) => savedObject.type === 'index-pattern')).toBe(true);
   });
 });

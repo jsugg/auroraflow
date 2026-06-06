@@ -1,0 +1,31 @@
+{
+  "index_patterns": ["auroraflow-self-healing-*"],
+  "template": {
+    "settings": {
+      "index.lifecycle.name": "auroraflow-local-retention",
+      "index.number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": true,
+      "properties": {
+        "@timestamp": { "type": "date" },
+        "runId": { "type": "keyword" },
+        "testId": { "type": "keyword" },
+        "mode": { "type": "keyword" },
+        "actionType": { "type": "keyword" },
+        "acceptedLocatorStrategy": { "type": "keyword" },
+        "auroraflow": {
+          "properties": {
+            "ingest_schema_version": { "type": "keyword" },
+            "source_kind": { "type": "keyword" }
+          }
+        }
+      }
+    }
+  },
+  "priority": 200,
+  "version": 1,
+  "_meta": {
+    "description": "AuroraFlow self-healing artifact events."
+  }
+}

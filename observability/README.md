@@ -33,6 +33,8 @@ npm run test:smoke
 - `observability/prometheus/prometheus.yml` scrapes the Collector and loads local alert rules.
 - `observability/grafana/provisioning` provisions Prometheus, Elasticsearch, Jaeger, and starter dashboards.
 - `observability/logstash/pipeline/auroraflow.conf` reads structured logs and self-healing artifacts from local mounted paths.
+- `observability/elastic/index-templates` and `observability/elastic/ilm` provide optional Elasticsearch templates and local retention policy definitions.
+- `observability/kibana/saved-objects` provides importable data views for log and self-healing exploration.
 
 ## Environment
 
@@ -42,7 +44,32 @@ npm run test:smoke
 
 ## Logs
 
-Logstash reads JSON lines from `logs/*.ndjson` and self-healing artifacts from `test-results/self-healing/*.json`. Known secret-like `message` fragments are redacted before indexing. Shared environments need stronger upstream redaction, TLS, authentication, and retention policies before persistent indexing is enabled.
+Logstash reads JSON lines from `logs/*.ndjson` and self-healing artifacts from `test-results/self-healing/*.json`. Secret-like field names and inline `key=value` fragments are redacted before indexing, and malformed JSON log lines are routed to `auroraflow-ingest-dead-letter-*` for triage.
+
+To apply the optional local Elasticsearch retention policy and index templates:
+
+```bash
+curl -fsS -X PUT http://localhost:9200/_ilm/policy/auroraflow-local-retention \
+  -H 'Content-Type: application/json' \
+  --data-binary @observability/elastic/ilm/auroraflow-local-retention.json
+
+for template in observability/elastic/index-templates/*.json; do
+  name="$(basename "$template" .json)"
+  curl -fsS -X PUT "http://localhost:9200/_index_template/$name" \
+    -H 'Content-Type: application/json' \
+    --data-binary "@$template"
+done
+```
+
+To import Kibana data views:
+
+```bash
+curl -fsS -X POST http://localhost:5601/api/saved_objects/_import \
+  -H 'kbn-xsrf: auroraflow' \
+  --form file=@observability/kibana/saved-objects/auroraflow-log-exploration.ndjson
+```
+
+Shared environments need stronger upstream redaction, TLS, authentication, and retention policies before persistent indexing is enabled.
 
 ## CI Collector Smoke
 
