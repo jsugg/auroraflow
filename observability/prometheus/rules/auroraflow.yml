@@ -1,0 +1,92 @@
+groups:
+  - name: auroraflow-slo
+    rules:
+      - alert: AuroraFlowPassRateLow
+        expr: |
+          sum(rate(auroraflow_test_cases_total{status="passed"}[10m]))
+            / clamp_min(sum(rate(auroraflow_test_cases_total[10m])), 1) < 0.95
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: AuroraFlow pass rate is below the local SLO.
+
+      - alert: AuroraFlowFailureRateHigh
+        expr: |
+          sum(rate(auroraflow_test_cases_total{status="failed"}[10m]))
+            / clamp_min(sum(rate(auroraflow_test_cases_total[10m])), 1) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: AuroraFlow failure rate is above the local SLO.
+
+      - alert: AuroraFlowFlakeRateHigh
+        expr: sum(increase(auroraflow_flaky_tests_total[30m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: AuroraFlow flaky test count increased.
+
+      - alert: AuroraFlowRetryPressureHigh
+        expr: sum(increase(auroraflow_retry_failures_total[30m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: AuroraFlow retry pressure increased.
+
+      - alert: AuroraFlowGuardedAutoHealFailureRateHigh
+        expr: |
+          sum(rate(auroraflow_guarded_auto_heal_total{status="failure"}[30m]))
+            / clamp_min(sum(rate(auroraflow_guarded_auto_heal_total[30m])), 1) > 0.1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: AuroraFlow guarded auto-heal failure rate is high.
+
+  - name: auroraflow-operations
+    rules:
+      - alert: AuroraFlowPageActionLatencyHigh
+        expr: histogram_quantile(0.95, sum(rate(auroraflow_page_action_duration_ms_bucket[10m])) by (le)) > 5000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: AuroraFlow page action p95 latency is above budget.
+
+      - alert: AuroraFlowRedisFailureRateHigh
+        expr: |
+          sum(rate(auroraflow_redis_operations_total{status="failure"}[10m]))
+            / clamp_min(sum(rate(auroraflow_redis_operations_total[10m])), 1) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: AuroraFlow Redis operation failure rate is high.
+
+      - alert: AuroraFlowCollectorExporterFailures
+        expr: sum(rate(otelcol_exporter_send_failed_spans[10m])) + sum(rate(otelcol_exporter_send_failed_metric_points[10m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: OpenTelemetry Collector exporter failures are present.
+
+      - alert: AuroraFlowTelemetryDroppedData
+        expr: sum(rate(otelcol_processor_dropped_spans[10m])) + sum(rate(otelcol_processor_dropped_metric_points[10m])) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: OpenTelemetry Collector dropped AuroraFlow telemetry.
+
+      - alert: AuroraFlowElasticIngestionLag
+        expr: logstash_node_queue_events_count > 10000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: Logstash queue depth suggests Elasticsearch ingestion lag.
