@@ -15,10 +15,26 @@ export interface SelfHealingSafetyPolicy {
   allowedDomains: string[];
 }
 
+export type SelfHealingRegistryMode = 'off' | 'read' | 'write_pending';
+
+export type SelfHealingPromotionMode = 'manual' | 'ci_acknowledged';
+
+export interface SelfHealingSatConfig {
+  enabled: boolean;
+  captureDom: boolean;
+  maxDomNodes: number;
+  maxCandidates: number;
+  maxTextLength: number;
+  allowedAttributes: string[];
+  registryMode: SelfHealingRegistryMode;
+  promotionMode: SelfHealingPromotionMode;
+}
+
 export interface SelfHealingConfig {
   mode: SelfHealingMode;
   minConfidence: number;
   safetyPolicy: SelfHealingSafetyPolicy;
+  sat: SelfHealingSatConfig;
 }
 
 export type SelfHealingSuggestionStrategy =
@@ -28,7 +44,9 @@ export type SelfHealingSuggestionStrategy =
   | 'ariaLabel'
   | 'text'
   | 'cssFallback'
-  | 'fallback';
+  | 'fallback'
+  | 'registry'
+  | 'domEvidence';
 
 export interface SelfHealingSuggestionSignals {
   roleSignal: number;
@@ -49,7 +67,106 @@ export interface SelfHealingSuggestion {
 export interface SelfHealingActionContext {
   type: SelfHealingActionType;
   target?: string;
+  targetAlias?: string;
+  expectedRole?: string;
+  expectedName?: string;
+  selectorId?: string;
   description: string;
+}
+
+export interface DomElementSummary {
+  id: string;
+  tagName: string;
+  attributes: Readonly<Record<string, string>>;
+  role?: string;
+  accessibleName?: string;
+  text?: string;
+  visible: boolean;
+  enabled?: boolean;
+  editable?: boolean;
+  depth: number;
+  childCount: number;
+  parentTagName?: string;
+  landmark?: string;
+  cssPath?: string;
+}
+
+export interface DomSnapshot {
+  schemaVersion: '1.0.0';
+  capturedAt: string;
+  url?: string;
+  nodeCount: number;
+  truncated: boolean;
+  elements: readonly DomElementSummary[];
+}
+
+export interface DomSnapshotSummary {
+  schemaVersion: '1.0.0';
+  capturedAt: string;
+  url?: string;
+  nodeCount: number;
+  truncated: boolean;
+  elementCount: number;
+  artifactPath?: string;
+}
+
+export interface CandidateEvidence {
+  elementId?: string;
+  source: 'dom' | 'history' | 'heuristic' | 'registry';
+  uniqueInSnapshot: boolean;
+  visible: boolean;
+  accessibleName?: string;
+  role?: string;
+  matchedAttributes: readonly string[];
+}
+
+export interface SelectorCandidateHistorySummary {
+  enabled: boolean;
+  observations: number;
+  loadedCandidates: number;
+  warnings: readonly string[];
+}
+
+export interface SelectorCandidateHistory {
+  candidateId: string;
+  attempts: number;
+  validated: number;
+  guardedApplySucceeded: number;
+  guardedApplyFailed: number;
+  promoted: number;
+  rejected: number;
+  lastSeenAt?: string;
+  lastSuccessAt?: string;
+}
+
+export interface PendingSelectorPromotion {
+  eventId: string;
+  candidateId: string;
+  selectorId: string;
+  locator: string;
+  requestedAt: string;
+  acknowledged: boolean;
+}
+
+export interface RankedSelfHealingCandidate {
+  id: string;
+  locator: string;
+  strategy: SelfHealingSuggestionStrategy;
+  score: number;
+  rationale: string;
+  signals: SelfHealingSuggestionSignals;
+  evidence: CandidateEvidence;
+  history?: SelectorCandidateHistorySummary;
+}
+
+export interface SelfHealingSatAnalysis {
+  schemaVersion: '1.0.0';
+  enabled: boolean;
+  snapshot?: DomSnapshotSummary;
+  candidates: readonly RankedSelfHealingCandidate[];
+  history: SelectorCandidateHistorySummary;
+  selectedCandidateId?: string;
+  analysisWarnings: readonly string[];
 }
 
 export interface CapturedFailureError {
@@ -100,6 +217,12 @@ export interface GuardedValidationCandidate {
   confidenceEligible: boolean;
   matchedElements: number;
   visible: boolean;
+  enabled?: boolean;
+  editable?: boolean;
+  stable?: boolean;
+  semanticMatch?: boolean;
+  failureReason?: string;
+  domEvidenceId?: string;
   status: GuardedValidationStatus;
   message?: string;
 }
@@ -131,6 +254,7 @@ export interface CapturedFailureEvent {
   action: SelfHealingActionContext;
   error: CapturedFailureError;
   suggestions: SelfHealingSuggestion[];
+  sat?: SelfHealingSatAnalysis;
   guardedValidation?: GuardedValidationSummary;
   guardedAutoHeal?: GuardedAutoHealSummary;
 }

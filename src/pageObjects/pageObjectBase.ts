@@ -1,6 +1,7 @@
 import { performance } from 'node:perf_hooks';
 import type { ElementHandle, Page, Response } from 'playwright';
 import { Logger, createChildLogger } from '../utils/logger';
+import { analyzeSelfHealingFailure } from '../framework/selfHealing/analyzer';
 import { resolveSelfHealingConfig } from '../framework/selfHealing/config';
 import { captureFailureEvent } from '../framework/selfHealing/failureCapture';
 import { generateRankedLocatorSuggestions } from '../framework/selfHealing/suggestionEngine';
@@ -31,6 +32,10 @@ export interface ActionOptions {
 export interface ActionContext {
   type: SelfHealingActionType;
   target?: string;
+  targetAlias?: string;
+  expectedRole?: string;
+  expectedName?: string;
+  selectorId?: string;
 }
 
 type GuardedAutoHealAction<T> = (acceptedLocator: string) => Promise<T>;
@@ -169,6 +174,28 @@ export abstract class PageObjectBase {
         actionType: actionContext.type,
         failedTarget: actionContext.target,
       });
+      const failureActionContext = {
+        type: actionContext.type,
+        target: actionContext.target,
+        targetAlias: actionContext.targetAlias,
+        expectedRole: actionContext.expectedRole,
+        expectedName: actionContext.expectedName,
+        selectorId: actionContext.selectorId,
+        description: errorMessage,
+      };
+      let selfHealingAnalysis: Awaited<ReturnType<typeof analyzeSelfHealingFailure>> | undefined;
+      try {
+        selfHealingAnalysis = await analyzeSelfHealingFailure({
+          page: this.page,
+          config: selfHealingConfig,
+          pageObjectName: this.pageObjectName,
+          action: failureActionContext,
+          currentUrl,
+          existingSuggestions: rankedSuggestions,
+        });
+      } catch (analysisError: unknown) {
+        this.logger.error('Failed to analyze self-healing failure.', { analysisError });
+      }
       let guardedValidation:
         | Awaited<ReturnType<typeof evaluateGuardedSuggestionsDryRun>>
         | undefined;
@@ -231,12 +258,9 @@ export abstract class PageObjectBase {
         pageObjectName: this.pageObjectName,
         currentUrl,
         screenshotPath,
-        action: {
-          type: actionContext.type,
-          target: actionContext.target,
-          description: errorMessage,
-        },
+        action: failureActionContext,
         error,
+        suggestions: selfHealingAnalysis?.suggestions ?? rankedSuggestions,
         correlation: {
           runId: this.runId,
           testId: this.testId,
@@ -244,6 +268,9 @@ export abstract class PageObjectBase {
           errorCode: `page_action_${actionContext.type}_failed`,
         },
         decorateEvent: async (event) => {
+          if (selfHealingAnalysis?.sat) {
+            event.sat = selfHealingAnalysis.sat;
+          }
           if (guardedValidation) {
             event.guardedValidation = guardedValidation;
           }
