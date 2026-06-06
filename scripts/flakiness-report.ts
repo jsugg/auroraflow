@@ -8,6 +8,8 @@ import {
   PLAYWRIGHT_REPORT_FILE_PREFIX,
   type FlakinessTestCase,
 } from '../src/framework/observability/flakinessReport';
+import { runFlakinessReportTelemetry } from '../src/framework/observability/reportTelemetry';
+import { shutdownTelemetry } from '../src/framework/observability/telemetry';
 
 interface CliOptions {
   inputDir: string;
@@ -121,43 +123,49 @@ async function ensureParentDirectory(filePath: string): Promise<void> {
 }
 
 async function main(): Promise<number> {
-  const options = parseCliOptions(process.argv.slice(2));
-  const reportFiles = await listPlaywrightResultFiles(options.inputDir);
-  const allCases: FlakinessTestCase[] = [];
+  return runFlakinessReportTelemetry({
+    task: async () => {
+      const options = parseCliOptions(process.argv.slice(2));
+      const reportFiles = await listPlaywrightResultFiles(options.inputDir);
+      const allCases: FlakinessTestCase[] = [];
 
-  for (const reportFile of reportFiles) {
-    const cases = await parseFlakinessReportFile(reportFile);
-    allCases.push(...cases);
-  }
+      for (const reportFile of reportFiles) {
+        const cases = await parseFlakinessReportFile(reportFile);
+        allCases.push(...cases);
+      }
 
-  const summary = buildFlakinessSummary({
-    sourceFiles: reportFiles.length,
-    cases: allCases,
-    topLimit: options.topLimit,
+      const summary = buildFlakinessSummary({
+        sourceFiles: reportFiles.length,
+        cases: allCases,
+        topLimit: options.topLimit,
+      });
+      const markdown = buildFlakinessMarkdown(summary);
+
+      await ensureParentDirectory(options.outputJson);
+      await ensureParentDirectory(options.outputMarkdown);
+
+      await writeFile(options.outputJson, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
+      await writeFile(options.outputMarkdown, `${markdown}\n`, 'utf8');
+
+      console.log(
+        `Flakiness report generated: status=${summary.status} sourceFiles=${summary.sourceFiles} flakyTests=${summary.flakyTests} failedTests=${summary.failedTests}`,
+      );
+      console.log(`JSON summary: ${options.outputJson}`);
+      console.log(`Markdown summary: ${options.outputMarkdown}`);
+
+      return { summary, value: 0 };
+    },
   });
-  const markdown = buildFlakinessMarkdown(summary);
-
-  await ensureParentDirectory(options.outputJson);
-  await ensureParentDirectory(options.outputMarkdown);
-
-  await writeFile(options.outputJson, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
-  await writeFile(options.outputMarkdown, `${markdown}\n`, 'utf8');
-
-  console.log(
-    `Flakiness report generated: status=${summary.status} sourceFiles=${summary.sourceFiles} flakyTests=${summary.flakyTests} failedTests=${summary.failedTests}`,
-  );
-  console.log(`JSON summary: ${options.outputJson}`);
-  console.log(`Markdown summary: ${options.outputMarkdown}`);
-
-  return 0;
 }
 
 main()
-  .then((exitCode) => {
+  .then(async (exitCode) => {
+    await shutdownTelemetry();
     process.exit(exitCode);
   })
-  .catch((error: unknown) => {
+  .catch(async (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Failed to generate flakiness report: ${message}`);
+    await shutdownTelemetry();
     process.exit(1);
   });

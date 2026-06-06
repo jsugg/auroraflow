@@ -10,10 +10,17 @@ import type {
 import type { TelemetryAttributes } from './telemetry';
 
 export const SPAN_NAMES = Object.freeze({
+  testRun: 'auroraflow.test_run',
+  testCase: 'auroraflow.test_case',
   pageAction: 'auroraflow.page_action',
   redisOperation: 'auroraflow.redis.operation',
   selfHealingCapture: 'auroraflow.self_healing.capture',
+  selfHealingSuggestionRank: 'auroraflow.self_healing.suggestion_rank',
   guardedValidation: 'auroraflow.self_healing.guarded_validation',
+  selfHealingAutoApply: 'auroraflow.self_healing.auto_apply',
+  reportFlakiness: 'auroraflow.report.flakiness',
+  reportSloDashboard: 'auroraflow.report.slo_dashboard',
+  reportSloAlerts: 'auroraflow.report.slo_alerts',
 } as const);
 
 export type PageActionMetricStatus = 'succeeded' | 'failed' | 'self_healed';
