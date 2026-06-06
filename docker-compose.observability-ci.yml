@@ -1,0 +1,19 @@
+name: auroraflow-observability-ci
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.116.1
+    command: ['--config=/etc/otelcol-contrib/config.yaml']
+    ports:
+      - '127.0.0.1:4317:4317'
+      - '127.0.0.1:4318:4318'
+      - '127.0.0.1:9464:9464'
+      - '127.0.0.1:13133:13133'
+    volumes:
+      - ./observability/otel-collector/ci-config.yaml:/etc/otelcol-contrib/config.yaml:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:13133/ >/dev/null 2>&1 || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 5s

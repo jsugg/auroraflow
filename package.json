@@ -41,6 +41,7 @@
     "observability:down": "docker compose -f docker-compose.yml -f docker-compose.observability.yml down --remove-orphans",
     "observability:logs": "docker compose -f docker-compose.yml -f docker-compose.observability.yml logs --tail=200 otel-collector prometheus grafana jaeger elasticsearch logstash kibana",
     "observability:smoke": "AURORAFLOW_OBSERVABILITY_ENABLED=true OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 npm run test:smoke",
+    "observability:ci:smoke": "node -r ts-node/register scripts/observability-ci-smoke.ts",
     "test:integration:local": "npm run infra:redis:up && npm run test:integration",
     "test-report": "npx playwright show-report test-reports",
     "self-heal:governance": "node scripts/self-healing-governance.mjs",
