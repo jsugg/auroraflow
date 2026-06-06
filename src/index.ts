@@ -8,7 +8,17 @@ export {
 export { PageFactory, type PageObjectConstructor } from './helpers/pageFactory';
 export { retry, wait } from './helpers/helpers';
 
-export { getMainLogger, createChildLogger, setLogLevel, type Logger } from './utils/logger';
+export {
+  LoggerConfigError,
+  createChildLogger,
+  createConfiguredLogger,
+  getMainLogger,
+  resolveLoggerRuntimeConfig,
+  setLogLevel,
+  type LogDestination,
+  type Logger,
+  type LoggerRuntimeConfig,
+} from './utils/logger';
 
 export {
   RedisClient,

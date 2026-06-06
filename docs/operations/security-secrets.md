@@ -36,6 +36,19 @@ This document defines the minimum secret-handling requirements for AuroraFlow de
 2. Redact secret values from logs and screenshots before sharing artifacts.
 3. Use dedicated non-production credentials for all automated tests.
 
+## Log Redaction and Destinations
+
+AuroraFlow redacts common secret-shaped log fields by default before records are written.
+
+- `AURORAFLOW_LOG_LEVEL`: `trace`, `debug`, `info`, `warn`, `error`, `fatal`, or `silent`.
+- `AURORAFLOW_LOG_DESTINATION`: `both`, `console`, `file`, or `silent`.
+- `AURORAFLOW_LOG_FILE_PATH`: file destination path; default `./logs/test-runs.log`.
+- `AURORAFLOW_LOG_REDACT_ENABLED`: boolean-like flag; default `true`.
+- `AURORAFLOW_LOG_REDACT_PATHS`: comma-separated Pino redaction paths.
+- `AURORAFLOW_LOG_REDACT_CENSOR`: replacement text; default `[Redacted]`.
+
+Default destination is `both` outside production and `file` when `NODE_ENV=production`.
+
 ## Incident Response
 
 1. Revoke/rotate the exposed secret immediately.
