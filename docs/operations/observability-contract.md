@@ -59,6 +59,8 @@ Every emitted signal should carry these attributes when the value is known:
 - `auroraflow_page_action_failures_total`
 - `auroraflow_flaky_tests_total`
 - `auroraflow_retry_failures_total`
+- `auroraflow_slo_metric_value`
+- `auroraflow_slo_alert_breaches_total`
 - `auroraflow_self_healing_artifacts_total`
 - `auroraflow_self_healing_suggestions_total`
 - `auroraflow_guarded_validation_candidates_total`

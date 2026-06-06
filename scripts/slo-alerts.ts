@@ -8,6 +8,8 @@ import {
   type AlertEvaluationResult,
   type AlertPolicy,
 } from '../src/framework/observability/alertPolicies';
+import { runSloAlertTelemetry } from '../src/framework/observability/reportTelemetry';
+import { shutdownTelemetry } from '../src/framework/observability/telemetry';
 import { type SloDashboard } from '../src/framework/observability/sloDashboard';
 
 interface CliOptions {
@@ -129,49 +131,57 @@ function emitBreachWarnings(result: AlertEvaluationResult): void {
 }
 
 async function main(): Promise<number> {
-  const options = parseCliOptions(process.argv.slice(2));
+  return runSloAlertTelemetry({
+    task: async () => {
+      const options = parseCliOptions(process.argv.slice(2));
 
-  const dashboard = parseDashboard(await parseJsonFile(options.dashboardJsonPath));
-  const policy = parseAlertPolicy((await parseJsonFile(options.policyPath)) as AlertPolicy);
+      const dashboard = parseDashboard(await parseJsonFile(options.dashboardJsonPath));
+      const policy = parseAlertPolicy((await parseJsonFile(options.policyPath)) as AlertPolicy);
 
-  const result = evaluateAlertPolicy({
-    dashboard,
-    policy,
+      const result = evaluateAlertPolicy({
+        dashboard,
+        policy,
+      });
+      const markdown = buildAlertEvaluationMarkdown(result);
+
+      await ensureParentDirectory(options.outputJsonPath);
+      await ensureParentDirectory(options.outputMarkdownPath);
+      await writeFile(options.outputJsonPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
+      await writeFile(options.outputMarkdownPath, `${markdown}\n`, 'utf8');
+
+      if (result.breachCount > 0) {
+        emitBreachWarnings(result);
+      }
+
+      console.log(
+        `SLO alerts evaluated: breaches=${result.breachCount} blockingBreaches=${result.blockingBreachCount}`,
+      );
+      console.log(`JSON summary: ${options.outputJsonPath}`);
+      console.log(`Markdown summary: ${options.outputMarkdownPath}`);
+
+      if (result.blockingBreachCount > 0) {
+        console.error('Blocking SLO breaches detected based on configured policy.');
+        return { result, value: 1 };
+      }
+
+      if (options.failOnBreach && result.breachCount > 0) {
+        console.error('SLO breaches detected and --fail-on-breach was set.');
+        return { result, value: 1 };
+      }
+
+      return { result, value: 0 };
+    },
   });
-  const markdown = buildAlertEvaluationMarkdown(result);
-
-  await ensureParentDirectory(options.outputJsonPath);
-  await ensureParentDirectory(options.outputMarkdownPath);
-  await writeFile(options.outputJsonPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
-  await writeFile(options.outputMarkdownPath, `${markdown}\n`, 'utf8');
-
-  if (result.breachCount > 0) {
-    emitBreachWarnings(result);
-  }
-
-  console.log(
-    `SLO alerts evaluated: breaches=${result.breachCount} blockingBreaches=${result.blockingBreachCount}`,
-  );
-  console.log(`JSON summary: ${options.outputJsonPath}`);
-  console.log(`Markdown summary: ${options.outputMarkdownPath}`);
-
-  if (result.blockingBreachCount > 0) {
-    console.error('Blocking SLO breaches detected based on configured policy.');
-    return 1;
-  }
-
-  if (options.failOnBreach && result.breachCount > 0) {
-    console.error('SLO breaches detected and --fail-on-breach was set.');
-    return 1;
-  }
-
-  return 0;
 }
 
 main()
-  .then((exitCode) => process.exit(exitCode))
-  .catch((error: unknown) => {
+  .then(async (exitCode) => {
+    await shutdownTelemetry();
+    process.exit(exitCode);
+  })
+  .catch(async (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Failed to evaluate SLO alerts: ${message}`);
+    await shutdownTelemetry();
     process.exit(1);
   });

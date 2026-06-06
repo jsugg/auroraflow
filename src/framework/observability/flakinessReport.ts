@@ -21,6 +21,7 @@ export interface FlakinessTestCase {
   attempts: number;
   retriesUsed: number;
   failedAttempts: number;
+  durationMs: number;
   finalStatus: FinalTestStatus;
   flaky: boolean;
 }
@@ -87,6 +88,10 @@ function asInteger(value: unknown): number {
     return 0;
   }
   return Math.trunc(value);
+}
+
+function asNonNegativeInteger(value: unknown): number {
+  return Math.max(0, asInteger(value));
 }
 
 function normalizeTitlePath(pathSegments: string[]): string[] {
@@ -207,6 +212,7 @@ export function extractFlakinessCasesFromReport(report: unknown): FlakinessTestC
         (count, result) => (shouldCountAsFailed(result.status) ? count + 1 : count),
         0,
       );
+      const durationMs = results.reduce((sum, result) => sum + result.durationMs, 0);
       const finalStatus = attempts > 0 ? results[attempts - 1].status : 'unknown';
       const flaky = failedAttempts > 0 && finalStatus === 'passed';
       const fullTitle = spec.titlePath.join(' > ');
@@ -229,6 +235,7 @@ export function extractFlakinessCasesFromReport(report: unknown): FlakinessTestC
         attempts,
         retriesUsed,
         failedAttempts,
+        durationMs,
         finalStatus,
         flaky,
       });
@@ -238,12 +245,13 @@ export function extractFlakinessCasesFromReport(report: unknown): FlakinessTestC
   return cases.sort(sortTestCases);
 }
 
-function normalizeResultRecord(result: unknown): { status: FinalTestStatus } {
+function normalizeResultRecord(result: unknown): { durationMs: number; status: FinalTestStatus } {
   const normalized = asRecord(result);
   if (!normalized) {
-    return { status: 'unknown' };
+    return { durationMs: 0, status: 'unknown' };
   }
   return {
+    durationMs: asNonNegativeInteger(normalized.duration),
     status: normalizeResultStatus(normalized.status),
   };
 }

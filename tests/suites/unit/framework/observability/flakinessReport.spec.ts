@@ -37,11 +37,17 @@ function samplePlaywrightReport(): unknown {
                 tests: [
                   {
                     projectName: 'Google Chrome',
-                    results: [{ status: 'failed' }, { status: 'passed' }],
+                    results: [
+                      { duration: 15, status: 'failed' },
+                      { duration: 20, status: 'passed' },
+                    ],
                   },
                   {
                     projectName: 'Firefox',
-                    results: [{ status: 'failed' }, { status: 'failed' }],
+                    results: [
+                      { duration: 30, status: 'failed' },
+                      { duration: 40, status: 'failed' },
+                    ],
                   },
                 ],
               },
@@ -53,7 +59,7 @@ function samplePlaywrightReport(): unknown {
                 tests: [
                   {
                     projectName: 'Google Chrome',
-                    results: [{ status: 'passed' }],
+                    results: [{ duration: 5, status: 'passed' }],
                   },
                 ],
               },
@@ -76,6 +82,7 @@ describe('extractFlakinessCasesFromReport', () => {
     expect(flakyCase.attempts).toBe(2);
     expect(flakyCase.retriesUsed).toBe(1);
     expect(flakyCase.failedAttempts).toBe(1);
+    expect(flakyCase.durationMs).toBe(35);
     expect(flakyCase.finalStatus).toBe('passed');
     expect(flakyCase.flaky).toBe(true);
 
@@ -83,6 +90,7 @@ describe('extractFlakinessCasesFromReport', () => {
     expect(failedCase.finalStatus).toBe('failed');
     expect(failedCase.flaky).toBe(false);
     expect(failedCase.failedAttempts).toBe(2);
+    expect(failedCase.durationMs).toBe(70);
   });
 
   it('returns an empty array for malformed report payloads', () => {

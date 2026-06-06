@@ -7,6 +7,8 @@ import {
   buildSloDashboardMarkdown,
   type SelfHealingGovernanceSummary,
 } from '../src/framework/observability/sloDashboard';
+import { runSloDashboardTelemetry } from '../src/framework/observability/reportTelemetry';
+import { shutdownTelemetry } from '../src/framework/observability/telemetry';
 
 interface CliOptions {
   flakinessJsonPath: string;
@@ -128,36 +130,46 @@ async function ensureParentDirectory(filePath: string): Promise<void> {
 }
 
 async function main(): Promise<number> {
-  const options = parseCliOptions(process.argv.slice(2));
+  return runSloDashboardTelemetry({
+    task: async () => {
+      const options = parseCliOptions(process.argv.slice(2));
 
-  const flakinessSummary = parseFlakinessSummary(await parseJsonFile(options.flakinessJsonPath));
-  const governanceSummary = options.governanceJsonPath
-    ? ((await parseJsonFile(options.governanceJsonPath)) as SelfHealingGovernanceSummary)
-    : undefined;
+      const flakinessSummary = parseFlakinessSummary(
+        await parseJsonFile(options.flakinessJsonPath),
+      );
+      const governanceSummary = options.governanceJsonPath
+        ? ((await parseJsonFile(options.governanceJsonPath)) as SelfHealingGovernanceSummary)
+        : undefined;
 
-  const dashboard = buildSloDashboard({
-    flakiness: flakinessSummary,
-    governance: governanceSummary,
+      const dashboard = buildSloDashboard({
+        flakiness: flakinessSummary,
+        governance: governanceSummary,
+      });
+      const markdown = buildSloDashboardMarkdown(dashboard);
+
+      await ensureParentDirectory(options.outputJsonPath);
+      await ensureParentDirectory(options.outputMarkdownPath);
+      await writeFile(options.outputJsonPath, `${JSON.stringify(dashboard, null, 2)}\n`, 'utf8');
+      await writeFile(options.outputMarkdownPath, `${markdown}\n`, 'utf8');
+
+      console.log(
+        `SLO dashboard generated: overallStatus=${dashboard.overallStatus} status=${dashboard.status}`,
+      );
+      console.log(`JSON summary: ${options.outputJsonPath}`);
+      console.log(`Markdown summary: ${options.outputMarkdownPath}`);
+      return { dashboard, value: 0 };
+    },
   });
-  const markdown = buildSloDashboardMarkdown(dashboard);
-
-  await ensureParentDirectory(options.outputJsonPath);
-  await ensureParentDirectory(options.outputMarkdownPath);
-  await writeFile(options.outputJsonPath, `${JSON.stringify(dashboard, null, 2)}\n`, 'utf8');
-  await writeFile(options.outputMarkdownPath, `${markdown}\n`, 'utf8');
-
-  console.log(
-    `SLO dashboard generated: overallStatus=${dashboard.overallStatus} status=${dashboard.status}`,
-  );
-  console.log(`JSON summary: ${options.outputJsonPath}`);
-  console.log(`Markdown summary: ${options.outputMarkdownPath}`);
-  return 0;
 }
 
 main()
-  .then((exitCode) => process.exit(exitCode))
-  .catch((error: unknown) => {
+  .then(async (exitCode) => {
+    await shutdownTelemetry();
+    process.exit(exitCode);
+  })
+  .catch(async (error: unknown) => {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`Failed to generate SLO dashboard: ${message}`);
+    await shutdownTelemetry();
     process.exit(1);
   });
