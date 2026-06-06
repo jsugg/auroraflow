@@ -145,4 +145,22 @@ describe('PageObjectBase error propagation', () => {
 
     expect(callOrder).toEqual(['goto', 'initialize']);
   });
+
+  it('accepts successful file navigation without an HTTP response', async () => {
+    pageMock.goto.mockResolvedValueOnce(null);
+
+    await expect(pageObject.navigateTo('file:///tmp/example-app.html')).resolves.toBeNull();
+
+    expect(pageMock.screenshot).not.toHaveBeenCalled();
+  });
+
+  it('rejects HTTP navigation when Playwright returns no main resource response', async () => {
+    pageMock.goto.mockResolvedValueOnce(null);
+
+    await expect(pageObject.navigateTo('https://example.test/app')).rejects.toThrow(
+      'Error navigating to https://example.test/app: Navigation to https://example.test/app failed without a main resource response',
+    );
+
+    expect(pageMock.screenshot).toHaveBeenCalledTimes(1);
+  });
 });
