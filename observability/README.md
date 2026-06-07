@@ -24,7 +24,7 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
 npm run test:smoke
 ```
 
-`npm run observability:smoke` runs the same command after the stack is up.
+`npm run observability:smoke` emits one synthetic trace, metric series, and JSON log after the stack is up.
 
 ## Files
 
