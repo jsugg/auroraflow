@@ -1,0 +1,97 @@
+name: auroraflow-observability-production
+
+services:
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.116.1
+    command: ['--config=/etc/otelcol-contrib/config.yaml']
+    read_only: true
+    restart: unless-stopped
+    environment:
+      AURORAFLOW_OTEL_BASIC_AUTH_HTPASSWD: ${AURORAFLOW_OTEL_BASIC_AUTH_HTPASSWD:?required}
+    volumes:
+      - ./otel-collector.yaml:/etc/otelcol-contrib/config.yaml:ro
+      - ./tls:/run/secrets/auroraflow-observability/tls:ro
+    ports:
+      - '4317:4317'
+      - '4318:4318'
+      - '9464:9464'
+      - '13133:13133'
+
+  prometheus:
+    image: prom/prometheus:v3.0.1
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--web.config.file=/etc/prometheus/web.yml'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=20GB'
+    restart: unless-stopped
+    environment:
+      AURORAFLOW_PROMETHEUS_BASIC_AUTH_HTPASSWD: ${AURORAFLOW_PROMETHEUS_BASIC_AUTH_HTPASSWD:?required}
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./prometheus-web.yml:/etc/prometheus/web.yml:ro
+      - ../prometheus/rules:/etc/prometheus/rules:ro
+      - ./tls:/run/secrets/auroraflow-observability/tls:ro
+      - prometheus-data:/prometheus
+    ports:
+      - '9090:9090'
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    restart: unless-stopped
+    environment:
+      GF_PATHS_CONFIG: /etc/grafana/grafana.ini
+      GF_SECURITY_ADMIN_PASSWORD: ${AURORAFLOW_GRAFANA_ADMIN_PASSWORD:?required}
+    volumes:
+      - ./grafana.ini:/etc/grafana/grafana.ini:ro
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - ../grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./tls:/run/secrets/auroraflow-observability/tls:ro
+      - grafana-data:/var/lib/grafana
+    ports:
+      - '3000:3000'
+
+  jaeger:
+    image: jaegertracing/all-in-one:1.63.0
+    restart: unless-stopped
+    command:
+      - '--collector.otlp.enabled=true'
+      - '--query.http.tls.enabled=true'
+      - '--query.http.tls.cert=/run/secrets/auroraflow-observability/tls/jaeger.crt'
+      - '--query.http.tls.key=/run/secrets/auroraflow-observability/tls/jaeger.key'
+    volumes:
+      - ./tls:/run/secrets/auroraflow-observability/tls:ro
+      - jaeger-data:/badger
+    ports:
+      - '16686:16686'
+
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.17.0
+    restart: unless-stopped
+    environment:
+      ELASTIC_PASSWORD: ${AURORAFLOW_ELASTIC_PASSWORD:?required}
+      ES_JAVA_OPTS: '-Xms2g -Xmx2g'
+    volumes:
+      - ./elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml:ro
+      - ./tls:/run/secrets/auroraflow-observability/tls:ro
+      - elasticsearch-data:/usr/share/elasticsearch/data
+    ports:
+      - '9200:9200'
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.17.0
+    restart: unless-stopped
+    environment:
+      ELASTICSEARCH_USERNAME: kibana_system
+      ELASTICSEARCH_PASSWORD: ${AURORAFLOW_KIBANA_SYSTEM_PASSWORD:?required}
+    volumes:
+      - ./kibana.yml:/usr/share/kibana/config/kibana.yml:ro
+      - ./tls:/run/secrets/auroraflow-observability/tls:ro
+    ports:
+      - '5601:5601'
+
+volumes:
+  prometheus-data:
+  grafana-data:
+  jaeger-data:
+  elasticsearch-data:

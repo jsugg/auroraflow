@@ -6,6 +6,7 @@ import { RESOURCE_ATTRIBUTE_NAMES } from '../../../../src/framework/observabilit
 
 const CONTRACT_PATH = path.join(process.cwd(), 'docs', 'operations', 'observability-contract.md');
 const OBSERVABILITY_ROOT = path.join(process.cwd(), 'observability');
+const DOCS_OPERATIONS_ROOT = path.join(process.cwd(), 'docs', 'operations');
 
 describe('observability contract documentation', () => {
   it('documents every supported live metric name', () => {
@@ -50,6 +51,15 @@ describe('observability contract documentation', () => {
       'elastic/index-templates/auroraflow-ingest-dead-letter.json',
       'kibana/kibana.yml',
       'kibana/saved-objects/auroraflow-log-exploration.ndjson',
+      'production/README.md',
+      'production/docker-compose.yml',
+      'production/otel-collector.yaml',
+      'production/prometheus.yml',
+      'production/prometheus-web.yml',
+      'production/grafana.ini',
+      'production/elasticsearch.yml',
+      'production/kibana.yml',
+      'production/tls/README.md',
       'README.md',
     ] as const;
 
@@ -104,6 +114,28 @@ describe('observability contract documentation', () => {
     expect(workflow).toContain('AURORAFLOW_OBSERVABILITY_CI_ENABLED');
     expect(workflow).toContain('observability-output/ci');
     expect(packageJson).toContain('"observability:ci:smoke"');
+  });
+
+  it('provides opt-in full-stack and remote-export CI observability lanes', () => {
+    const workflow = readFileSync(
+      path.join(process.cwd(), '.github', 'workflows', 'quality.yml'),
+      'utf8',
+    );
+
+    expect(workflow).toContain('Observability Full Stack Smoke');
+    expect(workflow).toContain('AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED');
+    expect(workflow).toContain('prometheus-targets.json');
+    expect(workflow).toContain('grafana-datasources.json');
+    expect(workflow).toContain('jaeger-traces.json');
+    expect(workflow).toContain('elasticsearch-indices.json');
+    expect(workflow).toContain('kibana-data-views.json');
+    expect(workflow).toContain('observability-full-stack-diagnostics');
+
+    expect(workflow).toContain('Observability Remote Export Smoke');
+    expect(workflow).toContain('AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED');
+    expect(workflow).toContain('secrets.OTEL_EXPORTER_OTLP_ENDPOINT');
+    expect(workflow).toContain('secrets.OTEL_EXPORTER_OTLP_HEADERS');
+    expect(workflow).toContain('observability-remote-export-diagnostics');
   });
 
   it('ships valid Grafana dashboard JSON files', () => {
@@ -200,5 +232,58 @@ describe('observability contract documentation', () => {
       ]),
     );
     expect(savedObjects.every((savedObject) => savedObject.type === 'index-pattern')).toBe(true);
+  });
+
+  it('ships production hardening manifests and operator guidance', () => {
+    const productionCompose = readFileSync(
+      path.join(OBSERVABILITY_ROOT, 'production', 'docker-compose.yml'),
+      'utf8',
+    );
+    const collectorConfig = readFileSync(
+      path.join(OBSERVABILITY_ROOT, 'production', 'otel-collector.yaml'),
+      'utf8',
+    );
+    const grafanaConfig = readFileSync(
+      path.join(OBSERVABILITY_ROOT, 'production', 'grafana.ini'),
+      'utf8',
+    );
+    const elasticsearchConfig = readFileSync(
+      path.join(OBSERVABILITY_ROOT, 'production', 'elasticsearch.yml'),
+      'utf8',
+    );
+    const kibanaConfig = readFileSync(
+      path.join(OBSERVABILITY_ROOT, 'production', 'kibana.yml'),
+      'utf8',
+    );
+
+    expect(productionCompose).toContain('AURORAFLOW_OTEL_BASIC_AUTH_HTPASSWD');
+    expect(productionCompose).toContain('AURORAFLOW_GRAFANA_ADMIN_PASSWORD');
+    expect(productionCompose).toContain('AURORAFLOW_ELASTIC_PASSWORD');
+    expect(collectorConfig).toContain('basicauth/server');
+    expect(collectorConfig).toContain('cert_file: /run/secrets/auroraflow-observability/tls');
+    expect(grafanaConfig).toContain('protocol = https');
+    expect(grafanaConfig).toContain('enabled = false');
+    expect(elasticsearchConfig).toContain('xpack.security.enabled: true');
+    expect(elasticsearchConfig).toContain('xpack.security.http.ssl.enabled: true');
+    expect(kibanaConfig).toContain('server.ssl.enabled: true');
+
+    const productionGuide = readFileSync(
+      path.join(DOCS_OPERATIONS_ROOT, 'observability-production.md'),
+      'utf8',
+    );
+    const runbooks = readFileSync(
+      path.join(DOCS_OPERATIONS_ROOT, 'observability-runbooks.md'),
+      'utf8',
+    );
+    const dashboardChecklist = readFileSync(
+      path.join(DOCS_OPERATIONS_ROOT, 'observability-dashboard-review.md'),
+      'utf8',
+    );
+
+    expect(productionGuide).toContain('Storage Budgets');
+    expect(productionGuide).toContain('Backup and Restore');
+    expect(runbooks).toContain('No Telemetry Arriving');
+    expect(runbooks).toContain('Grafana Provisioning Drift');
+    expect(dashboardChecklist).toContain('Prometheus labels remain low-cardinality');
   });
 });
