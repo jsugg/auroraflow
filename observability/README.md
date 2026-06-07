@@ -26,6 +26,14 @@ npm run test:smoke
 
 `npm run observability:smoke` emits one synthetic trace, metric series, and JSON log after the stack is up.
 
+To collect local backend API snapshots for troubleshooting or sharing as CI-style diagnostics:
+
+```bash
+npm run observability:snapshot
+```
+
+The command writes Prometheus, Grafana, Jaeger, Elasticsearch, and Kibana responses plus a `manifest.json` into `observability-output/snapshot`. Use `-- --allow-partial` to keep successful snapshots when one backend is unavailable.
+
 ## Files
 
 - `docker-compose.observability.yml` starts the Collector, Prometheus, Grafana, Jaeger, Elasticsearch, Logstash, and Kibana.
@@ -36,6 +44,7 @@ npm run test:smoke
 - `observability/elastic/index-templates` and `observability/elastic/ilm` provide optional Elasticsearch templates and local retention policy definitions.
 - `observability/kibana/saved-objects` provides importable data views for log and self-healing exploration.
 - `observability/production` provides reference manifests for TLS/auth-enabled shared deployments.
+- `scripts/observability-export-snapshot.ts` captures backend health and data-source snapshots into deterministic diagnostic files.
 
 ## Environment
 

@@ -6,7 +6,7 @@
 
 ## Objective
 
-This document describes AuroraFlow's current Test Automation Framework (TAF) foundation and the target architecture it is growing toward. The implemented repository currently centers on Playwright, TypeScript, Redis data primitives, guarded self-healing artifacts, JSON/Markdown observability reports, configurable structured logging, an opt-in OpenTelemetry facade for framework telemetry, and local Prometheus/Grafana/ELK/Jaeger stack configuration. AI-driven Selector Analysis Tooling (SAT), Dockerized SAT services, CI observability stack jobs, encrypted Redis dump lifecycle, production monitoring hardening, and autonomous selector optimization remain roadmap capabilities until corresponding services and workflows exist in source.
+This document describes AuroraFlow's current Test Automation Framework (TAF) foundation and the target architecture it is growing toward. The implemented repository currently centers on Playwright, TypeScript, Redis data primitives, guarded self-healing artifacts, JSON/Markdown observability reports, configurable structured logging, an opt-in OpenTelemetry facade for framework telemetry, local Prometheus/Grafana/ELK/Jaeger stack configuration, CI observability smoke lanes, remote telemetry export hooks, and production observability reference manifests. AI-driven Selector Analysis Tooling (SAT), Dockerized SAT services, encrypted Redis dump lifecycle, and autonomous selector optimization remain roadmap capabilities until corresponding services and workflows exist in source.
 
 ## Current Repository Status (June 2026)
 
@@ -23,13 +23,15 @@ Implemented now:
 - Redis data-layer primitives (`RedisClient`, selector registry repository) and Testcontainers integration tests.
 - Opt-in OpenTelemetry telemetry facade with no-op defaults, resource attribute normalization, PageObjectBase action spans/metrics, and trace/span log correlation.
 - Local observability stack configuration with OpenTelemetry Collector, Prometheus, Grafana dashboards, Jaeger, Elasticsearch, Logstash, and Kibana.
+- Collector-only, optional full-stack, and optional remote-export CI observability smoke lanes with uploaded diagnostics.
+- Production observability references with TLS/auth-enabled manifests, runbooks, and dashboard review guidance.
 - Configurable structured logging with default secret redaction and selectable console/file/silent destinations.
 - Runnable deterministic examples for page objects, quickstart, reliability, data-provider abstractions, observability patterns, accessibility checks, and CI templates.
 
 Planned/roadmap (not fully implemented yet):
 
 - SAT history-backed scoring, promotion workflows, ML pipeline, and autonomous selector optimization lifecycle.
-- CI observability stack jobs, remote telemetry export, production monitoring hardening, and trend-dashboard governance.
+- Trend-dashboard governance and environment-owned production deployments.
 - Extended platform governance automation and release/signing workflows.
 
 ## Target Architecture (Roadmap)
@@ -54,7 +56,7 @@ graph TD;
     Docker-.->|Planned service|SAT;
 ```
 
-This roadmap diagram separates the implemented foundation from planned services. Today, Docker Compose manages local Redis and an optional local observability stack, while the OpenTelemetry facade is available as an opt-in framework boundary. SAT services, CI observability jobs, remote telemetry export, and production monitoring hardening are target architecture, not current runtime infrastructure.
+This roadmap diagram separates the implemented foundation from planned services. Today, Docker Compose manages local Redis and an optional local observability stack, the OpenTelemetry facade is available as an opt-in framework boundary, CI can smoke-test collector/full-stack/remote telemetry paths, and production hardening is represented by reference manifests and operator docs. SAT services and autonomous selector optimization are target architecture, not current runtime infrastructure.
 
 ### Core Components
 
@@ -64,7 +66,7 @@ This roadmap diagram separates the implemented foundation from planned services.
 - **Redis:** Provides implemented data-layer primitives for namespaced keys and selector registry records; autonomous selector updates are planned.
 - **Docker Compose:** Currently orchestrates local Redis and an optional local observability stack. Dockerized SAT, TAF services, and Docker Swarm are not implemented yet.
 - **AI-Driven SAT:** Planned capability for dynamic selector identification and updates based on DOM analysis.
-- **Monitoring and Logging:** Currently implemented as redacted structured logs, JSON/Markdown flakiness, SLO, and alert artifacts, an opt-in OpenTelemetry facade, and local collector-backed Prometheus/Grafana/ELK/Jaeger configuration. CI and production observability integrations remain planned.
+- **Monitoring and Logging:** Currently implemented as redacted structured logs, JSON/Markdown flakiness, SLO, and alert artifacts, an opt-in OpenTelemetry facade, local collector-backed Prometheus/Grafana/ELK/Jaeger configuration, CI smoke lanes, remote export hooks, and production reference manifests.
 - **Computer Vision:** Planned capability for complex or dynamic UI elements.
 
 ### Enhanced Features
@@ -202,11 +204,11 @@ graph TD;
     Monitoring-.->|Planned trend dashboards|Alerts;
 ```
 
-Current infrastructure consists of local Redis orchestration, Testcontainers-backed Redis integration tests, artifact-based observability, opt-in OpenTelemetry emission from framework code, and a repo-managed local Prometheus/Grafana/ELK/Jaeger stack. Dockerized SAT services, CI observability stack jobs, remote export workflows, and production observability deployments remain planned until the corresponding runtime services, security controls, and workflows are implemented.
+Current infrastructure consists of local Redis orchestration, Testcontainers-backed Redis integration tests, artifact-based observability, opt-in OpenTelemetry emission from framework code, a repo-managed local Prometheus/Grafana/ELK/Jaeger stack, CI observability smoke workflows, remote export workflow hooks, and production observability reference manifests. Dockerized SAT services and environment-owned production deployments remain planned until the corresponding runtime services and operational ownership are in place.
 
 ## Rationale Behind Architectural Choices
 
-The proposed TAF architecture is designed to address the challenges of dynamic web UI testing at scale. The current implementation establishes the Playwright framework, Redis data primitives, guarded self-healing artifacts, CI observability reports, a vendor-neutral telemetry boundary, and a local backend stack for inspecting signals. Dockerized SAT, autonomous selector updates, CI telemetry jobs, and production monitoring/tracing are planned follow-on layers that should be claimed as implemented only after the corresponding source, services, security controls, and workflows exist.
+The proposed TAF architecture is designed to address the challenges of dynamic web UI testing at scale. The current implementation establishes the Playwright framework, Redis data primitives, guarded self-healing artifacts, CI observability reports, a vendor-neutral telemetry boundary, local and CI backend smoke paths, and production observability references. Dockerized SAT, autonomous selector updates, and environment-owned production monitoring/tracing remain planned follow-on layers that should be claimed as deployed only after the corresponding services, security controls, and owners exist.
 
 ## Contributing
 

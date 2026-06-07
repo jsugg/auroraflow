@@ -114,6 +114,7 @@ describe('observability contract documentation', () => {
     expect(workflow).toContain('AURORAFLOW_OBSERVABILITY_CI_ENABLED');
     expect(workflow).toContain('observability-output/ci');
     expect(packageJson).toContain('"observability:ci:smoke"');
+    expect(packageJson).toContain('"observability:snapshot"');
   });
 
   it('provides opt-in full-stack and remote-export CI observability lanes', () => {
