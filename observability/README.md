@@ -35,6 +35,7 @@ npm run test:smoke
 - `observability/logstash/pipeline/auroraflow.conf` reads structured logs and self-healing artifacts from local mounted paths.
 - `observability/elastic/index-templates` and `observability/elastic/ilm` provide optional Elasticsearch templates and local retention policy definitions.
 - `observability/kibana/saved-objects` provides importable data views for log and self-healing exploration.
+- `observability/production` provides reference manifests for TLS/auth-enabled shared deployments.
 
 ## Environment
 
@@ -76,6 +77,25 @@ Shared environments need stronger upstream redaction, TLS, authentication, and r
 Pull-request CI runs a lightweight collector-only smoke lane for observability-related changes unless the repository variable `AURORAFLOW_OBSERVABILITY_CI_ENABLED` is set to `false`. The lane uses `docker-compose.observability-ci.yml` and `observability/otel-collector/ci-config.yaml`, emits one synthetic trace/metric/log event, and uploads collector health, metrics, logs, and the local NDJSON log as diagnostics.
 
 The collector-only lane does not start Grafana, Prometheus, Jaeger, Elasticsearch, Logstash, or Kibana. The artifact-based SLO reports remain the merge-gate authority, and remote export secrets are not required.
+
+## Optional Full-Stack CI
+
+Set `AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED=true` to run the full-stack CI smoke job for observability-related changes. The job starts the local stack, applies Elasticsearch templates, imports Kibana data views, emits smoke telemetry, and uploads:
+
+- Prometheus target and metric API snapshots.
+- Grafana health and datasource snapshots.
+- Jaeger trace query output.
+- Elasticsearch health and index snapshots.
+- Kibana status and data-view validation output.
+- Compose service logs.
+
+## Optional Remote Export CI
+
+Set `AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED=true` and configure `OTEL_EXPORTER_OTLP_ENDPOINT` plus optional `OTEL_EXPORTER_OTLP_HEADERS` secrets to smoke-test a remote Collector. The workflow passes the secrets directly to OpenTelemetry and does not print headers.
+
+## Production References
+
+Use `observability/production` and `docs/operations/observability-production.md` as the starting point for shared deployments. Production environments must provide TLS material, credentials, storage budgets, backups, and network restrictions outside this repository.
 
 ## Stop
 

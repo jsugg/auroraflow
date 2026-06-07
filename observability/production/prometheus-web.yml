@@ -1,0 +1,6 @@
+tls_server_config:
+  cert_file: /run/secrets/auroraflow-observability/tls/prometheus.crt
+  key_file: /run/secrets/auroraflow-observability/tls/prometheus.key
+
+basic_auth_users:
+  auroraflow: ${AURORAFLOW_PROMETHEUS_BASIC_AUTH_HTPASSWD}
