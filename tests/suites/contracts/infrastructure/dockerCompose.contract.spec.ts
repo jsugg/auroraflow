@@ -41,6 +41,8 @@ describe('docker compose infrastructure contract', () => {
     );
     expect(scripts['observability:logs']).toContain('docker compose -f docker-compose.yml');
     expect(scripts['observability:smoke']).toContain('AURORAFLOW_OBSERVABILITY_ENABLED=true');
+    expect(scripts['observability:smoke']).toContain('AURORAFLOW_OBSERVABILITY_ENVIRONMENT=local');
+    expect(scripts['observability:smoke']).toContain('npm run observability:ci:smoke');
     expect(scripts['test:integration:local']).toBe(
       'npm run infra:redis:up && npm run test:integration',
     );

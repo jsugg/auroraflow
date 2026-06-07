@@ -55,6 +55,12 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
 npm run test:smoke
 ```
 
+Run a deterministic stack smoke emitter:
+
+```bash
+npm run observability:smoke
+```
+
 Open the local tools:
 
 - Grafana: http://localhost:3000
