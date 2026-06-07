@@ -54,7 +54,7 @@ The command writes Prometheus, Grafana, Jaeger, Elasticsearch, and Kibana respon
 
 ## Logs
 
-Logstash reads JSON lines from `logs/*.ndjson` and self-healing artifacts from `test-results/self-healing/*.json`. Secret-like field names and inline `key=value` fragments are redacted before indexing, and malformed JSON log lines are routed to `auroraflow-ingest-dead-letter-*` for triage.
+Logstash reads JSON lines from `logs/*.ndjson`, accepts local JSON smoke events on `http://localhost:8080`, and reads self-healing artifacts from `test-results/self-healing/*.json`. Secret-like field names and inline `key=value` fragments are redacted before indexing, and malformed JSON log lines are routed to `auroraflow-ingest-dead-letter-*` for triage.
 
 To apply the optional local Elasticsearch retention policy and index templates:
 
@@ -87,9 +87,9 @@ Pull-request CI runs a lightweight collector-only smoke lane for observability-r
 
 The collector-only lane does not start Grafana, Prometheus, Jaeger, Elasticsearch, Logstash, or Kibana. The artifact-based SLO reports remain the merge-gate authority, and remote export secrets are not required.
 
-## Optional Full-Stack CI
+## Full-Stack CI
 
-Set `AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED=true` to run the full-stack CI smoke job for observability-related changes. The job starts the local stack, applies Elasticsearch templates, imports Kibana data views, emits smoke telemetry, and uploads:
+Pull-request CI runs the full-stack smoke job for observability-related changes and on `main`. The job sets `AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED=true`, starts the local stack, applies Elasticsearch templates, imports Kibana data views, emits smoke telemetry, and uploads:
 
 - Prometheus target and metric API snapshots.
 - Grafana health and datasource snapshots.
@@ -98,9 +98,9 @@ Set `AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED=true` to run the full-stack 
 - Kibana status and data-view validation output.
 - Compose service logs.
 
-## Optional Remote Export CI
+## Remote Export CI
 
-Set `AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED=true` and configure `OTEL_EXPORTER_OTLP_ENDPOINT` plus optional `OTEL_EXPORTER_OTLP_HEADERS` secrets to smoke-test a remote Collector. The workflow passes the secrets directly to OpenTelemetry and does not print headers.
+For observability-related changes and on `main`, CI sets `AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED=true` and runs the remote smoke when `OTEL_EXPORTER_OTLP_ENDPOINT` is configured as a secret. `OTEL_EXPORTER_OTLP_HEADERS` remains optional. The workflow passes the secrets directly to OpenTelemetry and does not print headers.
 
 ## Production References
 

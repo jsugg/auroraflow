@@ -107,6 +107,8 @@ services:
   logstash:
     image: docker.elastic.co/logstash/logstash:8.17.0
     restart: unless-stopped
+    ports:
+      - '127.0.0.1:8080:8080'
     volumes:
       - ./observability/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
       - ./observability/logstash/pipeline:/usr/share/logstash/pipeline:ro

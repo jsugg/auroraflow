@@ -191,7 +191,8 @@ jobs:
     permissions:
       contents: read
     env:
-      SHOULD_RUN_OBSERVABILITY_FULL_STACK: ${{ (github.ref == 'refs/heads/main' || needs.preflight.outputs.run_observability_stack == 'true') && vars.AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED == 'true' }}
+      AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED: 'true'
+      SHOULD_RUN_OBSERVABILITY_FULL_STACK: ${{ github.ref == 'refs/heads/main' || needs.preflight.outputs.run_observability_stack == 'true' }}
       OBSERVABILITY_DIAGNOSTICS_DIR: observability-output/full-stack
     steps:
       - name: Checkout
@@ -218,6 +219,12 @@ jobs:
         if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
         run: |
           mkdir -p logs test-results/self-healing "${OBSERVABILITY_DIAGNOSTICS_DIR}"
+          printf '{"timestamp":"%s","level":"info","message":"Observability full-stack smoke log seed.","component":"observability-ci","runId":"%s","workflow":"%s","branch":"%s","commit":"%s"}\n' \
+            "$(date --utc +%Y-%m-%dT%H:%M:%SZ)" \
+            "${GITHUB_RUN_ID}" \
+            "${GITHUB_WORKFLOW}" \
+            "${GITHUB_REF_NAME}" \
+            "${GITHUB_SHA}" > logs/auroraflow.ndjson
           docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
 
       - name: Wait for full-stack backends
@@ -272,12 +279,37 @@ jobs:
           OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4318
         run: npm run observability:ci:smoke
 
+      - name: Emit full-stack smoke log through Logstash
+        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
+        run: |
+          curl --fail --silent --show-error -X POST http://localhost:8080 \
+            -H 'Content-Type: application/json' \
+            --data-binary @- <<EOF
+          {
+            "timestamp": "$(date --utc +%Y-%m-%dT%H:%M:%SZ)",
+            "level": "info",
+            "message": "Observability full-stack smoke log indexed through Logstash.",
+            "component": "observability-ci",
+            "runId": "${GITHUB_RUN_ID}",
+            "workflow": "${GITHUB_WORKFLOW}",
+            "branch": "${GITHUB_REF_NAME}",
+            "commit": "${GITHUB_SHA}"
+          }
+          EOF
+
       - name: Capture and validate backend snapshots
         if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
         run: |
           mkdir -p "${OBSERVABILITY_DIAGNOSTICS_DIR}"
 
-          curl --fail --silent --show-error http://localhost:9090/api/v1/targets > "${OBSERVABILITY_DIAGNOSTICS_DIR}/prometheus-targets.json"
+          for attempt in $(seq 1 30); do
+            curl --fail --silent --show-error http://localhost:9090/api/v1/targets > "${OBSERVABILITY_DIAGNOSTICS_DIR}/prometheus-targets.json" || true
+            if grep -q '"health":"up"' "${OBSERVABILITY_DIAGNOSTICS_DIR}/prometheus-targets.json"; then
+              break
+            fi
+            echo "Waiting for Prometheus target health (${attempt}/30)"
+            sleep 2
+          done
           grep -q '"health":"up"' "${OBSERVABILITY_DIAGNOSTICS_DIR}/prometheus-targets.json"
           for attempt in $(seq 1 30); do
             curl --fail --silent --show-error 'http://localhost:9090/api/v1/query?query=auroraflow_test_runs_total' > "${OBSERVABILITY_DIAGNOSTICS_DIR}/prometheus-auroraflow-test-runs.json" || true
@@ -343,7 +375,7 @@ jobs:
 
       - name: Skip full-stack smoke when not requested
         if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK != 'true'
-        run: echo "Full observability stack smoke disabled; set AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED=true to run it."
+        run: echo "No observability-relevant changes detected; full-stack smoke completed as no-op."
 
   observability-remote-export:
     name: Observability Remote Export Smoke
@@ -353,7 +385,8 @@ jobs:
     permissions:
       contents: read
     env:
-      SHOULD_RUN_REMOTE_EXPORT: ${{ (github.ref == 'refs/heads/main' || needs.preflight.outputs.run_observability_stack == 'true') && vars.AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED == 'true' }}
+      AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED: 'true'
+      SHOULD_RUN_REMOTE_EXPORT: ${{ github.ref == 'refs/heads/main' || needs.preflight.outputs.run_observability_stack == 'true' }}
       OBSERVABILITY_DIAGNOSTICS_DIR: observability-output/remote-export
       OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.OTEL_EXPORTER_OTLP_ENDPOINT }}
       OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
@@ -395,7 +428,7 @@ jobs:
 
       - name: Skip remote export when not configured
         if: env.SHOULD_RUN_REMOTE_EXPORT != 'true' || env.OTEL_EXPORTER_OTLP_ENDPOINT == ''
-        run: echo "Remote observability export smoke skipped because it is disabled or OTLP endpoint secret is not configured."
+        run: echo "Remote observability export smoke skipped because no observability-relevant changes were detected or the OTLP endpoint secret is not configured."
 
   smoke-e2e:
     name: Smoke E2E (Chrome)
