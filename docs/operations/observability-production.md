@@ -12,13 +12,12 @@ AuroraFlow production observability environments must be deployed from hardened,
 
 ## Remote Export
 
-CI remote export is opt-in:
+CI remote export runs for observability-related changes and on `main` when endpoint secrets are configured:
 
-- Repository variable: `AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED=true`
 - Secret: `OTEL_EXPORTER_OTLP_ENDPOINT`
 - Optional secret: `OTEL_EXPORTER_OTLP_HEADERS`
 
-The workflow passes these values directly to OpenTelemetry environment variables and uploads only smoke diagnostics. Do not echo headers or endpoint credentials in workflow logs.
+The workflow sets `AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED=true`, passes these values directly to OpenTelemetry environment variables, and uploads only smoke diagnostics. Do not echo headers or endpoint credentials in workflow logs.
 
 ## Storage Budgets
 

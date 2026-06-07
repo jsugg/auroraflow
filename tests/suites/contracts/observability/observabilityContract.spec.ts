@@ -81,6 +81,10 @@ describe('observability contract documentation', () => {
       path.join(OBSERVABILITY_ROOT, 'grafana', 'provisioning', 'datasources', 'datasources.yml'),
       'utf8',
     );
+    const kibanaConfig = readFileSync(
+      path.join(OBSERVABILITY_ROOT, 'kibana', 'kibana.yml'),
+      'utf8',
+    );
 
     expect(collectorConfig).toContain('otlp:');
     expect(collectorConfig).toContain('endpoint: 0.0.0.0:4318');
@@ -92,6 +96,7 @@ describe('observability contract documentation', () => {
     expect(dataSourcesConfig).toContain('type: prometheus');
     expect(dataSourcesConfig).toContain('type: elasticsearch');
     expect(dataSourcesConfig).toContain('type: jaeger');
+    expect(kibanaConfig).not.toContain('xpack.security.enabled');
   });
 
   it('provides a collector-only CI smoke lane with diagnostics', () => {
@@ -117,7 +122,7 @@ describe('observability contract documentation', () => {
     expect(packageJson).toContain('"observability:snapshot"');
   });
 
-  it('provides opt-in full-stack and remote-export CI observability lanes', () => {
+  it('provides full-stack and secret-gated remote-export CI observability lanes', () => {
     const workflow = readFileSync(
       path.join(process.cwd(), '.github', 'workflows', 'quality.yml'),
       'utf8',
@@ -125,15 +130,24 @@ describe('observability contract documentation', () => {
 
     expect(workflow).toContain('Observability Full Stack Smoke');
     expect(workflow).toContain('AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED');
+    expect(workflow).toContain(
+      "SHOULD_RUN_OBSERVABILITY_FULL_STACK: ${{ github.ref == 'refs/heads/main' || needs.preflight.outputs.run_observability_stack == 'true' }}",
+    );
+    expect(workflow).not.toContain('vars.AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED');
     expect(workflow).toContain('prometheus-targets.json');
     expect(workflow).toContain('grafana-datasources.json');
     expect(workflow).toContain('jaeger-traces.json');
     expect(workflow).toContain('elasticsearch-indices.json');
+    expect(workflow).toContain('Observability full-stack smoke log seed.');
     expect(workflow).toContain('kibana-data-views.json');
     expect(workflow).toContain('observability-full-stack-diagnostics');
 
     expect(workflow).toContain('Observability Remote Export Smoke');
     expect(workflow).toContain('AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED');
+    expect(workflow).toContain(
+      "SHOULD_RUN_REMOTE_EXPORT: ${{ github.ref == 'refs/heads/main' || needs.preflight.outputs.run_observability_stack == 'true' }}",
+    );
+    expect(workflow).not.toContain('vars.AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED');
     expect(workflow).toContain('secrets.OTEL_EXPORTER_OTLP_ENDPOINT');
     expect(workflow).toContain('secrets.OTEL_EXPORTER_OTLP_HEADERS');
     expect(workflow).toContain('observability-remote-export-diagnostics');
@@ -178,6 +192,8 @@ describe('observability contract documentation', () => {
     );
 
     expect(logstashPipeline).toContain('_jsonparsefailure');
+    expect(logstashPipeline).toContain('http {');
+    expect(logstashPipeline).toContain('port => 8080');
     expect(logstashPipeline).toContain('auroraflow-ingestion-dead-letter');
     expect(logstashPipeline).toContain('auroraflow-ingest-dead-letter-%{+YYYY.MM.dd}');
     expect(logstashPipeline).toContain('secret_key_pattern');
