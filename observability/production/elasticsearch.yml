@@ -1,0 +1,13 @@
+cluster.name: auroraflow-observability
+network.host: 0.0.0.0
+xpack.security.enabled: true
+xpack.security.http.ssl.enabled: true
+xpack.security.http.ssl.certificate: /run/secrets/auroraflow-observability/tls/elasticsearch.crt
+xpack.security.http.ssl.key: /run/secrets/auroraflow-observability/tls/elasticsearch.key
+xpack.security.http.ssl.certificate_authorities:
+  - /run/secrets/auroraflow-observability/tls/ca.crt
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.certificate: /run/secrets/auroraflow-observability/tls/elasticsearch.crt
+xpack.security.transport.ssl.key: /run/secrets/auroraflow-observability/tls/elasticsearch.key
+xpack.security.transport.ssl.certificate_authorities:
+  - /run/secrets/auroraflow-observability/tls/ca.crt

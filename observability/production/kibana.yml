@@ -1,0 +1,9 @@
+server.host: 0.0.0.0
+server.ssl.enabled: true
+server.ssl.certificate: /run/secrets/auroraflow-observability/tls/kibana.crt
+server.ssl.key: /run/secrets/auroraflow-observability/tls/kibana.key
+elasticsearch.hosts:
+  - https://elasticsearch:9200
+elasticsearch.ssl.certificateAuthorities:
+  - /run/secrets/auroraflow-observability/tls/ca.crt
+xpack.security.enabled: true

@@ -1,0 +1,79 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+        auth:
+          authenticator: basicauth/server
+        tls:
+          cert_file: /run/secrets/auroraflow-observability/tls/otel-collector.crt
+          key_file: /run/secrets/auroraflow-observability/tls/otel-collector.key
+      http:
+        endpoint: 0.0.0.0:4318
+        auth:
+          authenticator: basicauth/server
+        tls:
+          cert_file: /run/secrets/auroraflow-observability/tls/otel-collector.crt
+          key_file: /run/secrets/auroraflow-observability/tls/otel-collector.key
+
+processors:
+  memory_limiter:
+    check_interval: 1s
+    limit_mib: 1024
+    spike_limit_mib: 256
+  resource:
+    attributes:
+      - key: service.name
+        value: auroraflow
+        action: insert
+      - key: deployment.environment
+        from_attribute: deployment.environment
+        action: upsert
+  batch:
+    timeout: 2s
+    send_batch_size: 2048
+
+exporters:
+  prometheus:
+    endpoint: 0.0.0.0:9464
+    tls:
+      cert_file: /run/secrets/auroraflow-observability/tls/otel-collector.crt
+      key_file: /run/secrets/auroraflow-observability/tls/otel-collector.key
+  otlp/jaeger:
+    endpoint: jaeger:4317
+    tls:
+      ca_file: /run/secrets/auroraflow-observability/tls/ca.crt
+
+extensions:
+  basicauth/server:
+    htpasswd:
+      inline: ${env:AURORAFLOW_OTEL_BASIC_AUTH_HTPASSWD}
+  health_check:
+    endpoint: 0.0.0.0:13133
+    tls:
+      cert_file: /run/secrets/auroraflow-observability/tls/otel-collector.crt
+      key_file: /run/secrets/auroraflow-observability/tls/otel-collector.key
+
+service:
+  extensions:
+    - basicauth/server
+    - health_check
+  pipelines:
+    traces:
+      receivers:
+        - otlp
+      processors:
+        - memory_limiter
+        - resource
+        - batch
+      exporters:
+        - otlp/jaeger
+    metrics:
+      receivers:
+        - otlp
+      processors:
+        - memory_limiter
+        - resource
+        - batch
+      exporters:
+        - prometheus

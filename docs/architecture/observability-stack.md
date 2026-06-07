@@ -9,15 +9,15 @@ Implemented in source:
 - OpenTelemetry telemetry facade with no-op defaults.
 - Page action, Redis, self-healing, flakiness, SLO dashboard, and SLO alert telemetry hooks.
 - Local Docker Compose overlay for OpenTelemetry Collector, Prometheus, Grafana, Jaeger, Elasticsearch, Logstash, and Kibana.
+- Opt-in CI lanes for collector-only, full-stack backend snapshot, and remote OTLP export smoke validation.
 - Version-controlled Collector, Prometheus, Grafana provisioning, dashboard, Logstash, Elasticsearch, and Kibana config.
+- Reference production manifests with TLS/auth settings, storage budgets, backup guidance, runbooks, and dashboard review controls.
 - Contract tests that assert required stack files, services, ports, scrape targets, data sources, and dashboard JSON are present.
 
-Not implemented yet:
+Environment-specific work remains outside this repository:
 
-- CI observability stack jobs and backend snapshot uploads.
-- Remote telemetry export workflow and secret-backed authentication.
-- Production manifests, TLS, authentication, retention policy, and dashboard drift controls.
-- Production-grade Kibana saved searches and hardened Elasticsearch index lifecycle automation.
+- Provisioning real production DNS, certificates, storage classes, and network policy.
+- Enabling full-stack or remote-export CI variables in environments that have sufficient runner capacity and secrets.
 
 ## Signal Flow
 
@@ -85,6 +85,10 @@ Prometheus labels should remain bounded to dimensions such as action type, page 
 - `observability/grafana/dashboards`: starter dashboards for overview, CI matrix, flakiness, self-healing, page actions, Redis, and Collector health.
 - `observability/logstash/pipeline/auroraflow.conf`: local log and self-healing artifact ingestion.
 - `observability/elastic/elasticsearch.yml` and `observability/kibana/kibana.yml`: local single-node settings.
+- `observability/production`: reference production manifests that enable TLS/auth and persistent storage.
+- `docs/operations/observability-production.md`: production storage budgets plus backup and restore guidance.
+- `docs/operations/observability-runbooks.md`: operational triage paths for telemetry gaps, backpressure, cardinality, storage pressure, trace gaps, and dashboard drift.
+- `docs/operations/observability-dashboard-review.md`: dashboard and alert review checklist.
 
 ## Production Boundary
 
