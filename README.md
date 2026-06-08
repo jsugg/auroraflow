@@ -1,32 +1,22 @@
 # AuroraFlow
 
-[![Quality Gates](https://github.com/jsugg/auroraflow/actions/workflows/quality.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/quality.yml)
-[![Examples](https://github.com/jsugg/auroraflow/actions/workflows/examples.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/examples.yml)
-[![Security Checks](https://github.com/jsugg/auroraflow/actions/workflows/security.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/security.yml)
-[![E2E Matrix](https://github.com/jsugg/auroraflow/actions/workflows/ci.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/ci.yml)
+[![Quality Gates](https://github.com/jsugg/auroraflow/actions/workflows/quality.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/quality.yml) [![Examples](https://github.com/jsugg/auroraflow/actions/workflows/examples.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/examples.yml) [![Security Checks](https://github.com/jsugg/auroraflow/actions/workflows/security.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/security.yml) [![E2E Matrix](https://github.com/jsugg/auroraflow/actions/workflows/ci.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/ci.yml)
 
 ![AuroraFlow Logo](https://github.com/jsugg/auroraflow/blob/main/.github/assets/auroraflow-logo.png?raw=true)
 
-AuroraFlow is a TypeScript Playwright automation framework focused on maintainable page objects,
-mode-gated self-healing diagnostics, Redis-backed selector/data primitives, and deterministic CI
-observability artifacts.
+AuroraFlow is a TypeScript Playwright automation framework focused on maintainable page objects, mode-gated self-healing diagnostics, Redis-backed selector/data primitives, and deterministic CI observability artifacts.
 
-The project is intentionally explicit about what is production-ready foundation versus what is still a
-roadmap item. The current package ships framework primitives from `src/`; examples, tests, scripts, and
-operations assets remain repository tooling.
+The project is intentionally explicit about what is production-ready foundation versus what is still a roadmap item. The current package ships framework primitives from `src/`; examples, tests, scripts, and operations assets remain repository tooling.
 
 ## Current status
 
-AuroraFlow is a serious framework foundation, not a complete autonomous testing platform. The
-implementation currently includes:
+AuroraFlow is a serious framework foundation, not a complete autonomous testing platform. The implementation currently includes:
 
 - Playwright page object and page factory primitives with typed public exports.
 - Page action wrappers that emit logs, screenshots, self-healing artifacts, and optional telemetry.
-- Mode-gated self-healing diagnostics with bounded DOM snapshots, deterministic candidate scoring,
-  guarded dry-run validation, and a single guarded retry for supported actions.
+- Mode-gated self-healing diagnostics with bounded DOM snapshots, deterministic candidate scoring, guarded dry-run validation, and a single guarded retry for supported actions.
 - Redis configuration/client primitives plus a typed selector registry repository.
-- Deterministic flakiness, SLO dashboard, and alert evaluation reports generated from Playwright JSON
-  output.
+- Deterministic flakiness, SLO dashboard, and alert evaluation reports generated from Playwright JSON output.
 - Opt-in OpenTelemetry instrumentation and a local collector-backed observability stack.
 - CI quality, examples, security, observability smoke, and scheduled E2E matrix workflows.
 
@@ -35,8 +25,7 @@ Not implemented yet:
 - Autonomous selector promotion or source-code rewrites.
 - Runtime SAT history loading from Redis or persistent promotion writes.
 - A Dockerized SAT service or a Dockerized framework service.
-- Production-owned observability deployment; production manifests are references that require
-  environment-specific ownership, credentials, storage, DNS, TLS, and network controls.
+- Production-owned observability deployment; production manifests are references that require environment-specific ownership, credentials, storage, DNS, TLS, and network controls.
 
 ## Feature maturity
 
@@ -129,9 +118,7 @@ Artifacts are written under `test-results/self-healing/*.json` and can be summar
 npm run self-heal:governance
 ```
 
-Guarded mode is intentionally conservative. It evaluates locator candidates in dry-run mode and can retry
-supported actions once when a candidate is policy-allowed and confidence-eligible. It does not promote
-selectors into Redis, update source code, or maintain SAT history today.
+Guarded mode is intentionally conservative. It evaluates locator candidates in dry-run mode and can retry supported actions once when a candidate is policy-allowed and confidence-eligible. It does not promote selectors into Redis, update source code, or maintain SAT history today.
 
 See [`docs/architecture/self-healing.md`](docs/architecture/self-healing.md).
 
@@ -160,8 +147,7 @@ See [`docs/architecture/data-layer.md`](docs/architecture/data-layer.md).
 
 ## Observability
 
-Live telemetry is opt-in. Without `AURORAFLOW_OBSERVABILITY_ENABLED=true`, the telemetry facade stays
-no-op and report artifacts remain the primary evidence source.
+Live telemetry is opt-in. Without `AURORAFLOW_OBSERVABILITY_ENABLED=true`, the telemetry facade stays no-op and report artifacts remain the primary evidence source.
 
 Start the local stack:
 
@@ -191,9 +177,7 @@ Stop the stack:
 npm run observability:down
 ```
 
-See [`docs/operations/observability-contract.md`](docs/operations/observability-contract.md),
-[`docs/architecture/observability-stack.md`](docs/architecture/observability-stack.md), and
-[`observability/README.md`](observability/README.md).
+See [`docs/operations/observability-contract.md`](docs/operations/observability-contract.md), [`docs/architecture/observability-stack.md`](docs/architecture/observability-stack.md), and [`observability/README.md`](observability/README.md).
 
 ## Repository map
 
@@ -229,16 +213,13 @@ scripts/                   Report generation, workflow linting, governance, and 
 The next meaningful maturity steps are:
 
 1. Wire SAT analysis to selector registry history and reviewed promotion workflows.
-2. Add promotion governance that records pending selector changes without mutating application tests
-   silently.
+2. Add promotion governance that records pending selector changes without mutating application tests silently.
 3. Harden live dashboard and alert query semantics against emitted metric attributes.
 4. Continue expanding package-surface contracts and example coverage before widening the public API.
 
 ## Contributing
 
-Contributions are welcome when they preserve the repository's current-state framing: implemented features
-should be described as implemented, and roadmap items should stay clearly marked until corresponding source,
-tests, and workflows exist.
+Contributions are welcome when they preserve the repository's current-state framing: implemented features should be described as implemented, and roadmap items should stay clearly marked until corresponding source, tests, and workflows exist.
 
 Before opening a pull request, run:
 
