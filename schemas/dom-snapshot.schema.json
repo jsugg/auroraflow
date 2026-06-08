@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auroraflow.dev/schemas/dom-snapshot.schema.json",
+  "title": "AuroraFlow DOM snapshot",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["schemaVersion", "capturedAt", "nodeCount", "truncated", "elements"],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "capturedAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "url": {
+      "type": "string"
+    },
+    "nodeCount": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "truncated": {
+      "type": "boolean"
+    },
+    "elements": {
+      "type": "array",
+      "items": {
+        "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/domElementSummary"
+      }
+    }
+  }
+}

@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auroraflow.dev/schemas/self-healing-failure-event.schema.json",
+  "title": "AuroraFlow self-healing failure event",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "artifactVersion",
+    "eventId",
+    "timestamp",
+    "runId",
+    "component",
+    "errorCode",
+    "mode",
+    "minConfidence",
+    "safetyPolicy",
+    "pageObjectName",
+    "action",
+    "error",
+    "suggestions"
+  ],
+  "properties": {
+    "artifactVersion": {
+      "const": "1.0.0"
+    },
+    "eventId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "timestamp": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "testId": {
+      "type": "string"
+    },
+    "component": {
+      "type": "string",
+      "minLength": 1
+    },
+    "errorCode": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mode": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/selfHealingMode"
+    },
+    "minConfidence": {
+      "type": "number"
+    },
+    "safetyPolicy": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/selfHealingSafetyPolicy"
+    },
+    "pageObjectName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "currentUrl": {
+      "type": "string"
+    },
+    "screenshotPath": {
+      "type": "string"
+    },
+    "action": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/selfHealingActionContext"
+    },
+    "error": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/capturedFailureError"
+    },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/selfHealingSuggestion"
+      }
+    },
+    "sat": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["schemaVersion", "enabled", "candidates", "history", "analysisWarnings"],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "snapshot": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/domSnapshotSummary"
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/rankedSelfHealingCandidate"
+          }
+        },
+        "history": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/selectorCandidateHistorySummary"
+        },
+        "selectedCandidateId": {
+          "type": "string"
+        },
+        "analysisWarnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "guardedValidation": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/guardedValidationSummary"
+    },
+    "guardedAutoHeal": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/guardedAutoHealSummary"
+    }
+  }
+}

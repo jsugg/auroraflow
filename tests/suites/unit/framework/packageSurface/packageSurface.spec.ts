@@ -45,7 +45,10 @@ import {
   type RankedSelfHealingCandidate,
   type RedisRuntimeConfig,
   type SelfHealingConfig,
+  type SelfHealingRegistryRuntime,
+  type SelectorCandidateHistoryRepository,
   type SelectorRecord,
+  type SelectorRegistryReader,
   type SloDashboard,
 } from '../../../../../src';
 
@@ -114,6 +117,11 @@ describe('public package surface', () => {
     expectTypeOf<SelfHealingConfig['sat']['registryMode']>().toEqualTypeOf<
       'off' | 'read' | 'write_pending'
     >();
+    expectTypeOf<SelfHealingRegistryRuntime>().toMatchTypeOf<{
+      selectors: SelectorRegistryReader;
+      histories: SelectorCandidateHistoryRepository;
+      required: boolean;
+    }>();
     expectTypeOf<SelectorRecord>().toMatchTypeOf<{
       id: string;
       locator: string;

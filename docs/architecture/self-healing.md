@@ -67,6 +67,8 @@ Each artifact includes:
 - ranked locator suggestions with weighted scoring signals (`roleSignal`, `accessibleNameSignal`, `uniquenessSignal`, `historicalSignal`, `similaritySignal`).
 - optional `sat` payload with snapshot summary, ranked DOM/heuristic candidates, selected candidate ID, history summary, and analysis warnings.
 
+JSON Schema contracts for self-healing artifacts live in [`../operations/artifact-schemas.md`](../operations/artifact-schemas.md).
+
 ### Correlation Identifier Resolution
 
 - `runId` resolution order: explicit correlation input -> `AURORAFLOW_RUN_ID` -> `GITHUB_RUN_ID` -> `local-run`.

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auroraflow.dev/schemas/selector-candidate-history.schema.json",
+  "title": "AuroraFlow selector candidate history",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "candidateId",
+    "attempts",
+    "validated",
+    "guardedApplySucceeded",
+    "guardedApplyFailed",
+    "promoted",
+    "rejected"
+  ],
+  "properties": {
+    "candidateId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attempts": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "validated": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "guardedApplySucceeded": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "guardedApplyFailed": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "promoted": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "rejected": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "lastSeenAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "lastSuccessAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    }
+  }
+}

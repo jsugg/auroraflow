@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auroraflow.dev/schemas/slo-dashboard.schema.json",
+  "title": "AuroraFlow SLO dashboard",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "generatedAt",
+    "status",
+    "overallStatus",
+    "sourceFiles",
+    "totals",
+    "selfHealing",
+    "metrics"
+  ],
+  "properties": {
+    "generatedAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "status": {
+      "enum": ["complete", "no-input"]
+    },
+    "overallStatus": {
+      "enum": ["healthy", "degraded", "insufficient_data"]
+    },
+    "sourceFiles": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "tests",
+        "attempts",
+        "failedAttempts",
+        "passedTests",
+        "failedTests",
+        "flakyTests"
+      ],
+      "properties": {
+        "tests": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "attempts": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "failedAttempts": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "passedTests": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "failedTests": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "flakyTests": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "selfHealing": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "triageRequired",
+        "guardedAcceptedCount",
+        "guardedAutoHealAttempts",
+        "guardedAutoHealSucceeded",
+        "guardedAutoHealFailed",
+        "guardedAutoHealSkipped"
+      ],
+      "properties": {
+        "governanceStatus": {
+          "type": "string"
+        },
+        "triageRequired": {
+          "type": "boolean"
+        },
+        "guardedAcceptedCount": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "guardedAutoHealAttempts": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "guardedAutoHealSucceeded": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "guardedAutoHealFailed": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "guardedAutoHealSkipped": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "metrics": {
+      "type": "array",
+      "items": {
+        "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/sloMetric"
+      }
+    }
+  }
+}
