@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auroraflow.dev/schemas/self-healing-governance-summary.schema.json",
+  "title": "AuroraFlow self-healing governance summary",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "generatedAt",
+    "status",
+    "requireAcknowledgement",
+    "acknowledged",
+    "triageRequired",
+    "artifactsDir",
+    "totalArtifacts",
+    "parsedArtifacts",
+    "malformedArtifacts",
+    "guardedArtifacts",
+    "guardedAcceptedCount",
+    "guardedAccepted",
+    "telemetry"
+  ],
+  "properties": {
+    "generatedAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "status": {
+      "enum": [
+        "pass",
+        "triage_required",
+        "blocked_malformed_artifacts",
+        "blocked_acknowledgement_required"
+      ]
+    },
+    "requireAcknowledgement": {
+      "type": "boolean"
+    },
+    "acknowledged": {
+      "type": "boolean"
+    },
+    "triageRequired": {
+      "type": "boolean"
+    },
+    "artifactsDir": {
+      "type": "string"
+    },
+    "totalArtifacts": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "parsedArtifacts": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "malformedArtifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": true,
+        "required": ["fileName", "error"],
+        "properties": {
+          "fileName": {
+            "type": "string"
+          },
+          "error": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "guardedArtifacts": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "guardedAcceptedCount": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "guardedAccepted": {
+      "type": "array",
+      "items": {
+        "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/guardedAcceptedEvent"
+      }
+    },
+    "telemetry": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["modes", "actions", "errorCodes", "guardedAutoHeal"],
+      "properties": {
+        "modes": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/counterMap"
+        },
+        "actions": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/counterMap"
+        },
+        "errorCodes": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/counterMap"
+        },
+        "guardedAutoHeal": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["attempted", "succeeded", "failed", "skipped"],
+          "properties": {
+            "attempted": {
+              "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+            },
+            "succeeded": {
+              "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+            },
+            "failed": {
+              "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+            },
+            "skipped": {
+              "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auroraflow.dev/schemas/pending-selector-promotion.schema.json",
+  "title": "AuroraFlow pending selector promotion",
+  "type": "object",
+  "additionalProperties": true,
+  "required": ["eventId", "candidateId", "selectorId", "locator", "requestedAt", "acknowledged"],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "candidateId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "selectorId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "locator": {
+      "type": "string",
+      "minLength": 1
+    },
+    "requestedAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "acknowledged": {
+      "type": "boolean"
+    }
+  }
+}

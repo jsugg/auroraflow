@@ -1,0 +1,716 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auroraflow.dev/schemas/_shared.schema.json",
+  "title": "AuroraFlow shared artifact schema definitions",
+  "$defs": {
+    "isoDateTime": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "nonNegativeInteger": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "nonNegativeNumber": {
+      "type": "number",
+      "minimum": 0
+    },
+    "ratio": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "nullableRatio": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ratio"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "stringMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "counterMap": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/nonNegativeInteger"
+      }
+    },
+    "selfHealingMode": {
+      "enum": ["off", "suggest", "guarded"]
+    },
+    "selfHealingActionType": {
+      "enum": ["navigate", "click", "type", "read", "wait", "screenshot", "close", "unknown"]
+    },
+    "selfHealingSuggestionStrategy": {
+      "enum": [
+        "original",
+        "testId",
+        "roleName",
+        "ariaLabel",
+        "text",
+        "cssFallback",
+        "fallback",
+        "registry",
+        "domEvidence"
+      ]
+    },
+    "selfHealingSuggestionSignals": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "roleSignal",
+        "accessibleNameSignal",
+        "uniquenessSignal",
+        "historicalSignal",
+        "similaritySignal"
+      ],
+      "properties": {
+        "roleSignal": {
+          "type": "number"
+        },
+        "accessibleNameSignal": {
+          "type": "number"
+        },
+        "uniquenessSignal": {
+          "type": "number"
+        },
+        "historicalSignal": {
+          "type": "number"
+        },
+        "similaritySignal": {
+          "type": "number"
+        }
+      }
+    },
+    "selfHealingSuggestion": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["locator", "strategy", "score", "rationale", "signals"],
+      "properties": {
+        "locator": {
+          "type": "string",
+          "minLength": 1
+        },
+        "strategy": {
+          "$ref": "#/$defs/selfHealingSuggestionStrategy"
+        },
+        "score": {
+          "type": "number"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "signals": {
+          "$ref": "#/$defs/selfHealingSuggestionSignals"
+        }
+      }
+    },
+    "selfHealingActionContext": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["type", "description"],
+      "properties": {
+        "type": {
+          "$ref": "#/$defs/selfHealingActionType"
+        },
+        "target": {
+          "type": "string"
+        },
+        "targetAlias": {
+          "type": "string"
+        },
+        "expectedRole": {
+          "type": "string"
+        },
+        "expectedName": {
+          "type": "string"
+        },
+        "selectorId": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        }
+      }
+    },
+    "selfHealingSafetyPolicy": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["allowedActions", "allowedDomains"],
+      "properties": {
+        "allowedActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/selfHealingActionType"
+          }
+        },
+        "allowedDomains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "capturedFailureError": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["name", "message"],
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "stack": {
+          "type": "string"
+        }
+      }
+    },
+    "domElementSummary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "tagName", "attributes", "visible", "depth", "childCount"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "tagName": {
+          "type": "string"
+        },
+        "attributes": {
+          "$ref": "#/$defs/stringMap"
+        },
+        "role": {
+          "type": "string"
+        },
+        "accessibleName": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "editable": {
+          "type": "boolean"
+        },
+        "depth": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "childCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "parentTagName": {
+          "type": "string"
+        },
+        "landmark": {
+          "type": "string"
+        },
+        "cssPath": {
+          "type": "string"
+        }
+      }
+    },
+    "domSnapshotSummary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["schemaVersion", "capturedAt", "nodeCount", "truncated", "elementCount"],
+      "properties": {
+        "schemaVersion": {
+          "const": "1.0.0"
+        },
+        "capturedAt": {
+          "$ref": "#/$defs/isoDateTime"
+        },
+        "url": {
+          "type": "string"
+        },
+        "nodeCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "elementCount": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "artifactPath": {
+          "type": "string"
+        }
+      }
+    },
+    "selectorCandidateHistorySummary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["enabled", "loadedCandidates", "observations", "warnings"],
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "loadedCandidates": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "observations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "candidateEvidence": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["source", "uniqueInSnapshot", "visible", "matchedAttributes"],
+      "properties": {
+        "elementId": {
+          "type": "string"
+        },
+        "source": {
+          "enum": ["dom", "history", "heuristic", "registry"]
+        },
+        "uniqueInSnapshot": {
+          "type": "boolean"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "accessibleName": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "matchedAttributes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "rankedSelfHealingCandidate": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["id", "locator", "strategy", "score", "rationale", "signals", "evidence"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "locator": {
+          "type": "string"
+        },
+        "strategy": {
+          "$ref": "#/$defs/selfHealingSuggestionStrategy"
+        },
+        "score": {
+          "type": "number"
+        },
+        "rationale": {
+          "type": "string"
+        },
+        "signals": {
+          "$ref": "#/$defs/selfHealingSuggestionSignals"
+        },
+        "evidence": {
+          "$ref": "#/$defs/candidateEvidence"
+        },
+        "history": {
+          "$ref": "#/$defs/selectorCandidateHistorySummary"
+        }
+      }
+    },
+    "guardedValidationPolicyDecision": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["actionAllowed", "domainAllowed", "allowedActions", "allowedDomains"],
+      "properties": {
+        "actionAllowed": {
+          "type": "boolean"
+        },
+        "domainAllowed": {
+          "type": "boolean"
+        },
+        "evaluatedDomain": {
+          "type": "string"
+        },
+        "blockedReason": {
+          "enum": ["action_not_allowed", "domain_not_allowed", "missing_or_invalid_url"]
+        },
+        "allowedActions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/selfHealingActionType"
+          }
+        },
+        "allowedDomains": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "guardedValidationCandidate": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "locator",
+        "strategy",
+        "score",
+        "confidenceEligible",
+        "matchedElements",
+        "visible",
+        "status"
+      ],
+      "properties": {
+        "locator": {
+          "type": "string"
+        },
+        "strategy": {
+          "$ref": "#/$defs/selfHealingSuggestionStrategy"
+        },
+        "score": {
+          "type": "number"
+        },
+        "confidenceEligible": {
+          "type": "boolean"
+        },
+        "matchedElements": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "visible": {
+          "type": "boolean"
+        },
+        "enabled": {
+          "type": "boolean"
+        },
+        "editable": {
+          "type": "boolean"
+        },
+        "stable": {
+          "type": "boolean"
+        },
+        "semanticMatch": {
+          "type": "boolean"
+        },
+        "failureReason": {
+          "type": "string"
+        },
+        "domEvidenceId": {
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "accepted",
+            "below_confidence_threshold",
+            "unsupported_locator_expression",
+            "no_matches",
+            "not_visible",
+            "evaluation_error"
+          ]
+        },
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "guardedValidationSummary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["mode", "actionType", "minConfidence", "policy", "candidates"],
+      "properties": {
+        "mode": {
+          "const": "dry-run"
+        },
+        "actionType": {
+          "$ref": "#/$defs/selfHealingActionType"
+        },
+        "minConfidence": {
+          "type": "number"
+        },
+        "policy": {
+          "$ref": "#/$defs/guardedValidationPolicyDecision"
+        },
+        "acceptedLocator": {
+          "type": "string"
+        },
+        "acceptedScore": {
+          "type": "number"
+        },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/guardedValidationCandidate"
+          }
+        }
+      }
+    },
+    "guardedAutoHealSummary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["attempted", "succeeded"],
+      "properties": {
+        "attempted": {
+          "type": "boolean"
+        },
+        "succeeded": {
+          "type": "boolean"
+        },
+        "locator": {
+          "type": "string"
+        },
+        "skippedReason": {
+          "enum": ["no_accepted_locator", "unsupported_action", "unsupported_locator_expression"]
+        },
+        "errorMessage": {
+          "type": "string"
+        }
+      }
+    },
+    "flakinessTestCase": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "caseId",
+        "projectName",
+        "file",
+        "line",
+        "column",
+        "titlePath",
+        "fullTitle",
+        "attempts",
+        "retriesUsed",
+        "failedAttempts",
+        "durationMs",
+        "finalStatus",
+        "flaky"
+      ],
+      "properties": {
+        "caseId": {
+          "type": "string"
+        },
+        "projectName": {
+          "type": "string"
+        },
+        "file": {
+          "type": "string"
+        },
+        "line": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "column": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "titlePath": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "fullTitle": {
+          "type": "string"
+        },
+        "attempts": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "retriesUsed": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "failedAttempts": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "durationMs": {
+          "$ref": "#/$defs/nonNegativeNumber"
+        },
+        "finalStatus": {
+          "enum": ["passed", "failed", "timedOut", "skipped", "interrupted", "unknown"]
+        },
+        "flaky": {
+          "type": "boolean"
+        }
+      }
+    },
+    "projectFlakinessSummary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "projectName",
+        "totalTests",
+        "flakyTests",
+        "failedTests",
+        "totalAttempts",
+        "failedAttempts"
+      ],
+      "properties": {
+        "projectName": {
+          "type": "string"
+        },
+        "totalTests": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "flakyTests": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "failedTests": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "totalAttempts": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "failedAttempts": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "sloMetricTarget": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["comparator", "threshold", "rationale"],
+      "properties": {
+        "comparator": {
+          "enum": ["gte", "lte"]
+        },
+        "threshold": {
+          "$ref": "#/$defs/ratio"
+        },
+        "rationale": {
+          "type": "string"
+        }
+      }
+    },
+    "sloMetric": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["key", "label", "value", "target", "status"],
+      "properties": {
+        "key": {
+          "enum": [
+            "passRate",
+            "failureRate",
+            "flakeRate",
+            "retryFailureRate",
+            "guardedAutoHealFailureRate"
+          ]
+        },
+        "label": {
+          "type": "string"
+        },
+        "value": {
+          "$ref": "#/$defs/nullableRatio"
+        },
+        "target": {
+          "$ref": "#/$defs/sloMetricTarget"
+        },
+        "status": {
+          "enum": ["met", "breached", "insufficient_data"]
+        }
+      }
+    },
+    "alertBreach": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "id",
+        "metric",
+        "severity",
+        "description",
+        "operator",
+        "threshold",
+        "actualValue",
+        "blockOnBreach"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "metric": {
+          "enum": [
+            "passRate",
+            "failureRate",
+            "flakeRate",
+            "retryFailureRate",
+            "guardedAutoHealFailureRate"
+          ]
+        },
+        "severity": {
+          "enum": ["info", "warning", "critical"]
+        },
+        "description": {
+          "type": "string"
+        },
+        "operator": {
+          "enum": ["gt", "gte", "lt", "lte"]
+        },
+        "threshold": {
+          "$ref": "#/$defs/ratio"
+        },
+        "actualValue": {
+          "$ref": "#/$defs/ratio"
+        },
+        "blockOnBreach": {
+          "type": "boolean"
+        }
+      }
+    },
+    "guardedAcceptedEvent": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["fileName", "eventId", "mode", "pageObjectName"],
+      "properties": {
+        "fileName": {
+          "type": "string"
+        },
+        "eventId": {
+          "type": "string"
+        },
+        "mode": {
+          "type": "string"
+        },
+        "pageObjectName": {
+          "type": "string"
+        },
+        "currentUrl": {
+          "type": "string"
+        },
+        "actionType": {
+          "type": "string"
+        },
+        "errorCode": {
+          "type": "string"
+        },
+        "guardedAutoHealAttempted": {
+          "type": "boolean"
+        },
+        "guardedAutoHealSucceeded": {
+          "type": "boolean"
+        },
+        "acceptedLocator": {
+          "type": "string"
+        },
+        "acceptedScore": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}

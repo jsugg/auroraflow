@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auroraflow.dev/schemas/slo-alert-evaluation.schema.json",
+  "title": "AuroraFlow SLO alert evaluation",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "generatedAt",
+    "dashboardGeneratedAt",
+    "overallStatus",
+    "breachCount",
+    "blockingBreachCount",
+    "breaches"
+  ],
+  "properties": {
+    "generatedAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "dashboardGeneratedAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "overallStatus": {
+      "enum": ["healthy", "degraded", "insufficient_data"]
+    },
+    "breachCount": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "blockingBreachCount": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "breaches": {
+      "type": "array",
+      "items": {
+        "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/alertBreach"
+      }
+    }
+  }
+}

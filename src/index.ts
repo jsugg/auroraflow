@@ -177,6 +177,17 @@ export {
 
 export { type SelfHealingCandidateSeed } from './framework/selfHealing/candidateTypes';
 
+export type {
+  PendingSelectorPromotionQuery,
+  PendingSelectorPromotionRepository,
+  SelectorCandidateHistoryObservation,
+  SelectorCandidateHistoryRepository,
+  SelectorRegistryEntry,
+  SelectorRegistryLookup,
+  SelectorRegistryReader,
+  SelfHealingRegistryRuntime,
+} from './framework/selfHealing/registryContracts';
+
 export {
   extractDomCandidateSeeds,
   type DomCandidateExtractionInput,

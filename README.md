@@ -204,6 +204,7 @@ scripts/                   Report generation, workflow linting, governance, and 
 - [Data layer foundation](docs/architecture/data-layer.md)
 - [Observability stack architecture](docs/architecture/observability-stack.md)
 - [Observability contract](docs/operations/observability-contract.md)
+- [Artifact schemas](docs/operations/artifact-schemas.md)
 - [SLO dashboard and alerting](docs/operations/slo-dashboard-alerting.md)
 - [Security and secrets](docs/operations/security-secrets.md)
 - [Examples](examples/README.md)

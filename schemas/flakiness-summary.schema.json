@@ -1,0 +1,76 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auroraflow.dev/schemas/flakiness-summary.schema.json",
+  "title": "AuroraFlow flakiness summary",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "generatedAt",
+    "status",
+    "sourceFiles",
+    "totalTests",
+    "flakyTests",
+    "failedTests",
+    "passedTests",
+    "skippedTests",
+    "interruptedTests",
+    "totalAttempts",
+    "totalFailedAttempts",
+    "projectBreakdown",
+    "topFlakyCases",
+    "testCases"
+  ],
+  "properties": {
+    "generatedAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "status": {
+      "enum": ["complete", "no-input"]
+    },
+    "sourceFiles": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "totalTests": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "flakyTests": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "failedTests": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "passedTests": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "skippedTests": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "interruptedTests": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "totalAttempts": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "totalFailedAttempts": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "projectBreakdown": {
+      "type": "array",
+      "items": {
+        "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/projectFlakinessSummary"
+      }
+    },
+    "topFlakyCases": {
+      "type": "array",
+      "items": {
+        "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/flakinessTestCase"
+      }
+    },
+    "testCases": {
+      "type": "array",
+      "items": {
+        "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/flakinessTestCase"
+      }
+    }
+  }
+}
