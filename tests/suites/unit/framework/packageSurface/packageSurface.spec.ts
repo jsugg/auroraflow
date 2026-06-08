@@ -21,7 +21,9 @@ import {
   captureDomSnapshot,
   createChildLogger,
   createConfiguredLogger,
+  createRedisSelfHealingRegistryRuntime,
   createRedisSelectorStore,
+  createStoreSelfHealingRegistryRuntime,
   evaluateAlertPolicy,
   evaluateGuardedSuggestionsDryRun,
   extractDomCandidateSeeds,
@@ -34,6 +36,7 @@ import {
   resolveCorrelationIdentifiers,
   resolveLoggerRuntimeConfig,
   resolveRedisRuntimeConfig,
+  resolveSelfHealingRegistryRuntime,
   resolveSelfHealingConfig,
   resolveTelemetryConfig,
   retry,
@@ -46,6 +49,7 @@ import {
   type LoggerRuntimeConfig,
   type RankedSelfHealingCandidate,
   type RedisRuntimeConfig,
+  type ResolveSelfHealingRegistryRuntimeOptions,
   type SelfHealingConfig,
   type SelfHealingRegistryRuntime,
   type SelectorCandidateHistoryRepository,
@@ -80,7 +84,9 @@ describe('public package surface', () => {
     expect(captureDomSnapshot).toBeTypeOf('function');
     expect(createChildLogger).toBeTypeOf('function');
     expect(createConfiguredLogger).toBeTypeOf('function');
+    expect(createRedisSelfHealingRegistryRuntime).toBeTypeOf('function');
     expect(createRedisSelectorStore).toBeTypeOf('function');
+    expect(createStoreSelfHealingRegistryRuntime).toBeTypeOf('function');
     expect(evaluateAlertPolicy).toBeTypeOf('function');
     expect(evaluateGuardedSuggestionsDryRun).toBeTypeOf('function');
     expect(extractDomCandidateSeeds).toBeTypeOf('function');
@@ -93,6 +99,7 @@ describe('public package surface', () => {
     expect(resolveCorrelationIdentifiers).toBeTypeOf('function');
     expect(resolveLoggerRuntimeConfig).toBeTypeOf('function');
     expect(resolveRedisRuntimeConfig).toBeTypeOf('function');
+    expect(resolveSelfHealingRegistryRuntime).toBeTypeOf('function');
     expect(resolveSelfHealingConfig).toBeTypeOf('function');
     expect(resolveTelemetryConfig).toBeTypeOf('function');
     expect(retry).toBeTypeOf('function');
@@ -128,6 +135,7 @@ describe('public package surface', () => {
       histories: SelectorCandidateHistoryRepository;
       required: boolean;
     }>();
+    expectTypeOf<ResolveSelfHealingRegistryRuntimeOptions>().toMatchTypeOf<object>();
     expectTypeOf<SelectorRecord>().toMatchTypeOf<{
       id: string;
       locator: string;

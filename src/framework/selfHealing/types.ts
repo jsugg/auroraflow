@@ -156,6 +156,8 @@ export interface RankedSelfHealingCandidate {
   rationale: string;
   signals: SelfHealingSuggestionSignals;
   evidence: CandidateEvidence;
+  registryRecordId?: string;
+  registryRecordVersion?: number;
   history?: SelectorCandidateHistorySummary;
 }
 

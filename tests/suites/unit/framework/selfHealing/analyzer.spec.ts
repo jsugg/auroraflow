@@ -1,8 +1,11 @@
 import type { Page } from 'playwright';
 import { describe, expect, it, vi } from 'vitest';
 import { analyzeSelfHealingFailure } from '../../../../../src/framework/selfHealing/analyzer';
+import { buildSelfHealingCandidateId } from '../../../../../src/framework/selfHealing/candidateScoring';
+import type { SelfHealingRegistryRuntime } from '../../../../../src/framework/selfHealing/registryContracts';
 import type {
   DomSnapshot,
+  SelectorCandidateHistory,
   SelfHealingConfig,
 } from '../../../../../src/framework/selfHealing/types';
 
@@ -116,5 +119,134 @@ describe('analyzeSelfHealingFailure', () => {
       analysisWarnings: [],
     });
     expect(evaluate).not.toHaveBeenCalled();
+  });
+
+  it('loads active registry selectors and applies candidate history to ranking', async () => {
+    const page = {} as unknown as Page;
+    const locator = "page.getByTestId('submit-order')";
+    const candidateId = buildSelfHealingCandidateId({
+      pageObjectName: 'CheckoutPage',
+      actionType: 'click',
+      failedTarget: '#submit',
+      selectorId: 'checkout.submit',
+      strategy: 'registry',
+      locator,
+    });
+    const history: SelectorCandidateHistory = {
+      candidateId,
+      attempts: 6,
+      validated: 4,
+      guardedApplySucceeded: 3,
+      guardedApplyFailed: 0,
+      promoted: 1,
+      rejected: 0,
+      lastSeenAt: '2026-06-08T12:00:00.000Z',
+      lastSuccessAt: '2026-06-08T12:00:00.000Z',
+    };
+    const record = {
+      id: 'checkout.submit',
+      pageObjectName: 'CheckoutPage',
+      actionType: 'click',
+      locator,
+      confidence: 0.96,
+      updatedAt: '2026-06-08T12:00:00.000Z',
+      version: 3,
+    };
+    const recordObservation = vi.fn(async () => history);
+    const upsertPromotion = vi.fn(async (promotion) => promotion);
+    const runtime: SelfHealingRegistryRuntime = {
+      selectors: {
+        get: vi.fn().mockResolvedValue(record),
+        findCandidates: vi.fn().mockResolvedValue([record]),
+      },
+      histories: {
+        get: vi.fn().mockResolvedValue(history),
+        getMany: vi.fn().mockImplementation(async (candidateIds: readonly string[]) => {
+          const histories = new Map<string, SelectorCandidateHistory>();
+          if (candidateIds.includes(candidateId)) {
+            histories.set(candidateId, history);
+          }
+          return histories;
+        }),
+        recordObservation,
+      },
+      promotions: {
+        get: vi.fn().mockResolvedValue(null),
+        list: vi.fn().mockResolvedValue([]),
+        upsert: upsertPromotion,
+      },
+      required: false,
+    };
+
+    const result = await analyzeSelfHealingFailure({
+      page,
+      config: selfHealingConfig({ captureDom: false }),
+      pageObjectName: 'CheckoutPage',
+      currentUrl: snapshot.url,
+      action: {
+        type: 'click',
+        target: '#submit',
+        selectorId: 'checkout.submit',
+        description: 'Error clicking selector #submit',
+      },
+      registryRuntime: runtime,
+    });
+
+    expect(runtime.selectors.get).toHaveBeenCalledWith('checkout.submit');
+    expect(runtime.histories.getMany).toHaveBeenCalledWith(expect.arrayContaining([candidateId]));
+    expect(recordObservation).not.toHaveBeenCalled();
+    expect(upsertPromotion).not.toHaveBeenCalled();
+    expect(result.sat?.history).toMatchObject({
+      enabled: true,
+      loadedCandidates: 1,
+      observations: 6,
+      warnings: [],
+    });
+
+    const registryCandidate = result.sat?.candidates.find(
+      (candidate) => candidate.registryRecordId === 'checkout.submit',
+    );
+    expect(registryCandidate).toMatchObject({
+      id: candidateId,
+      locator,
+      strategy: 'registry',
+      registryRecordVersion: 3,
+      evidence: {
+        source: 'registry',
+      },
+      history: {
+        enabled: true,
+        observations: 6,
+      },
+    });
+    expect(registryCandidate?.signals.historicalSignal).toBeGreaterThan(0.5);
+    expect(result.sat?.selectedCandidateId).toBe(result.sat?.candidates[0]?.id);
+  });
+
+  it('surfaces registry read warnings when read mode lacks a runtime', async () => {
+    const result = await analyzeSelfHealingFailure({
+      page: {} as unknown as Page,
+      config: selfHealingConfig({ captureDom: false }),
+      pageObjectName: 'CheckoutPage',
+      currentUrl: snapshot.url,
+      action: {
+        type: 'click',
+        target: '#submit',
+        selectorId: 'checkout.submit',
+        description: 'Error clicking selector #submit',
+      },
+    });
+
+    expect(result.sat?.history).toMatchObject({
+      enabled: true,
+      loadedCandidates: 0,
+      observations: 0,
+      warnings: [
+        'Self-healing registry read mode is enabled, but no registry runtime is configured.',
+      ],
+    });
+    expect(result.sat?.analysisWarnings).toContain(
+      'Self-healing registry read mode is enabled, but no registry runtime is configured.',
+    );
   });
 });

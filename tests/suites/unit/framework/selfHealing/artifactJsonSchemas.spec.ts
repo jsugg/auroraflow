@@ -121,7 +121,7 @@ describe('self-healing artifact JSON Schemas', () => {
         history: {
           enabled: false,
           loadedCandidates: 0,
-          observations: [],
+          observations: 0,
           warnings: ['registry history is not wired yet'],
         },
         selectedCandidateId: 'CheckoutPage::click::submit::roleName',
