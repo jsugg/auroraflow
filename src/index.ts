@@ -29,6 +29,8 @@ export {
   getRedisClient,
   resetRedisClientForTests,
   resolveRedisRuntimeConfig,
+  type RedisCompareAndSetOptions,
+  type RedisCompareAndSetResult,
   type RedisClientDriver,
   type RedisRuntimeConfig,
   type RedisScanOptions,
@@ -36,13 +38,23 @@ export {
 } from './utils/redisClient';
 
 export {
+  DEFAULT_SELECTOR_REGISTRY_NAMESPACES,
+  SelectorRegistryConflictError,
   SelectorRegistryDataError,
   SelectorRegistryRepository,
   SelectorRegistryValidationError,
+  buildSelectorRegistryNamespaces,
+  type SelectorRegistryNamespaces,
   type SelectorRecord,
   type SelectorStore,
+  type SelectorStoreCompareAndSetOptions,
+  type SelectorStoreCompareAndSetResult,
+  type SelectorStoreSetOptions,
   type SelectorUpsertInput,
+  type SelectorUpsertOptions,
 } from './data/selectors/selectorRegistry';
+
+export { createRedisSelectorStore } from './data/selectors/redisSelectorStore';
 
 export {
   normalizeOptionalIdentifier,
