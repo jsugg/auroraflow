@@ -4,6 +4,7 @@ import { Logger, createChildLogger } from '../utils/logger';
 import { analyzeSelfHealingFailure } from '../framework/selfHealing/analyzer';
 import { resolveSelfHealingConfig } from '../framework/selfHealing/config';
 import { captureFailureEvent } from '../framework/selfHealing/failureCapture';
+import { persistSelfHealingRegistryTelemetry } from '../framework/selfHealing/registryPersistence';
 import { resolveSelfHealingRegistryRuntime } from '../framework/selfHealing/registryRuntime';
 import { generateRankedLocatorSuggestions } from '../framework/selfHealing/suggestionEngine';
 import {
@@ -12,6 +13,7 @@ import {
 } from '../framework/selfHealing/guardedValidation';
 import type {
   GuardedAutoHealSummary,
+  SelfHealingRegistryPersistenceSummary,
   SelfHealingActionType,
   SelfHealingConfig,
 } from '../framework/selfHealing/types';
@@ -219,6 +221,7 @@ export abstract class PageObjectBase {
     let actionError: Error | undefined;
     let guardedValidation: Awaited<ReturnType<typeof evaluateGuardedSuggestionsDryRun>> | undefined;
     let guardedAutoHeal: GuardedAutoHealSummary | undefined;
+    let registryPersistence: SelfHealingRegistryPersistenceSummary | undefined;
 
     try {
       if (requiresInitialization) {
@@ -378,10 +381,37 @@ export abstract class PageObjectBase {
           if (guardedAutoHeal) {
             event.guardedAutoHeal = guardedAutoHeal;
           }
+          if (selfHealingConfig.sat.registryMode === 'write_pending') {
+            registryPersistence = await persistSelfHealingRegistryTelemetry({
+              config: selfHealingConfig,
+              event,
+              registryRuntime,
+            });
+            event.registryPersistence = registryPersistence;
+          }
         },
       }).catch((captureError) =>
         this.logger.error('Failed to capture self-healing failure artifact.', { captureError }),
       );
+
+      if (registryPersistence) {
+        span.setAttribute(
+          'auroraflow.self_heal.registry.history_write_succeeded',
+          registryPersistence.history.succeeded,
+        );
+        span.setAttribute(
+          'auroraflow.self_heal.registry.history_write_failed',
+          registryPersistence.history.failed,
+        );
+        span.setAttribute(
+          'auroraflow.self_heal.registry.promotion_write_status',
+          registryPersistence.promotion.status,
+        );
+        span.setAttribute(
+          'auroraflow.self_heal.registry.persistence_warning_count',
+          registryPersistence.warnings.length,
+        );
+      }
 
       if (guardedAutoHeal?.attempted && guardedAutoHeal.succeeded) {
         actionStatus = 'self_healed';

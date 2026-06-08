@@ -1,26 +1,19 @@
 import {
   DEFAULT_SELECTOR_REGISTRY_NAMESPACES,
   SelectorRegistryRepository,
-  buildSelectorRegistryNamespaces,
   type SelectorStore,
 } from '../../data/selectors/selectorRegistry';
 import { createRedisSelectorStore } from '../../data/selectors/redisSelectorStore';
 import { getRedisClient, type RedisClient } from '../../utils/redisClient';
-import { parsePendingSelectorPromotion, parseSelectorCandidateHistory } from './artifactSchema';
+import { StoreSelectorCandidateHistoryRepository } from './historyRepository';
+import { StorePendingSelectorPromotionRepository } from './promotionRepository';
 import type {
-  PendingSelectorPromotionQuery,
-  PendingSelectorPromotionRepository,
-  SelectorCandidateHistoryRepository,
   SelectorRegistryEntry,
   SelectorRegistryLookup,
   SelectorRegistryReader,
   SelfHealingRegistryRuntime,
 } from './registryContracts';
-import type {
-  PendingSelectorPromotion,
-  SelectorCandidateHistory,
-  SelfHealingConfig,
-} from './types';
+import type { SelfHealingConfig } from './types';
 
 const EXPLICIT_REDIS_CONFIG_KEYS = Object.freeze([
   'AURORAFLOW_REDIS_URL',
@@ -75,128 +68,6 @@ class SelectorRegistryReaderAdapter implements SelectorRegistryReader {
   }
 }
 
-class StoreSelectorCandidateHistoryRepository implements SelectorCandidateHistoryRepository {
-  private readonly namespace: string;
-
-  public constructor(
-    private readonly store: SelectorStore,
-    activeNamespace: string,
-  ) {
-    this.namespace = buildSelectorRegistryNamespaces(activeNamespace).history;
-  }
-
-  public async get(candidateId: string): Promise<SelectorCandidateHistory | null> {
-    const payload = await this.store.get(this.keyFor(candidateId));
-    if (payload === null) {
-      return null;
-    }
-    return parseSelectorCandidateHistory(JSON.parse(payload) as unknown);
-  }
-
-  public async getMany(
-    candidateIds: readonly string[],
-  ): Promise<ReadonlyMap<string, SelectorCandidateHistory>> {
-    if (candidateIds.length === 0) {
-      return new Map();
-    }
-
-    const keys = candidateIds.map((candidateId) => this.keyFor(candidateId));
-    const payloads = this.store.getMany
-      ? await this.store.getMany(keys)
-      : await Promise.all(keys.map((key) => this.store.get(key)));
-    const histories = new Map<string, SelectorCandidateHistory>();
-
-    for (let index = 0; index < candidateIds.length; index += 1) {
-      const payload = payloads[index];
-      if (payload === null || payload === undefined) {
-        continue;
-      }
-      const history = parseSelectorCandidateHistory(JSON.parse(payload) as unknown);
-      histories.set(candidateIds[index], history);
-    }
-
-    return histories;
-  }
-
-  private keyFor(candidateId: string): string {
-    return `${this.namespace}:${candidateId.trim()}`;
-  }
-}
-
-class StorePendingSelectorPromotionRepository implements PendingSelectorPromotionRepository {
-  private readonly namespace: string;
-
-  public constructor(
-    private readonly store: SelectorStore,
-    activeNamespace: string,
-  ) {
-    this.namespace = buildSelectorRegistryNamespaces(activeNamespace).promotions;
-  }
-
-  public async get(eventId: string): Promise<PendingSelectorPromotion | null> {
-    const payload = await this.store.get(this.keyFor(eventId));
-    if (payload === null) {
-      return null;
-    }
-    return parsePendingSelectorPromotion(JSON.parse(payload) as unknown);
-  }
-
-  public async list(
-    query: PendingSelectorPromotionQuery = {},
-  ): Promise<readonly PendingSelectorPromotion[]> {
-    const keys = await this.listPromotionKeys(query.limit);
-    const payloads = this.store.getMany
-      ? await this.store.getMany(keys)
-      : await Promise.all(keys.map((key) => this.store.get(key)));
-    const promotions: PendingSelectorPromotion[] = [];
-
-    for (const payload of payloads) {
-      if (payload === null || payload === undefined) {
-        continue;
-      }
-      const promotion = parsePendingSelectorPromotion(JSON.parse(payload) as unknown);
-      if (query.selectorId && promotion.selectorId !== query.selectorId) {
-        continue;
-      }
-      if (query.candidateId && promotion.candidateId !== query.candidateId) {
-        continue;
-      }
-      if (!query.includeAcknowledged && promotion.acknowledged) {
-        continue;
-      }
-      promotions.push(promotion);
-    }
-
-    return promotions;
-  }
-
-  public async upsert(promotion: PendingSelectorPromotion): Promise<PendingSelectorPromotion> {
-    await this.store.set(this.keyFor(promotion.eventId), JSON.stringify(promotion));
-    return promotion;
-  }
-
-  private async listPromotionKeys(limit = 100): Promise<string[]> {
-    const boundedLimit = Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 100;
-    const pattern = `${this.namespace}:*`;
-    const keys: string[] = [];
-    if (this.store.scanKeys) {
-      for await (const key of this.store.scanKeys(pattern)) {
-        keys.push(key);
-        if (keys.length >= boundedLimit) {
-          break;
-        }
-      }
-      return keys.sort();
-    }
-
-    return (await this.store.keys(pattern)).sort().slice(0, boundedLimit);
-  }
-
-  private keyFor(eventId: string): string {
-    return `${this.namespace}:${eventId.trim()}`;
-  }
-}
-
 function parseBoolean(rawValue: string | undefined): boolean {
   if (!rawValue) {
     return false;
@@ -223,8 +94,8 @@ export function createStoreSelfHealingRegistryRuntime({
   const selectors = new SelectorRegistryRepository({ store, namespace });
   return {
     selectors: new SelectorRegistryReaderAdapter(selectors),
-    histories: new StoreSelectorCandidateHistoryRepository(store, namespace),
-    promotions: new StorePendingSelectorPromotionRepository(store, namespace),
+    histories: new StoreSelectorCandidateHistoryRepository({ store, activeNamespace: namespace }),
+    promotions: new StorePendingSelectorPromotionRepository({ store, activeNamespace: namespace }),
     required,
   };
 }

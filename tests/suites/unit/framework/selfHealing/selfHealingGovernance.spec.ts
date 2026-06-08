@@ -10,12 +10,19 @@ type SelfHealingArtifactAnalysis = {
   parsedArtifacts: number;
   malformedArtifacts: Array<{ fileName: string; error: string }>;
   guardedArtifacts: number;
+  pendingPromotions: Array<{ eventId: string; pendingPromotionId?: string }>;
+  registryPersistenceFailures: Array<{ eventId: string }>;
   telemetry: {
     modes: Record<string, number>;
     actions: Record<string, number>;
     errorCodes: Record<string, number>;
     guardedAutoHeal: {
       attempted: number;
+      succeeded: number;
+      failed: number;
+      skipped: number;
+    };
+    pendingPromotionWrites: {
       succeeded: number;
       failed: number;
       skipped: number;
@@ -42,6 +49,8 @@ type GovernanceModule = {
       status: string;
       triageRequired: boolean;
       generatedAt: string;
+      pendingPromotionCount?: number;
+      registryPersistenceFailureCount?: number;
     };
     markdown: string;
   };
@@ -148,6 +157,7 @@ describe('self-healing governance script', () => {
           failed: number;
           skipped: number;
         };
+        pendingPromotionWrites: Record<string, number>;
       };
     };
     expect(summary.status).toBe('blocked_acknowledgement_required');
@@ -156,6 +166,11 @@ describe('self-healing governance script', () => {
     expect(summary.telemetry.guardedAutoHeal).toEqual({
       attempted: 1,
       succeeded: 1,
+      failed: 0,
+      skipped: 0,
+    });
+    expect(summary.telemetry.pendingPromotionWrites).toEqual({
+      succeeded: 0,
       failed: 0,
       skipped: 0,
     });
@@ -236,6 +251,8 @@ describe('self-healing governance script', () => {
       parsedArtifacts: 1,
       malformedArtifacts: [],
       guardedArtifacts: 1,
+      pendingPromotions: [],
+      registryPersistenceFailures: [],
       telemetry: {
         modes: { guarded: 1 },
         actions: { click: 1 },
@@ -244,6 +261,11 @@ describe('self-healing governance script', () => {
           attempted: 1,
           succeeded: 0,
           failed: 1,
+          skipped: 0,
+        },
+        pendingPromotionWrites: {
+          succeeded: 0,
+          failed: 0,
           skipped: 0,
         },
       },
@@ -267,5 +289,130 @@ describe('self-healing governance script', () => {
         errorCodes: { page_action_click_failed: 1 },
       },
     });
+  });
+
+  it('summarizes pending promotion writes and blocks until acknowledged', async () => {
+    const governance = await loadGovernanceModule();
+    const tempDir = await createTempDir('self-heal-governance-');
+    tempDirectories.add(tempDir);
+
+    const artifactsDir = path.join(tempDir, 'artifacts');
+    const summaryJsonPath = path.join(tempDir, 'summary.json');
+    const summaryMarkdownPath = path.join(tempDir, 'summary.md');
+
+    await writeJsonFile(path.join(artifactsDir, 'event-001.json'), {
+      eventId: 'evt-001',
+      mode: 'guarded',
+      pageObjectName: 'CheckoutPage',
+      action: {
+        type: 'click',
+      },
+      guardedValidation: {
+        acceptedLocator: "page.getByRole('button', { name: 'Submit order' })",
+        acceptedScore: 0.96,
+      },
+      registryPersistence: {
+        mode: 'write_pending',
+        history: {
+          attempted: 1,
+          succeeded: 1,
+          failed: 0,
+          skipped: 0,
+          observations: [],
+        },
+        promotion: {
+          eventId: 'evt-001',
+          status: 'succeeded',
+          promotionId: 'promotion:evt-001:candidate',
+          candidateId: 'candidate',
+          selectorId: 'checkout.submit',
+        },
+        warnings: [],
+      },
+    });
+
+    const exitCode = await governance.runSelfHealingGovernance({
+      artifactsDir,
+      requireAcknowledgement: true,
+      acknowledged: false,
+      summaryJsonPath,
+      summaryMarkdownPath,
+    });
+
+    expect(exitCode).toBe(1);
+
+    const summary = JSON.parse(await readFile(summaryJsonPath, 'utf8')) as {
+      status: string;
+      pendingPromotionCount: number;
+      telemetry: {
+        pendingPromotionWrites: Record<string, number>;
+      };
+    };
+    expect(summary.status).toBe('blocked_acknowledgement_required');
+    expect(summary.pendingPromotionCount).toBe(1);
+    expect(summary.telemetry.pendingPromotionWrites.succeeded).toBe(1);
+
+    const markdown = await readFile(summaryMarkdownPath, 'utf8');
+    expect(markdown).toContain('Pending Promotions');
+    expect(markdown).toContain('promotion:evt-001:candidate');
+  });
+
+  it('blocks when registry persistence failures are present', async () => {
+    const governance = await loadGovernanceModule();
+    const tempDir = await createTempDir('self-heal-governance-');
+    tempDirectories.add(tempDir);
+
+    const artifactsDir = path.join(tempDir, 'artifacts');
+    const summaryJsonPath = path.join(tempDir, 'summary.json');
+    const summaryMarkdownPath = path.join(tempDir, 'summary.md');
+
+    await writeJsonFile(path.join(artifactsDir, 'event-001.json'), {
+      eventId: 'evt-001',
+      mode: 'guarded',
+      pageObjectName: 'CheckoutPage',
+      registryPersistence: {
+        mode: 'write_pending',
+        history: {
+          attempted: 1,
+          succeeded: 0,
+          failed: 1,
+          skipped: 0,
+          observations: [
+            {
+              candidateId: 'candidate',
+              status: 'failed',
+              errorMessage: 'history down',
+            },
+          ],
+        },
+        promotion: {
+          eventId: 'evt-001',
+          status: 'failed',
+          errorMessage: 'promotion down',
+        },
+        warnings: ['promotion down'],
+      },
+    });
+
+    const exitCode = await governance.runSelfHealingGovernance({
+      artifactsDir,
+      requireAcknowledgement: false,
+      acknowledged: false,
+      summaryJsonPath,
+      summaryMarkdownPath,
+    });
+
+    expect(exitCode).toBe(1);
+
+    const summary = JSON.parse(await readFile(summaryJsonPath, 'utf8')) as {
+      status: string;
+      registryPersistenceFailureCount: number;
+      telemetry: {
+        pendingPromotionWrites: Record<string, number>;
+      };
+    };
+    expect(summary.status).toBe('blocked_registry_persistence_failed');
+    expect(summary.registryPersistenceFailureCount).toBe(1);
+    expect(summary.telemetry.pendingPromotionWrites.failed).toBe(1);
   });
 });

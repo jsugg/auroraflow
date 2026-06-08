@@ -3,7 +3,9 @@ import type {
   DomElementSummary,
   DomSnapshot,
   PendingSelectorPromotion,
+  PendingSelectorPromotionStatus,
   SelectorCandidateHistory,
+  SelfHealingActionType,
 } from './types';
 
 export class SelfHealingArtifactSchemaError extends Error {
@@ -11,6 +13,31 @@ export class SelfHealingArtifactSchemaError extends Error {
     super(message);
     this.name = 'SelfHealingArtifactSchemaError';
   }
+}
+
+const PENDING_PROMOTION_STATUSES: readonly PendingSelectorPromotionStatus[] = [
+  'pending',
+  'approved',
+  'rejected',
+  'rolled_back',
+];
+const SELF_HEALING_ACTION_TYPES: readonly SelfHealingActionType[] = [
+  'navigate',
+  'click',
+  'type',
+  'read',
+  'wait',
+  'screenshot',
+  'close',
+  'unknown',
+];
+
+function isPendingPromotionStatus(value: string): value is PendingSelectorPromotionStatus {
+  return PENDING_PROMOTION_STATUSES.includes(value as PendingSelectorPromotionStatus);
+}
+
+function isSelfHealingActionType(value: string): value is SelfHealingActionType {
+  return SELF_HEALING_ACTION_TYPES.includes(value as SelfHealingActionType);
 }
 
 function toRecord(value: unknown, path: string): Record<string, unknown> {
@@ -59,6 +86,21 @@ function readNumber(record: Record<string, unknown>, key: string, path: string):
   return value;
 }
 
+function readOptionalNumber(
+  record: Record<string, unknown>,
+  key: string,
+  path: string,
+): number | undefined {
+  const value = record[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    throw new SelfHealingArtifactSchemaError(`${path}.${key} must be a finite number.`);
+  }
+  return value;
+}
+
 function readNonNegativeInteger(
   record: Record<string, unknown>,
   key: string,
@@ -69,6 +111,22 @@ function readNonNegativeInteger(
     throw new SelfHealingArtifactSchemaError(`${path}.${key} must be a non-negative integer.`);
   }
   return value;
+}
+
+function readOptionalNonNegativeInteger(
+  record: Record<string, unknown>,
+  key: string,
+  path: string,
+): number | undefined {
+  const value = record[key];
+  if (value === undefined) {
+    return undefined;
+  }
+  const numericValue = readNumber(record, key, path);
+  if (!Number.isInteger(numericValue) || numericValue < 0) {
+    throw new SelfHealingArtifactSchemaError(`${path}.${key} must be a non-negative integer.`);
+  }
+  return numericValue;
 }
 
 function readStringRecord(
@@ -143,18 +201,56 @@ export function parseSelectorCandidateHistory(raw: unknown): SelectorCandidateHi
     rejected: readNonNegativeInteger(history, 'rejected', 'history'),
     lastSeenAt: readOptionalString(history, 'lastSeenAt', 'history'),
     lastSuccessAt: readOptionalString(history, 'lastSuccessAt', 'history'),
+    expiresAt: readOptionalString(history, 'expiresAt', 'history'),
   };
 }
 
 export function parsePendingSelectorPromotion(raw: unknown): PendingSelectorPromotion {
   const promotion = toRecord(raw, 'promotion');
+  const eventId = readString(promotion, 'eventId', 'promotion');
+  const candidateId = readString(promotion, 'candidateId', 'promotion');
+  const proposedLocator =
+    readOptionalString(promotion, 'proposedLocator', 'promotion') ??
+    readString(promotion, 'locator', 'promotion');
+  const status = readOptionalString(promotion, 'status', 'promotion') ?? 'pending';
+  if (!isPendingPromotionStatus(status)) {
+    throw new SelfHealingArtifactSchemaError(
+      'promotion.status must be pending, approved, rejected, or rolled_back.',
+    );
+  }
+  const actionType = readOptionalString(promotion, 'actionType', 'promotion');
+  if (actionType !== undefined && !isSelfHealingActionType(actionType)) {
+    throw new SelfHealingArtifactSchemaError('promotion.actionType must be a known action type.');
+  }
+  const confidence = readOptionalNumber(promotion, 'confidence', 'promotion') ?? 0;
+  if (confidence < 0 || confidence > 1) {
+    throw new SelfHealingArtifactSchemaError('promotion.confidence must be between 0 and 1.');
+  }
   return {
-    eventId: readString(promotion, 'eventId', 'promotion'),
-    candidateId: readString(promotion, 'candidateId', 'promotion'),
+    promotionId:
+      readOptionalString(promotion, 'promotionId', 'promotion') ?? `${eventId}:${candidateId}`,
+    eventId,
+    candidateId,
     selectorId: readString(promotion, 'selectorId', 'promotion'),
-    locator: readString(promotion, 'locator', 'promotion'),
+    proposedLocator,
+    locator: readOptionalString(promotion, 'locator', 'promotion') ?? proposedLocator,
+    baseSelectorVersion: readOptionalNonNegativeInteger(
+      promotion,
+      'baseSelectorVersion',
+      'promotion',
+    ),
+    confidence,
+    status,
     requestedAt: readString(promotion, 'requestedAt', 'promotion'),
-    acknowledged: readBoolean(promotion, 'acknowledged', 'promotion'),
+    expiresAt: readOptionalString(promotion, 'expiresAt', 'promotion'),
+    runId: readOptionalString(promotion, 'runId', 'promotion'),
+    testId: readOptionalString(promotion, 'testId', 'promotion'),
+    pageObjectName: readOptionalString(promotion, 'pageObjectName', 'promotion'),
+    actionType,
+    acknowledged:
+      promotion.acknowledged === undefined
+        ? status !== 'pending'
+        : readBoolean(promotion, 'acknowledged', 'promotion'),
   };
 }
 

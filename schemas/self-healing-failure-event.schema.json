@@ -115,6 +115,9 @@
     },
     "guardedAutoHeal": {
       "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/guardedAutoHealSummary"
+    },
+    "registryPersistence": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/selfHealingRegistryPersistenceSummary"
     }
   }
 }

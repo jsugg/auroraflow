@@ -30,4 +30,4 @@ The command compiles all schema files and validates generated artifacts found un
 
 ## Runtime Status
 
-These schemas define contracts for current artifacts plus future selector-history and promotion records. Selector registry history and pending promotion writes are still planned runtime work; schemas alone do not make SAT autonomous.
+These schemas define contracts for current artifacts, selector-history records, and pending promotion review records. Pending promotion records are runtime-written in `SELF_HEAL_REGISTRY_MODE=write_pending`, but reviewed approval/rejection/rollback workflows are still planned; schemas alone do not make SAT autonomous.

@@ -101,6 +101,7 @@ describe('PageObjectBase self-healing integration', () => {
     process.env.SELF_HEAL_MIN_CONFIDENCE = '0.95';
     delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
     delete process.env.SELF_HEAL_ALLOWED_DOMAINS;
+    delete process.env.SELF_HEAL_REGISTRY_MODE;
     await rm(artifactsDir, { recursive: true, force: true });
     pageMock = createPageMock();
     pageObject = new TestPageObject(pageMock as unknown as Page);
@@ -113,6 +114,7 @@ describe('PageObjectBase self-healing integration', () => {
     delete process.env.SELF_HEAL_MIN_CONFIDENCE;
     delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
     delete process.env.SELF_HEAL_ALLOWED_DOMAINS;
+    delete process.env.SELF_HEAL_REGISTRY_MODE;
     resetTelemetryForTests();
     await rm(artifactsDir, { recursive: true, force: true });
   });
@@ -350,6 +352,106 @@ describe('PageObjectBase self-healing integration', () => {
       'auroraflow.self_heal.registry.history_loaded_candidates': 0,
       'auroraflow.self_heal.registry.warning_count': expect.any(Number) as number,
     });
+  });
+
+  it('persists write-pending registry telemetry into artifacts after guarded success', async () => {
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
+    const recordObservation = vi.fn().mockResolvedValue({
+      candidateId: 'candidate',
+      attempts: 1,
+      validated: 1,
+      guardedApplySucceeded: 1,
+      guardedApplyFailed: 0,
+      promoted: 0,
+      rejected: 0,
+    });
+    const upsertPromotion = vi.fn().mockImplementation(async (promotion) => promotion);
+    const runtime: SelfHealingRegistryRuntime = {
+      selectors: {
+        get: vi.fn().mockResolvedValue({
+          id: 'checkout.submit',
+          pageObjectName: 'TestPageObject',
+          actionType: 'click',
+          locator: '#legacy-active',
+          confidence: 0.1,
+          updatedAt: '2026-06-08T12:00:00.000Z',
+          version: 5,
+        }),
+        findCandidates: vi.fn().mockResolvedValue([]),
+      },
+      histories: {
+        get: vi.fn().mockResolvedValue(null),
+        getMany: vi.fn().mockResolvedValue(new Map()),
+        recordObservation,
+      },
+      promotions: {
+        get: vi.fn().mockResolvedValue(null),
+        list: vi.fn().mockResolvedValue([]),
+        upsert: upsertPromotion,
+      },
+      required: false,
+    };
+    pageObject = new TestPageObject(pageMock as unknown as Page, runtime);
+    process.env.SELF_HEAL_MODE = 'guarded';
+    process.env.SELF_HEAL_REGISTRY_MODE = 'write_pending';
+    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
+    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
+    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'example.test';
+    pageMock.click.mockRejectedValueOnce(new Error('click failed'));
+
+    await expect(
+      pageObject.click('#submit', { selectorId: 'checkout.submit' }),
+    ).resolves.toBeNull();
+
+    expect(recordObservation).toHaveBeenCalled();
+    expect(upsertPromotion).toHaveBeenCalledWith(
+      expect.objectContaining({
+        eventId: expect.any(String) as string,
+        selectorId: 'checkout.submit',
+        baseSelectorVersion: 5,
+        status: 'pending',
+      }),
+    );
+
+    const artifacts = await readdir(artifactsDir);
+    const artifactPath = path.join(artifactsDir, artifacts[0]);
+    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+      eventId: string;
+      action: { selectorId?: string };
+      guardedValidation?: { acceptedLocator?: string };
+      registryPersistence?: {
+        history: {
+          succeeded: number;
+        };
+        promotion: {
+          status: string;
+          eventId?: string;
+          selectorId?: string;
+        };
+      };
+    };
+
+    expect(content.action.selectorId).toBe('checkout.submit');
+    expect(content.registryPersistence).toMatchObject({
+      history: {
+        succeeded: expect.any(Number) as number,
+      },
+      promotion: {
+        status: 'succeeded',
+        eventId: content.eventId,
+        selectorId: 'checkout.submit',
+      },
+    });
+    expect(telemetry.counters).toContainEqual(
+      expect.objectContaining({
+        name: METRIC_NAMES.selfHealingRegistryWritesTotal,
+        attributes: expect.objectContaining({
+          'auroraflow.self_heal.registry.operation': 'pending_promotion',
+          'auroraflow.self_heal.status': 'succeeded',
+        }) as Record<string, unknown>,
+      }),
+    );
   });
 
   it('auto-applies accepted guarded clickWhenVisible candidates and records success', async () => {

@@ -22,8 +22,7 @@ AuroraFlow is a serious framework foundation, not a complete autonomous testing 
 
 Not implemented yet:
 
-- Autonomous selector promotion or source-code rewrites.
-- Runtime SAT history loading from Redis or persistent promotion writes.
+- Reviewed selector approval/rejection/rollback workflows or source-code rewrites.
 - A Dockerized SAT service or a Dockerized framework service.
 - Production-owned observability deployment; production manifests are references that require environment-specific ownership, credentials, storage, DNS, TLS, and network controls.
 
@@ -33,8 +32,8 @@ Not implemented yet:
 | --- | --- | --- | --- |
 | Package surface | Root package metadata, declaration output, curated publish files, and broad typed exports are contract-tested. | The published artifact is limited to `dist`, `README.md`, and `LICENSE`; repository examples and scripts are not part of the package API. | `package.json`, `src/index.ts`, `tsconfig.build.json`, `tests/suites/contracts/package/packageSurface.contract.spec.ts` |
 | Page objects | `PageObjectBase` wraps navigation, click, type, read, wait, screenshot, and close actions with initialization, logging, screenshots, self-healing analysis, and telemetry metrics. `PageFactory` caches page object instances. | Protected helpers that call Playwright directly should be reviewed before treating them as instrumented public actions. | `src/pageObjects/pageObjectBase.ts`, `src/helpers/pageFactory.ts` |
-| Self-healing diagnostics | `off`, `suggest`, and `guarded` modes are parsed and enforced. Failure capture can include ranked suggestions, DOM-derived candidates, guarded validation, and one guarded retry for click/type/read/wait. | SAT registry and promotion modes are parsed, but runtime analysis still returns an empty history summary and does not write selector registry records. | `src/framework/selfHealing/config.ts`, `src/framework/selfHealing/analyzer.ts`, `src/framework/selfHealing/guardedValidation.ts`, `docs/architecture/self-healing.md` |
-| Redis data layer | Runtime config validation, namespaced keys, bounded retry with jitter, SCAN-based listing, batched reads, selector record validation, CAS, page/action indexes, TTL-capable stores, and Testcontainers coverage are implemented. | Redis is not yet wired into SAT history scoring or promotion workflows. | `src/utils/redisClient.ts`, `src/data/selectors/selectorRegistry.ts`, `docs/architecture/data-layer.md` |
+| Self-healing diagnostics | `off`, `suggest`, and `guarded` modes are parsed and enforced. Failure capture can include ranked suggestions, DOM-derived candidates, registry-backed history, guarded validation, one guarded retry for click/type/read/wait, history observations, and reviewable pending promotion records. | Pending promotions are review records only. Reviewed approval, rejection, rollback, and active selector mutation workflows are not implemented yet. | `src/framework/selfHealing/config.ts`, `src/framework/selfHealing/analyzer.ts`, `src/framework/selfHealing/guardedValidation.ts`, `docs/architecture/self-healing.md` |
+| Redis data layer | Runtime config validation, namespaced keys, bounded retry with jitter, SCAN-based listing, batched reads, selector record validation, CAS, page/action indexes, TTL-capable stores, SAT history records, pending promotions, and Testcontainers coverage are implemented. | Active selector updates still require future reviewed workflows; no source-code rewrites occur. | `src/utils/redisClient.ts`, `src/data/selectors/selectorRegistry.ts`, `docs/architecture/data-layer.md` |
 | Observability | The telemetry facade is no-op by default, can export OpenTelemetry spans/metrics when enabled, and keeps JSON/Markdown report artifacts as deterministic merge-gate evidence. Local Collector, Prometheus, Grafana, Jaeger, Elasticsearch, Logstash, and Kibana configuration exists. | Dashboards and alert rules are starter operational assets; review their query semantics against emitted attributes before using them as production SLO sources. | `src/framework/observability/*`, `docs/operations/observability-contract.md`, `docs/architecture/observability-stack.md`, `observability/README.md` |
 | CI and security | Pull requests run quality and security gates. Example and smoke lanes are path-filtered. The full E2E matrix runs on `main`, schedule, and manual dispatch. | Some optional observability and remote-export paths need repository variables/secrets and enough runner capacity. | `.github/workflows/quality.yml`, `.github/workflows/examples.yml`, `.github/workflows/security.yml`, `.github/workflows/ci.yml` |
 
@@ -118,7 +117,7 @@ Artifacts are written under `test-results/self-healing/*.json` and can be summar
 npm run self-heal:governance
 ```
 
-Guarded mode is intentionally conservative. It evaluates locator candidates in dry-run mode and can retry supported actions once when a candidate is policy-allowed and confidence-eligible. SAT can read active selectors and candidate history from a configured registry, but it does not promote selectors into Redis, write pending promotions, or update source code today.
+Guarded mode is intentionally conservative. It evaluates locator candidates in dry-run mode and can retry supported actions once when a candidate is policy-allowed and confidence-eligible. With `SELF_HEAL_REGISTRY_MODE=write_pending` and a configured registry, SAT records history observations and pending promotion review records. It does not mutate active selectors or update source code.
 
 See [`docs/architecture/self-healing.md`](docs/architecture/self-healing.md).
 

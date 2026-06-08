@@ -5,6 +5,8 @@ import {
   SelectorRegistryRepository,
 } from '../../../../../src/data/selectors/selectorRegistry';
 import { createRedisSelectorStore } from '../../../../../src/data/selectors/redisSelectorStore';
+import { StoreSelectorCandidateHistoryRepository } from '../../../../../src/framework/selfHealing/historyRepository';
+import { StorePendingSelectorPromotionRepository } from '../../../../../src/framework/selfHealing/promotionRepository';
 import { RedisClient } from '../../../../../src/utils/redisClient';
 
 interface IntegrationRuntime {
@@ -241,5 +243,84 @@ describe('SelectorRegistryRepository integration', () => {
     expect(await store.get(`${namespaces.promotions}:promotion`)).toBeNull();
     await expect(repository.listAll()).resolves.toHaveLength(1);
     await repository.delete('settings.field');
+  });
+
+  it('persists SAT history and pending promotion records with Redis TTLs', async (context) => {
+    const client = requireClient(context);
+    const store = createRedisSelectorStore(client);
+    const historyRepository = new StoreSelectorCandidateHistoryRepository({
+      store,
+      activeNamespace: 'selector-registry-sat-int',
+      ttlSeconds: 1,
+    });
+    const promotionRepository = new StorePendingSelectorPromotionRepository({
+      store,
+      activeNamespace: 'selector-registry-sat-int',
+    });
+    const observedAt = new Date().toISOString();
+    const expiresAt = new Date(Date.now() + 1_000).toISOString();
+
+    const history = await historyRepository.recordObservation({
+      candidate: {
+        id: 'candidate-int',
+        locator: '#submit',
+        strategy: 'cssFallback',
+        score: 0.8,
+        rationale: 'CSS fallback candidate.',
+        signals: {
+          roleSignal: 0,
+          accessibleNameSignal: 0,
+          uniquenessSignal: 1,
+          historicalSignal: 0,
+          similaritySignal: 0.5,
+        },
+        evidence: {
+          source: 'heuristic',
+          uniqueInSnapshot: true,
+          visible: true,
+          matchedAttributes: [],
+        },
+      },
+      eventId: 'evt-int',
+      observedAt,
+      selectorId: 'checkout.submit',
+      validationStatus: 'accepted',
+      validationAccepted: true,
+      guardedApplySucceeded: true,
+    });
+    await promotionRepository.upsert({
+      promotionId: 'promotion:evt-int:candidate',
+      eventId: 'evt-int',
+      candidateId: 'candidate-int',
+      selectorId: 'checkout.submit',
+      proposedLocator: '#submit',
+      locator: '#submit',
+      baseSelectorVersion: 2,
+      confidence: 0.8,
+      status: 'pending',
+      requestedAt: observedAt,
+      expiresAt,
+      acknowledged: false,
+    });
+
+    expect(history).toMatchObject({
+      candidateId: 'candidate-int',
+      attempts: 1,
+      validated: 1,
+      guardedApplySucceeded: 1,
+    });
+    await expect(historyRepository.get('candidate-int')).resolves.toMatchObject({
+      candidateId: 'candidate-int',
+      attempts: 1,
+    });
+    await expect(promotionRepository.get('evt-int')).resolves.toMatchObject({
+      promotionId: 'promotion:evt-int:candidate',
+      selectorId: 'checkout.submit',
+      status: 'pending',
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 1_200));
+    await expect(historyRepository.get('candidate-int')).resolves.toBeNull();
+    await expect(promotionRepository.get('evt-int')).resolves.toBeNull();
   });
 });

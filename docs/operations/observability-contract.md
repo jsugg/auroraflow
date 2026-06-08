@@ -65,6 +65,7 @@ Every emitted signal should carry these attributes when the value is known:
 - `auroraflow_self_healing_suggestions_total`
 - `auroraflow_guarded_validation_candidates_total`
 - `auroraflow_guarded_auto_heal_total`
+- `auroraflow_self_healing_registry_writes_total`
 - `auroraflow_redis_operations_total`
 - `auroraflow_redis_operation_duration_ms`
 - `auroraflow_redis_operation_retries_total`

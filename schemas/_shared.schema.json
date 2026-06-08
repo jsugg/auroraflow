@@ -669,6 +669,125 @@
         }
       }
     },
+    "selectorCandidateHistoryWriteResult": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["candidateId", "status"],
+      "properties": {
+        "candidateId": {
+          "type": "string"
+        },
+        "selectorId": {
+          "type": "string"
+        },
+        "status": {
+          "enum": ["succeeded", "failed", "skipped"]
+        },
+        "validationStatus": {
+          "enum": [
+            "accepted",
+            "below_confidence_threshold",
+            "unsupported_locator_expression",
+            "no_matches",
+            "not_visible",
+            "evaluation_error"
+          ]
+        },
+        "validationAccepted": {
+          "type": "boolean"
+        },
+        "guardedApplySucceeded": {
+          "type": "boolean"
+        },
+        "guardedApplyFailed": {
+          "type": "boolean"
+        },
+        "attempts": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "validated": {
+          "$ref": "#/$defs/nonNegativeInteger"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "errorMessage": {
+          "type": "string"
+        }
+      }
+    },
+    "pendingSelectorPromotionWriteResult": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["eventId", "status"],
+      "properties": {
+        "eventId": {
+          "type": "string"
+        },
+        "status": {
+          "enum": ["succeeded", "failed", "skipped"]
+        },
+        "promotionId": {
+          "type": "string"
+        },
+        "candidateId": {
+          "type": "string"
+        },
+        "selectorId": {
+          "type": "string"
+        },
+        "reason": {
+          "type": "string"
+        },
+        "errorMessage": {
+          "type": "string"
+        }
+      }
+    },
+    "selfHealingRegistryPersistenceSummary": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["mode", "history", "promotion", "warnings"],
+      "properties": {
+        "mode": {
+          "enum": ["off", "read", "write_pending"]
+        },
+        "history": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["attempted", "succeeded", "failed", "skipped", "observations"],
+          "properties": {
+            "attempted": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            },
+            "succeeded": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            },
+            "failed": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            },
+            "skipped": {
+              "$ref": "#/$defs/nonNegativeInteger"
+            },
+            "observations": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/selectorCandidateHistoryWriteResult"
+              }
+            }
+          }
+        },
+        "promotion": {
+          "$ref": "#/$defs/pendingSelectorPromotionWriteResult"
+        },
+        "warnings": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
     "guardedAcceptedEvent": {
       "type": "object",
       "additionalProperties": true,
@@ -706,6 +825,9 @@
         },
         "acceptedScore": {
           "type": "number"
+        },
+        "registryPersistence": {
+          "$ref": "#/$defs/selfHealingRegistryPersistenceSummary"
         }
       }
     }

@@ -4,8 +4,23 @@
   "title": "AuroraFlow pending selector promotion",
   "type": "object",
   "additionalProperties": true,
-  "required": ["eventId", "candidateId", "selectorId", "locator", "requestedAt", "acknowledged"],
+  "required": [
+    "promotionId",
+    "eventId",
+    "candidateId",
+    "selectorId",
+    "proposedLocator",
+    "locator",
+    "confidence",
+    "status",
+    "requestedAt",
+    "acknowledged"
+  ],
   "properties": {
+    "promotionId": {
+      "type": "string",
+      "minLength": 1
+    },
     "eventId": {
       "type": "string",
       "minLength": 1
@@ -22,8 +37,36 @@
       "type": "string",
       "minLength": 1
     },
+    "proposedLocator": {
+      "type": "string",
+      "minLength": 1
+    },
+    "baseSelectorVersion": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "confidence": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/ratio"
+    },
+    "status": {
+      "enum": ["pending", "approved", "rejected", "rolled_back"]
+    },
     "requestedAt": {
       "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "expiresAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "runId": {
+      "type": "string"
+    },
+    "testId": {
+      "type": "string"
+    },
+    "pageObjectName": {
+      "type": "string"
+    },
+    "actionType": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/selfHealingActionType"
     },
     "acknowledged": {
       "type": "boolean"

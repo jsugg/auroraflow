@@ -14,9 +14,16 @@ export interface SelfHealingGovernanceSummary {
   status?: string;
   triageRequired?: boolean;
   guardedAcceptedCount?: number;
+  pendingPromotionCount?: number;
+  registryPersistenceFailureCount?: number;
   telemetry?: {
     guardedAutoHeal?: {
       attempted?: number;
+      succeeded?: number;
+      failed?: number;
+      skipped?: number;
+    };
+    pendingPromotionWrites?: {
       succeeded?: number;
       failed?: number;
       skipped?: number;

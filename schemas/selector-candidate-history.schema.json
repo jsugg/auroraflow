@@ -41,6 +41,9 @@
     },
     "lastSuccessAt": {
       "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "expiresAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
     }
   }
 }
