@@ -87,8 +87,8 @@
     "@commitlint/cli": "^21.0.2",
     "@commitlint/config-conventional": "^21.0.2",
     "@eslint/js": "^9.39.4",
-    "@playwright/test": "^1.59.1",
-    "@types/node": "^25.6.0",
+    "@playwright/test": "^1.60.0",
+    "@types/node": "^25.9.2",
     "actionlint": "^2.0.6",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
@@ -101,8 +101,8 @@
     "testcontainers": "^12.0.1",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.59.0",
-    "vitest": "^4.1.5"
+    "typescript-eslint": "^8.60.1",
+    "vitest": "^4.1.8"
   },
   "lint-staged": {
     "*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}": [
