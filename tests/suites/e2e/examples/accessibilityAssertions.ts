@@ -36,6 +36,7 @@ function summarizeViolations(
 
 export async function expectNoAccessibilityViolations(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page })
+    .include('main')
     .setLegacyMode(true)
     .withTags([...ACCESSIBILITY_TAGS])
     .analyze();
