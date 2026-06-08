@@ -10,12 +10,18 @@ This document defines the current Redis-backed data layer primitives available i
   - namespaced key behavior through `AURORAFLOW_REDIS_KEY_PREFIX`.
   - cursor-based key discovery through `SCAN`/`scanKeys()` instead of blocking `KEYS`.
   - batched value loading through `mget()` for list/read-heavy registry paths.
+  - atomic JSON record compare-and-set through Redis `EVAL` for versioned selector writes.
   - explicit connection lifecycle with `connect()` and `disconnect()`.
 - `src/data/selectors/selectorRegistry.ts`
   - typed selector record schema.
   - Redis-agnostic repository contract (`SelectorStore`).
-  - deterministic `upsert`, `get`, `listAll`, `listByPageObject`, and `delete` behavior.
+  - deterministic `upsert`, `get`, `listAll`, `listByPageObject`, `listByPageObjectAndAction`, and `delete` behavior.
+  - optional `expectedVersion` concurrency checks for reviewed selector promotion workflows.
+  - page/action index keys for bounded runtime lookup without scanning all active selectors.
+  - distinct namespaces for active records, indexes, candidate history, pending promotions, and audit records.
   - large-registry listing via cursor key scans plus bounded batched payload reads.
+- `src/data/selectors/redisSelectorStore.ts`
+  - Redis-backed `SelectorStore` adapter with TTL and compare-and-set support.
 
 ## Environment Variables
 
@@ -37,20 +43,14 @@ This document defines the current Redis-backed data layer primitives available i
 ```ts
 import { getRedisClient } from '../../src/utils/redisClient';
 import { SelectorRegistryRepository } from '../../src/data/selectors/selectorRegistry';
+import { createRedisSelectorStore } from '../../src/data/selectors/redisSelectorStore';
 
 const redisClient = getRedisClient();
 await redisClient.connect();
 
 const registry = new SelectorRegistryRepository({
   namespace: 'selector-registry',
-  store: {
-    get: (key) => redisClient.get(key),
-    getMany: (keys) => redisClient.mget(keys),
-    set: (key, value) => redisClient.set(key, value),
-    del: (key) => redisClient.del(key),
-    keys: (pattern) => redisClient.keys(pattern),
-    scanKeys: (pattern) => redisClient.scanKeys(pattern),
-  },
+  store: createRedisSelectorStore(redisClient),
 });
 
 await registry.upsert({
@@ -60,6 +60,17 @@ await registry.upsert({
   locator: "page.getByRole('button', { name: 'Sign in' })",
   confidence: 0.95,
 });
+
+await registry.upsert(
+  {
+    id: 'login.submit',
+    pageObjectName: 'LoginPage',
+    actionType: 'click',
+    locator: "page.getByRole('button', { name: 'Log in' })",
+    confidence: 0.96,
+  },
+  { expectedVersion: 1 },
+);
 ```
 
 ## Failure Semantics
@@ -68,6 +79,7 @@ await registry.upsert({
 - Connection setup failures throw `RedisConnectionError`.
 - Exhausted operation retries throw `RedisOperationError` with operation name and attempts.
 - Invalid selector payload/schema throws `SelectorRegistryValidationError` or `SelectorRegistryDataError`.
+- Stale expected-version writes throw `SelectorRegistryConflictError` and do not overwrite active records.
 
 ## Integration Testing
 
@@ -81,7 +93,7 @@ npm run test:integration
 
 Behavior notes:
 
-- When Docker is available, tests validate real Redis connectivity, namespaced key behavior, TTL handling, and selector registry versioning.
+- When Docker is available, tests validate real Redis connectivity, namespaced key behavior, TTL handling, selector registry versioning, Redis-backed CAS, and indexed selector lookup.
 - When Docker/Testcontainers is unavailable, tests skip with an explicit reason rather than hanging.
 
 ## Local Redis Orchestration (Docker Compose)

@@ -1,9 +1,10 @@
 import { afterAll, beforeAll, describe, expect, it, type TestContext } from 'vitest';
 import { GenericContainer, type StartedTestContainer, Wait } from 'testcontainers';
 import {
+  SelectorRegistryConflictError,
   SelectorRegistryRepository,
-  type SelectorStore,
 } from '../../../../../src/data/selectors/selectorRegistry';
+import { createRedisSelectorStore } from '../../../../../src/data/selectors/redisSelectorStore';
 import { RedisClient } from '../../../../../src/utils/redisClient';
 
 interface IntegrationRuntime {
@@ -123,14 +124,7 @@ describe('RedisClient integration', () => {
 describe('SelectorRegistryRepository integration', () => {
   it('persists versioned selector records and lists by page object', async (context) => {
     const client = requireClient(context);
-    const store: SelectorStore = {
-      get: (key: string) => client.get(key),
-      getMany: (keys: readonly string[]) => client.mget(keys),
-      set: (key: string, value: string) => client.set(key, value),
-      del: (key: string) => client.del(key),
-      keys: (pattern: string) => client.keys(pattern),
-      scanKeys: (pattern: string) => client.scanKeys(pattern),
-    };
+    const store = createRedisSelectorStore(client);
     const repository = new SelectorRegistryRepository({
       store,
       namespace: 'selector-registry-int',
@@ -163,5 +157,89 @@ describe('SelectorRegistryRepository integration', () => {
     expect(byPageObject[0]?.id).toBe('profile.menu');
     expect(byPageObject[0]?.version).toBe(2);
     expect(deleted).toBe(true);
+  });
+
+  it('prevents concurrent expected-version overwrites with Redis CAS', async (context) => {
+    const client = requireClient(context);
+    const repository = new SelectorRegistryRepository({
+      store: createRedisSelectorStore(client),
+      namespace: 'selector-registry-cas-int',
+    });
+
+    await repository.upsert(
+      {
+        id: 'checkout.submit',
+        pageObjectName: 'CheckoutPage',
+        actionType: 'click',
+        locator: '#submit',
+      },
+      { expectedVersion: null },
+    );
+
+    const results = await Promise.allSettled([
+      repository.upsert(
+        {
+          id: 'checkout.submit',
+          pageObjectName: 'CheckoutPage',
+          actionType: 'click',
+          locator: '#submit-primary',
+        },
+        { expectedVersion: 1 },
+      ),
+      repository.upsert(
+        {
+          id: 'checkout.submit',
+          pageObjectName: 'CheckoutPage',
+          actionType: 'click',
+          locator: '#submit-secondary',
+        },
+        { expectedVersion: 1 },
+      ),
+    ]);
+    const fulfilled = results.filter((result) => result.status === 'fulfilled');
+    const rejected = results.filter((result) => result.status === 'rejected');
+    const loaded = await repository.get('checkout.submit');
+
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.reason).toBeInstanceOf(SelectorRegistryConflictError);
+    expect(loaded?.version).toBe(2);
+    await repository.delete('checkout.submit');
+  });
+
+  it('uses Redis-backed page/action indexes and isolated TTL keyspaces', async (context) => {
+    const client = requireClient(context);
+    const store = createRedisSelectorStore(client);
+    const repository = new SelectorRegistryRepository({
+      store,
+      namespace: 'selector-registry-index-int',
+    });
+    const namespaces = repository.getNamespaces();
+
+    await repository.upsert({
+      id: 'settings.field',
+      pageObjectName: 'SettingsPage',
+      actionType: 'type',
+      locator: '#settings-field',
+    });
+    await store.set(`${namespaces.history}:candidate`, '{"candidateId":"candidate"}', {
+      ttlSeconds: 1,
+    });
+    await store.set(`${namespaces.promotions}:promotion`, '{"candidateId":"candidate"}', {
+      ttlSeconds: 1,
+    });
+
+    const indexed = await repository.listByPageObjectAndAction('SettingsPage', 'type');
+    expect(indexed.map((record) => record.id)).toEqual(['settings.field']);
+    expect(await store.get(`${namespaces.history}:candidate`)).toBe('{"candidateId":"candidate"}');
+    expect(await store.get(`${namespaces.promotions}:promotion`)).toBe(
+      '{"candidateId":"candidate"}',
+    );
+
+    await new Promise((resolve) => setTimeout(resolve, 1_200));
+    expect(await store.get(`${namespaces.history}:candidate`)).toBeNull();
+    expect(await store.get(`${namespaces.promotions}:promotion`)).toBeNull();
+    await expect(repository.listAll()).resolves.toHaveLength(1);
+    await repository.delete('settings.field');
   });
 });

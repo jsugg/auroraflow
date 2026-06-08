@@ -11,6 +11,7 @@ import {
   RESOURCE_ATTRIBUTE_NAMES,
   RedisClient,
   RedisConfigError,
+  SelectorRegistryConflictError,
   SelectorRegistryRepository,
   analyzeSelfHealingFailure,
   buildFlakinessSummary,
@@ -20,6 +21,7 @@ import {
   captureDomSnapshot,
   createChildLogger,
   createConfiguredLogger,
+  createRedisSelectorStore,
   evaluateAlertPolicy,
   evaluateGuardedSuggestionsDryRun,
   extractDomCandidateSeeds,
@@ -47,8 +49,10 @@ import {
   type SelfHealingConfig,
   type SelfHealingRegistryRuntime,
   type SelectorCandidateHistoryRepository,
+  type SelectorRegistryNamespaces,
   type SelectorRecord,
   type SelectorRegistryReader,
+  type SelectorUpsertOptions,
   type SloDashboard,
 } from '../../../../../src';
 
@@ -58,6 +62,7 @@ describe('public package surface', () => {
     expect(PageObjectBase).toBeTypeOf('function');
     expect(RedisClient).toBeTypeOf('function');
     expect(RedisConfigError).toBeTypeOf('function');
+    expect(SelectorRegistryConflictError).toBeTypeOf('function');
     expect(SelectorRegistryRepository).toBeTypeOf('function');
     expect(AlertPolicyValidationError).toBeTypeOf('function');
     expect(LoggerConfigError).toBeTypeOf('function');
@@ -75,6 +80,7 @@ describe('public package surface', () => {
     expect(captureDomSnapshot).toBeTypeOf('function');
     expect(createChildLogger).toBeTypeOf('function');
     expect(createConfiguredLogger).toBeTypeOf('function');
+    expect(createRedisSelectorStore).toBeTypeOf('function');
     expect(evaluateAlertPolicy).toBeTypeOf('function');
     expect(evaluateGuardedSuggestionsDryRun).toBeTypeOf('function');
     expect(extractDomCandidateSeeds).toBeTypeOf('function');
@@ -126,6 +132,15 @@ describe('public package surface', () => {
       id: string;
       locator: string;
       version: number;
+    }>();
+    expectTypeOf<SelectorRegistryNamespaces>().toMatchTypeOf<{
+      active: string;
+      history: string;
+      promotions: string;
+      audit: string;
+    }>();
+    expectTypeOf<SelectorUpsertOptions>().toMatchTypeOf<{
+      expectedVersion?: number | null;
     }>();
     expectTypeOf<CapturedFailureEvent['artifactVersion']>().toEqualTypeOf<'1.0.0'>();
     expectTypeOf<CapturedFailureEvent['sat']>().toMatchTypeOf<

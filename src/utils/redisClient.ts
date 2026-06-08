@@ -18,6 +18,35 @@ const DEFAULT_REDIS_MAX_RETRIES = 3;
 const DEFAULT_REDIS_BASE_BACKOFF_MS = 50;
 const DEFAULT_REDIS_MAX_BACKOFF_MS = 2_000;
 const DEFAULT_REDIS_KEY_PREFIX = 'auroraflow';
+const REDIS_COMPARE_AND_SET_EXPECT_ABSENT = '__AURORAFLOW_EXPECT_ABSENT__';
+const REDIS_COMPARE_AND_SET_SCRIPT = `
+local current = redis.call("GET", KEYS[1])
+local expected = ARGV[1]
+local nextValue = ARGV[2]
+local ttlSeconds = ARGV[3]
+
+if expected == "${REDIS_COMPARE_AND_SET_EXPECT_ABSENT}" then
+  if current then
+    return {"0", current}
+  end
+else
+  if not current then
+    return {"0", ""}
+  end
+  local ok, decoded = pcall(cjson.decode, current)
+  if not ok or type(decoded) ~= "table" or tonumber(decoded["version"]) ~= tonumber(expected) then
+    return {"0", current}
+  end
+end
+
+if ttlSeconds == "" then
+  redis.call("SET", KEYS[1], nextValue)
+else
+  redis.call("SET", KEYS[1], nextValue, "EX", tonumber(ttlSeconds))
+end
+
+return {"1", current or ""}
+`;
 
 export class RedisConfigError extends Error {
   constructor(message: string) {
@@ -67,6 +96,15 @@ export interface RedisSetOptions {
   ttlSeconds?: number;
 }
 
+export interface RedisCompareAndSetOptions extends RedisSetOptions {
+  expectedVersion: number | null;
+}
+
+export interface RedisCompareAndSetResult {
+  written: boolean;
+  existingValue: string | null;
+}
+
 export interface RedisScanOptions {
   count?: number;
 }
@@ -78,6 +116,11 @@ interface RedisSetCommandOptions {
 interface RedisScanCommandOptions {
   MATCH: string;
   COUNT?: number;
+}
+
+interface RedisEvalOptions {
+  keys?: string[];
+  arguments?: string[];
 }
 
 export interface RedisClientDriver {
@@ -93,6 +136,7 @@ export interface RedisClientDriver {
   del(key: string): Promise<number>;
   mGet(keys: string[]): Promise<Array<string | null>>;
   scanIterator(options: RedisScanCommandOptions): AsyncIterable<string | string[]>;
+  eval?(script: string, options?: RedisEvalOptions): Promise<unknown>;
 }
 
 type RedisClientFactory = (options: RedisClientOptions) => RedisClientDriver;
@@ -385,6 +429,31 @@ export class RedisClient {
     });
   }
 
+  public async compareAndSetJsonVersion(
+    key: string,
+    value: string,
+    options: RedisCompareAndSetOptions,
+  ): Promise<RedisCompareAndSetResult> {
+    const qualifiedKey = this.qualifyKey(key);
+    const expectedVersion = this.normalizeCompareAndSetExpectedVersion(options.expectedVersion);
+    const ttlSeconds =
+      options.ttlSeconds === undefined ? '' : String(this.normalizeTtlSeconds(options.ttlSeconds));
+
+    const reply = await this.executeCommand('compareAndSetJsonVersion', async (client) => {
+      if (!client.eval) {
+        throw new RedisConfigError(
+          'Redis client driver must support EVAL for compare-and-set operations.',
+        );
+      }
+      return client.eval(REDIS_COMPARE_AND_SET_SCRIPT, {
+        keys: [qualifiedKey],
+        arguments: [expectedVersion, value, ttlSeconds],
+      });
+    });
+
+    return this.parseCompareAndSetReply(reply);
+  }
+
   public async del(key: string): Promise<number> {
     const qualifiedKey = this.qualifyKey(key);
     return this.executeCommand('del', (client) => client.del(qualifiedKey));
@@ -551,6 +620,45 @@ export class RedisClient {
     const jitterRange = Math.max(1, Math.floor(this.config.baseBackoffMs / 2));
     const jitter = Math.floor(this.random() * jitterRange);
     return baseDelay + jitter;
+  }
+
+  private normalizeCompareAndSetExpectedVersion(expectedVersion: number | null): string {
+    if (expectedVersion === null) {
+      return REDIS_COMPARE_AND_SET_EXPECT_ABSENT;
+    }
+
+    if (!Number.isInteger(expectedVersion) || expectedVersion < 1) {
+      throw new RedisConfigError('expectedVersion must be a positive integer or null.');
+    }
+
+    return String(expectedVersion);
+  }
+
+  private parseCompareAndSetReply(reply: unknown): RedisCompareAndSetResult {
+    if (!Array.isArray(reply) || reply.length !== 2) {
+      throw new RedisConfigError('Unexpected Redis compare-and-set reply shape.');
+    }
+
+    const [writtenReply, existingReply] = reply;
+    const written = writtenReply === 1 || writtenReply === '1';
+    if (!written && writtenReply !== 0 && writtenReply !== '0') {
+      throw new RedisConfigError('Unexpected Redis compare-and-set status reply.');
+    }
+
+    if (existingReply === null || existingReply === '') {
+      return { written, existingValue: null };
+    }
+
+    if (typeof existingReply === 'string') {
+      return { written, existingValue: existingReply };
+    }
+
+    if (Buffer.isBuffer(existingReply)) {
+      const existingValue = existingReply.toString('utf8');
+      return { written, existingValue: existingValue.length > 0 ? existingValue : null };
+    }
+
+    throw new RedisConfigError('Unexpected Redis compare-and-set existing-value reply.');
   }
 
   private normalizeTtlSeconds(ttlSeconds: number): number {

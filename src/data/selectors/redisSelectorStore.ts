@@ -1,0 +1,26 @@
+import type { RedisClient } from '../../utils/redisClient';
+import type {
+  SelectorStore,
+  SelectorStoreCompareAndSetOptions,
+  SelectorStoreCompareAndSetResult,
+  SelectorStoreSetOptions,
+} from './selectorRegistry';
+
+/** Creates a selector store backed by AuroraFlow's Redis client. */
+export function createRedisSelectorStore(client: RedisClient): SelectorStore {
+  return {
+    get: (key: string) => client.get(key),
+    getMany: (keys: readonly string[]) => client.mget(keys),
+    set: (key: string, value: string, options?: SelectorStoreSetOptions) =>
+      client.set(key, value, options),
+    compareAndSet: (
+      key: string,
+      value: string,
+      options: SelectorStoreCompareAndSetOptions,
+    ): Promise<SelectorStoreCompareAndSetResult> =>
+      client.compareAndSetJsonVersion(key, value, options),
+    del: (key: string) => client.del(key),
+    keys: (pattern: string) => client.keys(pattern),
+    scanKeys: (pattern: string) => client.scanKeys(pattern),
+  };
+}
