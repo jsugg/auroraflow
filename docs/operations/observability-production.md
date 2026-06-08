@@ -21,13 +21,13 @@ The workflow sets `AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED=true`, passes 
 
 ## Storage Budgets
 
-| Backend       | Default Budget |             Retention Target | Notes                                                                   |
-| ------------- | -------------: | ---------------------------: | ----------------------------------------------------------------------- |
-| Prometheus    |          20 GB |                      30 days | Prefer remote write for longer retention.                               |
-| Grafana       |           1 GB | source-controlled dashboards | Back up database only if UI edits are allowed.                          |
-| Jaeger        |          20 GB |                    7-14 days | Use durable storage or a managed trace backend for shared environments. |
-| Elasticsearch |         100 GB |                   14-30 days | Enforce ILM before indexing persistent logs.                            |
-| Collector     |    1 GB memory |                          n/a | Batch and memory limiter must stay enabled.                             |
+| Backend | Default Budget | Retention Target | Notes |
+| --- | --: | --: | --- |
+| Prometheus | 20 GB | 30 days | Prefer remote write for longer retention. |
+| Grafana | 1 GB | source-controlled dashboards | Back up database only if UI edits are allowed. |
+| Jaeger | 20 GB | 7-14 days | Use durable storage or a managed trace backend for shared environments. |
+| Elasticsearch | 100 GB | 14-30 days | Enforce ILM before indexing persistent logs. |
+| Collector | 1 GB memory | n/a | Batch and memory limiter must stay enabled. |
 
 Raise budgets only after reviewing cardinality, shard count, and dashboard query costs.
 
