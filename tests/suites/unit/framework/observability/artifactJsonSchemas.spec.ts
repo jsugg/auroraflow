@@ -65,9 +65,16 @@ function createGovernanceSummary(): SelfHealingGovernanceSummary {
     status: 'triage_required',
     triageRequired: true,
     guardedAcceptedCount: 1,
+    pendingPromotionCount: 1,
+    registryPersistenceFailureCount: 0,
     telemetry: {
       guardedAutoHeal: {
         attempted: 1,
+        succeeded: 1,
+        failed: 0,
+        skipped: 0,
+      },
+      pendingPromotionWrites: {
         succeeded: 1,
         failed: 0,
         skipped: 0,
@@ -87,6 +94,20 @@ function createGovernanceArtifact(): Record<string, unknown> {
     parsedArtifacts: 1,
     malformedArtifacts: [],
     guardedArtifacts: 1,
+    pendingPromotionCount: 1,
+    pendingPromotions: [
+      {
+        fileName: 'self-heal-2026-06-05T12-00-00-000Z-abc.json',
+        eventId: 'self-heal-2026-06-05T12-00-00-000Z-abc',
+        mode: 'guarded',
+        pageObjectName: 'CheckoutPage',
+        pendingPromotionId: 'promotion:self-heal-2026-06-05:candidate',
+        pendingPromotionCandidateId: 'candidate',
+        pendingPromotionSelectorId: 'checkout.submit',
+      },
+    ],
+    registryPersistenceFailureCount: 0,
+    registryPersistenceFailures: [],
     guardedAccepted: [
       {
         fileName: 'self-heal-2026-06-05T12-00-00-000Z-abc.json',
@@ -113,6 +134,7 @@ function createGovernanceArtifact(): Record<string, unknown> {
         page_action_error: 1,
       },
       guardedAutoHeal: createGovernanceSummary().telemetry?.guardedAutoHeal,
+      pendingPromotionWrites: createGovernanceSummary().telemetry?.pendingPromotionWrites,
     },
   };
 }

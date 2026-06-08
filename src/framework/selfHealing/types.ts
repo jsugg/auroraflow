@@ -18,6 +18,7 @@ export interface SelfHealingSafetyPolicy {
 export type SelfHealingRegistryMode = 'off' | 'read' | 'write_pending';
 
 export type SelfHealingPromotionMode = 'manual' | 'ci_acknowledged';
+export type PendingSelectorPromotionStatus = 'pending' | 'approved' | 'rejected' | 'rolled_back';
 
 export interface SelfHealingSatConfig {
   enabled: boolean;
@@ -137,14 +138,25 @@ export interface SelectorCandidateHistory {
   rejected: number;
   lastSeenAt?: string;
   lastSuccessAt?: string;
+  expiresAt?: string;
 }
 
 export interface PendingSelectorPromotion {
+  promotionId: string;
   eventId: string;
   candidateId: string;
   selectorId: string;
+  proposedLocator: string;
   locator: string;
+  baseSelectorVersion?: number;
+  confidence: number;
+  status: PendingSelectorPromotionStatus;
   requestedAt: string;
+  expiresAt?: string;
+  runId?: string;
+  testId?: string;
+  pageObjectName?: string;
+  actionType?: SelfHealingActionType;
   acknowledged: boolean;
 }
 
@@ -239,6 +251,45 @@ export interface GuardedValidationSummary {
   candidates: GuardedValidationCandidate[];
 }
 
+export type SelfHealingRegistryWriteStatus = 'succeeded' | 'failed' | 'skipped';
+
+export interface SelectorCandidateHistoryWriteResult {
+  candidateId: string;
+  selectorId?: string;
+  status: SelfHealingRegistryWriteStatus;
+  validationStatus?: GuardedValidationStatus;
+  validationAccepted?: boolean;
+  guardedApplySucceeded?: boolean;
+  guardedApplyFailed?: boolean;
+  attempts?: number;
+  validated?: number;
+  reason?: string;
+  errorMessage?: string;
+}
+
+export interface PendingSelectorPromotionWriteResult {
+  eventId: string;
+  status: SelfHealingRegistryWriteStatus;
+  promotionId?: string;
+  candidateId?: string;
+  selectorId?: string;
+  reason?: string;
+  errorMessage?: string;
+}
+
+export interface SelfHealingRegistryPersistenceSummary {
+  mode: SelfHealingRegistryMode;
+  history: {
+    attempted: number;
+    succeeded: number;
+    failed: number;
+    skipped: number;
+    observations: readonly SelectorCandidateHistoryWriteResult[];
+  };
+  promotion: PendingSelectorPromotionWriteResult;
+  warnings: readonly string[];
+}
+
 export interface CapturedFailureEvent {
   artifactVersion: '1.0.0';
   eventId: string;
@@ -259,4 +310,5 @@ export interface CapturedFailureEvent {
   sat?: SelfHealingSatAnalysis;
   guardedValidation?: GuardedValidationSummary;
   guardedAutoHeal?: GuardedAutoHealSummary;
+  registryPersistence?: SelfHealingRegistryPersistenceSummary;
 }

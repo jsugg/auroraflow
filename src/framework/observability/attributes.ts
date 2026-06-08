@@ -5,6 +5,7 @@ import type {
   GuardedValidationStatus,
   SelfHealingActionType,
   SelfHealingMode,
+  SelfHealingRegistryMode,
   SelfHealingSuggestionStrategy,
 } from '../selfHealing/types';
 import type { TelemetryAttributes } from './telemetry';
@@ -29,6 +30,8 @@ export type GuardedAutoHealMetricStatus = 'succeeded' | 'failed' | 'skipped';
 export type GuardedValidationMetricStatus =
   | GuardedValidationStatus
   | GuardedValidationPolicyBlockReason;
+export type SelfHealingRegistryWriteMetricStatus = 'succeeded' | 'failed' | 'skipped';
+export type SelfHealingRegistryWriteOperation = 'history_observation' | 'pending_promotion';
 
 export interface PageActionTelemetryInput {
   pageObjectName: string;
@@ -85,6 +88,13 @@ export interface GuardedAutoHealMetricInput {
   actionType: SelfHealingActionType;
   status: GuardedAutoHealMetricStatus;
   skippedReason?: GuardedAutoHealSkipReason;
+}
+
+export interface SelfHealingRegistryWriteMetricInput {
+  actionType: SelfHealingActionType;
+  mode: SelfHealingRegistryMode;
+  operation: SelfHealingRegistryWriteOperation;
+  status: SelfHealingRegistryWriteMetricStatus;
 }
 
 function normalizeTelemetryString(value: string): string {
@@ -266,5 +276,19 @@ export function buildGuardedAutoHealMetricAttributes({
     'auroraflow.action.type': actionType,
     'auroraflow.self_heal.status': status,
     'auroraflow.self_heal.skip_reason': skippedReason,
+  };
+}
+
+export function buildSelfHealingRegistryWriteMetricAttributes({
+  actionType,
+  mode,
+  operation,
+  status,
+}: SelfHealingRegistryWriteMetricInput): TelemetryAttributes {
+  return {
+    'auroraflow.action.type': actionType,
+    'auroraflow.self_heal.registry.mode': mode,
+    'auroraflow.self_heal.registry.operation': operation,
+    'auroraflow.self_heal.status': status,
   };
 }

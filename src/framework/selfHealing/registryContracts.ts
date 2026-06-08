@@ -1,5 +1,6 @@
 import type {
   PendingSelectorPromotion,
+  GuardedValidationStatus,
   RankedSelfHealingCandidate,
   SelectorCandidateHistory,
   SelfHealingActionType,
@@ -51,6 +52,8 @@ export interface SelectorCandidateHistoryObservation {
   eventId: string;
   observedAt: string;
   selectorId?: string;
+  validationStatus?: GuardedValidationStatus;
+  validationAccepted?: boolean;
   guardedApplySucceeded?: boolean;
   guardedApplyFailed?: boolean;
 }

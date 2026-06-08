@@ -16,7 +16,7 @@ AuroraFlow supports a mode-gated self-healing failure-capture foundation for fai
 
 ## SAT Enrichment
 
-Selector Analysis Tooling (SAT) enriches `suggest` and `guarded` artifacts with bounded DOM evidence, optional selector-registry reads, optional candidate history reads, and deterministic candidate scoring. SAT remains diagnostic for persistence in this implementation; selector registry writes, pending promotion writes, and source-code rewrites remain out of scope.
+Selector Analysis Tooling (SAT) enriches `suggest` and `guarded` artifacts with bounded DOM evidence, optional selector-registry reads, optional candidate history reads, deterministic candidate scoring, and write-pending registry telemetry. SAT can write history observations and pending promotion review records, but reviewed approval/rejection/rollback flows and source-code rewrites remain out of scope.
 
 - `SELF_HEAL_SAT_ENABLED` defaults to enabled for `suggest` and `guarded`, disabled for `off`.
 - `SELF_HEAL_SAT_CAPTURE_DOM` defaults to true when SAT is enabled.
@@ -24,7 +24,7 @@ Selector Analysis Tooling (SAT) enriches `suggest` and `guarded` artifacts with 
 - `SELF_HEAL_MAX_CANDIDATES` defaults to `10` and is capped at `50`.
 - `SELF_HEAL_MAX_TEXT_LENGTH` defaults to `120` and is capped at `500`.
 - `SELF_HEAL_ALLOWED_ATTRIBUTES` defaults to `data-testid,data-test,id,name,aria-label,placeholder,title,role,type`.
-- `SELF_HEAL_REGISTRY_MODE` accepts `off`, `read`, or `write_pending`; current runtime SAT reads active selector records and candidate history when a registry runtime is configured, but does not write registry records.
+- `SELF_HEAL_REGISTRY_MODE` accepts `off`, `read`, or `write_pending`; `read` loads active selector records/history, while `write_pending` also stores history observations and reviewable pending promotion records after successful guarded auto-apply.
 - `SELF_HEAL_REGISTRY_REQUIRED=true` opts into required registry resolution; otherwise read mode is opportunistic when Redis configuration is present.
 - `SELF_HEAL_REGISTRY_NAMESPACE` overrides the active selector namespace; default is `selector-registry`.
 - `SELF_HEAL_PROMOTION_MODE` accepts `manual` or `ci_acknowledged`; promotion workflows remain manual.
@@ -72,6 +72,7 @@ Each artifact includes:
 - screenshot path captured for the failure.
 - ranked locator suggestions with weighted scoring signals (`roleSignal`, `accessibleNameSignal`, `uniquenessSignal`, `historicalSignal`, `similaritySignal`).
 - optional `sat` payload with snapshot summary, ranked DOM/heuristic candidates, selected candidate ID, history summary, and analysis warnings.
+- optional `registryPersistence` payload with history write counts, pending promotion write status, and persistence warnings when `SELF_HEAL_REGISTRY_MODE=write_pending`.
 
 JSON Schema contracts for self-healing artifacts live in [`../operations/artifact-schemas.md`](../operations/artifact-schemas.md).
 
@@ -106,6 +107,16 @@ When guarded validation produces an accepted candidate and the action is support
   - `skippedReason` when no attempt is made
   - `errorMessage` when retry fails
 
+### Write-Pending Registry Telemetry
+
+When `SELF_HEAL_REGISTRY_MODE=write_pending` and a registry runtime is configured, AuroraFlow writes bounded SAT telemetry after the failure artifact event ID is allocated:
+
+- candidate history observations for SAT-ranked candidates, with validation status and guarded auto-apply outcome.
+- pending promotion records only when guarded auto-apply succeeds, a stable `selectorId` and base selector version are known, and the accepted locator differs from the active selector.
+- Redis TTLs for historical SAT telemetry and pending promotion review records.
+
+Pending promotion records share `eventId`, `candidateId`, and `selectorId` with the file artifact. They are review records only; AuroraFlow does not mutate active selector records or source files in this step.
+
 ## CI Governance and Triage
 
 AuroraFlow includes a governance pass for self-healing artifacts in CI:
@@ -118,6 +129,7 @@ AuroraFlow includes a governance pass for self-healing artifacts in CI:
 - Governance telemetry aggregates:
   - event counts by mode.
   - event counts by action type.
+  - pending promotion write status counts.
   - event counts by error code.
   - guarded auto-heal attempted/succeeded/failed/skipped counters.
 

@@ -2,6 +2,8 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   AlertPolicyValidationError,
   DEFAULT_SELF_HEAL_MAX_CANDIDATES,
+  DEFAULT_PENDING_SELECTOR_PROMOTION_TTL_SECONDS,
+  DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS,
   SelfHealingArtifactSchemaError,
   DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
   LoggerConfigError,
@@ -13,6 +15,8 @@ import {
   RedisConfigError,
   SelectorRegistryConflictError,
   SelectorRegistryRepository,
+  StorePendingSelectorPromotionRepository,
+  StoreSelectorCandidateHistoryRepository,
   analyzeSelfHealingFailure,
   buildFlakinessSummary,
   buildSelfHealingCandidateId,
@@ -33,6 +37,7 @@ import {
   parseAlertPolicy,
   parseDomSnapshot,
   rankSelfHealingCandidates,
+  persistSelfHealingRegistryTelemetry,
   resolveCorrelationIdentifiers,
   resolveLoggerRuntimeConfig,
   resolveRedisRuntimeConfig,
@@ -51,6 +56,7 @@ import {
   type RedisRuntimeConfig,
   type ResolveSelfHealingRegistryRuntimeOptions,
   type SelfHealingConfig,
+  type SelfHealingRegistryPersistenceSummary,
   type SelfHealingRegistryRuntime,
   type SelectorCandidateHistoryRepository,
   type SelectorRegistryNamespaces,
@@ -71,6 +77,10 @@ describe('public package surface', () => {
     expect(AlertPolicyValidationError).toBeTypeOf('function');
     expect(LoggerConfigError).toBeTypeOf('function');
     expect(SelfHealingArtifactSchemaError).toBeTypeOf('function');
+    expect(StorePendingSelectorPromotionRepository).toBeTypeOf('function');
+    expect(StoreSelectorCandidateHistoryRepository).toBeTypeOf('function');
+    expect(DEFAULT_PENDING_SELECTOR_PROMOTION_TTL_SECONDS).toBeGreaterThan(0);
+    expect(DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS).toBeGreaterThan(0);
     expect(DEFAULT_SELF_HEAL_MIN_CONFIDENCE).toBe(0.92);
     expect(DEFAULT_SELF_HEAL_MAX_CANDIDATES).toBe(10);
     expect(METRIC_NAMES.pageActionsTotal).toBe('auroraflow_page_actions_total');
@@ -95,6 +105,7 @@ describe('public package surface', () => {
     expect(initializeTelemetry).toBeTypeOf('function');
     expect(parseAlertPolicy).toBeTypeOf('function');
     expect(parseDomSnapshot).toBeTypeOf('function');
+    expect(persistSelfHealingRegistryTelemetry).toBeTypeOf('function');
     expect(rankSelfHealingCandidates).toBeTypeOf('function');
     expect(resolveCorrelationIdentifiers).toBeTypeOf('function');
     expect(resolveLoggerRuntimeConfig).toBeTypeOf('function');
@@ -157,6 +168,9 @@ describe('public package surface', () => {
           candidates: readonly RankedSelfHealingCandidate[];
         }
       | undefined
+    >();
+    expectTypeOf<CapturedFailureEvent['registryPersistence']>().toMatchTypeOf<
+      SelfHealingRegistryPersistenceSummary | undefined
     >();
     expectTypeOf<DomSnapshot['schemaVersion']>().toEqualTypeOf<'1.0.0'>();
     expectTypeOf<AlertPolicy>().toMatchTypeOf<{ version: '1.0.0'; alerts: unknown[] }>();

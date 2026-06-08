@@ -174,14 +174,25 @@ describe('self-healing artifact JSON Schemas', () => {
       rejected: 0,
       lastSeenAt: '2026-06-05T12:00:00.000Z',
       lastSuccessAt: '2026-06-05T12:00:00.000Z',
+      expiresAt: '2026-09-03T12:00:00.000Z',
     });
 
     await expectSchemaValid(ARTIFACT_SCHEMA_FILES.pendingSelectorPromotion, {
+      promotionId: 'promotion:self-heal-2026-06-05T12-00-00-000Z-abc:candidate',
       eventId: 'self-heal-2026-06-05T12-00-00-000Z-abc',
       candidateId: 'CheckoutPage::click::submit::roleName',
       selectorId: 'checkout.submit',
+      proposedLocator: 'getByRole("button", { name: "Submit order" })',
       locator: 'getByRole("button", { name: "Submit order" })',
+      baseSelectorVersion: 4,
+      confidence: 0.96,
+      status: 'pending',
       requestedAt: '2026-06-05T12:00:00.000Z',
+      expiresAt: '2026-07-05T12:00:00.000Z',
+      runId: 'run-1',
+      testId: 'spec-1',
+      pageObjectName: 'CheckoutPage',
+      actionType: 'click',
       acknowledged: false,
     });
   });

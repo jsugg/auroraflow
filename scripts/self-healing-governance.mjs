@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 const DEFAULT_ARTIFACTS_DIR = path.join('test-results', 'self-healing');
 const DEFAULT_SUMMARY_JSON_PATH = path.join('test-results', 'self-healing-governance-summary.json');
 const DEFAULT_SUMMARY_MD_PATH = path.join('test-results', 'self-healing-governance-summary.md');
+const REGISTRY_WRITE_STATUSES = new Set(['succeeded', 'failed', 'skipped']);
 
 function parseBooleanFlag(rawValue, defaultValue) {
   if (rawValue === undefined || rawValue === null || rawValue.trim() === '') {
@@ -28,16 +29,29 @@ function incrementCounter(counter, key) {
   counter[key] = (counter[key] ?? 0) + 1;
 }
 
+function readObject(value) {
+  return typeof value === 'object' && value !== null
+    ? /** @type {Record<string, unknown>} */ (value)
+    : null;
+}
+
+function readRegistryWriteStatus(value) {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+  if (!REGISTRY_WRITE_STATUSES.has(value)) {
+    throw new Error(`registry persistence write status is not supported: ${value}`);
+  }
+  return value;
+}
+
 function normalizeEventRecord(rawEvent, fileName) {
   if (typeof rawEvent !== 'object' || rawEvent === null) {
     throw new Error('Artifact root must be an object.');
   }
 
   const event = /** @type {Record<string, unknown>} */ (rawEvent);
-  const guardedValidation =
-    typeof event.guardedValidation === 'object' && event.guardedValidation !== null
-      ? /** @type {Record<string, unknown>} */ (event.guardedValidation)
-      : null;
+  const guardedValidation = readObject(event.guardedValidation);
 
   const acceptedLocator =
     guardedValidation && typeof guardedValidation.acceptedLocator === 'string'
@@ -47,16 +61,10 @@ function normalizeEventRecord(rawEvent, fileName) {
     guardedValidation && typeof guardedValidation.acceptedScore === 'number'
       ? guardedValidation.acceptedScore
       : undefined;
-  const action =
-    typeof event.action === 'object' && event.action !== null
-      ? /** @type {Record<string, unknown>} */ (event.action)
-      : null;
+  const action = readObject(event.action);
   const actionType = action && typeof action.type === 'string' ? action.type : undefined;
   const errorCode = typeof event.errorCode === 'string' ? event.errorCode : undefined;
-  const guardedAutoHeal =
-    typeof event.guardedAutoHeal === 'object' && event.guardedAutoHeal !== null
-      ? /** @type {Record<string, unknown>} */ (event.guardedAutoHeal)
-      : null;
+  const guardedAutoHeal = readObject(event.guardedAutoHeal);
   const guardedAutoHealAttempted =
     guardedAutoHeal && typeof guardedAutoHeal.attempted === 'boolean'
       ? guardedAutoHeal.attempted
@@ -65,6 +73,20 @@ function normalizeEventRecord(rawEvent, fileName) {
     guardedAutoHeal && typeof guardedAutoHeal.succeeded === 'boolean'
       ? guardedAutoHeal.succeeded
       : undefined;
+  const registryPersistence = readObject(event.registryPersistence);
+  const promotion = registryPersistence ? readObject(registryPersistence.promotion) : null;
+  const history = registryPersistence ? readObject(registryPersistence.history) : null;
+  const pendingPromotionWriteStatus = promotion
+    ? readRegistryWriteStatus(promotion.status)
+    : undefined;
+  const historyWriteFailed =
+    history && typeof history.failed === 'number' ? history.failed : undefined;
+  const pendingPromotionId =
+    promotion && typeof promotion.promotionId === 'string' ? promotion.promotionId : undefined;
+  const pendingPromotionCandidateId =
+    promotion && typeof promotion.candidateId === 'string' ? promotion.candidateId : undefined;
+  const pendingPromotionSelectorId =
+    promotion && typeof promotion.selectorId === 'string' ? promotion.selectorId : undefined;
 
   return {
     fileName,
@@ -79,6 +101,12 @@ function normalizeEventRecord(rawEvent, fileName) {
     guardedAutoHealSucceeded,
     acceptedLocator,
     acceptedScore,
+    pendingPromotionWriteStatus,
+    pendingPromotionId,
+    pendingPromotionCandidateId,
+    pendingPromotionSelectorId,
+    historyWriteFailed,
+    registryPersistence,
   };
 }
 
@@ -90,12 +118,19 @@ export async function analyzeSelfHealingArtifacts(artifactsDir = DEFAULT_ARTIFAC
     malformedArtifacts: [],
     guardedArtifacts: 0,
     guardedAccepted: [],
+    pendingPromotions: [],
+    registryPersistenceFailures: [],
     telemetry: {
       modes: {},
       actions: {},
       errorCodes: {},
       guardedAutoHeal: {
         attempted: 0,
+        succeeded: 0,
+        failed: 0,
+        skipped: 0,
+      },
+      pendingPromotionWrites: {
         succeeded: 0,
         failed: 0,
         skipped: 0,
@@ -145,6 +180,22 @@ export async function analyzeSelfHealingArtifacts(artifactsDir = DEFAULT_ARTIFAC
           analysis.guardedAccepted.push(normalized);
         }
       }
+
+      if (normalized.pendingPromotionWriteStatus) {
+        incrementCounter(
+          analysis.telemetry.pendingPromotionWrites,
+          normalized.pendingPromotionWriteStatus,
+        );
+      }
+      if (normalized.pendingPromotionWriteStatus === 'succeeded') {
+        analysis.pendingPromotions.push(normalized);
+      }
+      if (
+        normalized.pendingPromotionWriteStatus === 'failed' ||
+        (normalized.historyWriteFailed ?? 0) > 0
+      ) {
+        analysis.registryPersistenceFailures.push(normalized);
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown parse error.';
       analysis.malformedArtifacts.push({ fileName, error: message });
@@ -167,6 +218,19 @@ function toMarkdownTableRows(guardedAccepted) {
     .join('\n');
 }
 
+function toMarkdownPromotionRows(pendingPromotions) {
+  if (pendingPromotions.length === 0) {
+    return '| _None_ | _None_ | _None_ | _None_ |\n';
+  }
+
+  return pendingPromotions
+    .map(
+      (event) =>
+        `| ${event.eventId} | ${event.pendingPromotionId ?? 'n/a'} | ${event.pendingPromotionSelectorId ?? 'n/a'} | ${event.pendingPromotionCandidateId ?? 'n/a'} |`,
+    )
+    .join('\n');
+}
+
 function toMarkdownCounterRows(counter) {
   const entries = Object.entries(counter).sort(([left], [right]) => left.localeCompare(right));
   if (entries.length === 0) {
@@ -183,11 +247,15 @@ export function buildGovernanceSummary({
   generatedAt = new Date(),
 }) {
   const guardedAcceptedCount = analysis.guardedAccepted.length;
-  const triageRequired = guardedAcceptedCount > 0;
+  const pendingPromotionCount = analysis.pendingPromotions.length;
+  const registryPersistenceFailureCount = analysis.registryPersistenceFailures.length;
+  const triageRequired = guardedAcceptedCount > 0 || pendingPromotionCount > 0;
 
   let status = 'pass';
   if (analysis.malformedArtifacts.length > 0) {
     status = 'blocked_malformed_artifacts';
+  } else if (registryPersistenceFailureCount > 0) {
+    status = 'blocked_registry_persistence_failed';
   } else if (triageRequired && requireAcknowledgement && !acknowledged) {
     status = 'blocked_acknowledgement_required';
   } else if (triageRequired) {
@@ -207,6 +275,10 @@ export function buildGovernanceSummary({
     guardedArtifacts: analysis.guardedArtifacts,
     guardedAcceptedCount,
     guardedAccepted: analysis.guardedAccepted,
+    pendingPromotionCount,
+    pendingPromotions: analysis.pendingPromotions,
+    registryPersistenceFailureCount,
+    registryPersistenceFailures: analysis.registryPersistenceFailures,
     telemetry: analysis.telemetry,
   };
 
@@ -223,6 +295,8 @@ export function buildGovernanceSummary({
     `- Malformed Artifacts: ${summary.malformedArtifacts.length}`,
     `- Guarded Artifacts: ${summary.guardedArtifacts}`,
     `- Guarded Accepted Count: ${summary.guardedAcceptedCount}`,
+    `- Pending Promotion Count: ${summary.pendingPromotionCount}`,
+    `- Registry Persistence Failures: ${summary.registryPersistenceFailureCount}`,
     '',
     '## Telemetry Aggregates',
     '',
@@ -248,12 +322,21 @@ export function buildGovernanceSummary({
     `- Guarded Auto-Heal Succeeded: ${summary.telemetry.guardedAutoHeal.succeeded}`,
     `- Guarded Auto-Heal Failed: ${summary.telemetry.guardedAutoHeal.failed}`,
     `- Guarded Auto-Heal Skipped: ${summary.telemetry.guardedAutoHeal.skipped}`,
+    `- Pending Promotion Writes Succeeded: ${summary.telemetry.pendingPromotionWrites.succeeded}`,
+    `- Pending Promotion Writes Failed: ${summary.telemetry.pendingPromotionWrites.failed}`,
+    `- Pending Promotion Writes Skipped: ${summary.telemetry.pendingPromotionWrites.skipped}`,
     '',
     '## Guarded Accepted Events',
     '',
     '| Event ID | Page Object | URL | Accepted Locator | Score |',
     '|---|---|---|---|---|',
     toMarkdownTableRows(summary.guardedAccepted),
+    '',
+    '## Pending Promotions',
+    '',
+    '| Event ID | Promotion ID | Selector ID | Candidate ID |',
+    '|---|---|---|---|',
+    toMarkdownPromotionRows(summary.pendingPromotions),
     '',
   ].join('\n');
 
@@ -285,6 +368,8 @@ function emitGithubOutputs({ summary, summaryJsonPath, summaryMarkdownPath }) {
     `triage_required=${String(summary.triageRequired)}`,
     `acknowledged=${String(summary.acknowledged)}`,
     `guarded_accepted_count=${summary.guardedAcceptedCount}`,
+    `pending_promotion_count=${summary.pendingPromotionCount}`,
+    `registry_persistence_failure_count=${summary.registryPersistenceFailureCount}`,
     `malformed_count=${summary.malformedArtifacts.length}`,
     `summary_json_path=${summaryJsonPath}`,
     `summary_markdown_path=${summaryMarkdownPath}`,
@@ -324,13 +409,18 @@ export async function runSelfHealingGovernance({
   });
 
   console.log(
-    `Self-healing governance status=${summary.status} guardedAccepted=${summary.guardedAcceptedCount} malformed=${summary.malformedArtifacts.length}`,
+    `Self-healing governance status=${summary.status} guardedAccepted=${summary.guardedAcceptedCount} pendingPromotions=${summary.pendingPromotionCount} registryPersistenceFailures=${summary.registryPersistenceFailureCount} malformed=${summary.malformedArtifacts.length}`,
   );
   console.log(`Governance JSON summary: ${files.summaryJsonPath}`);
   console.log(`Governance Markdown summary: ${files.summaryMarkdownPath}`);
 
   if (summary.status === 'blocked_malformed_artifacts') {
     console.error('Malformed self-healing artifacts detected. Inspect summary for details.');
+    return 1;
+  }
+
+  if (summary.status === 'blocked_registry_persistence_failed') {
+    console.error('Self-healing registry persistence failures detected. Inspect summary.');
     return 1;
   }
 

@@ -76,6 +76,7 @@ export {
   buildRedisOperationSpanAttributes,
   buildSelfHealingArtifactMetricAttributes,
   buildSelfHealingCaptureSpanAttributes,
+  buildSelfHealingRegistryWriteMetricAttributes,
   buildSelfHealingSuggestionMetricAttributes,
   hashTelemetryValue,
   type GuardedAutoHealMetricInput,
@@ -90,6 +91,9 @@ export {
   type RedisOperationTelemetryInput,
   type SelfHealingArtifactMetricInput,
   type SelfHealingCaptureTelemetryInput,
+  type SelfHealingRegistryWriteMetricInput,
+  type SelfHealingRegistryWriteMetricStatus,
+  type SelfHealingRegistryWriteOperation,
   type SelfHealingSuggestionMetricInput,
 } from './framework/observability/attributes';
 
@@ -183,6 +187,23 @@ export {
 } from './framework/selfHealing/registryRuntime';
 
 export {
+  DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS,
+  StoreSelectorCandidateHistoryRepository,
+  type StoreSelectorCandidateHistoryRepositoryOptions,
+} from './framework/selfHealing/historyRepository';
+
+export {
+  StorePendingSelectorPromotionRepository,
+  type StorePendingSelectorPromotionRepositoryOptions,
+} from './framework/selfHealing/promotionRepository';
+
+export {
+  DEFAULT_PENDING_SELECTOR_PROMOTION_TTL_SECONDS,
+  persistSelfHealingRegistryTelemetry,
+  type PersistSelfHealingRegistryTelemetryInput,
+} from './framework/selfHealing/registryPersistence';
+
+export {
   SelfHealingArtifactSchemaError,
   parseCapturedFailureEvent,
   parseDomSnapshot,
@@ -256,15 +277,20 @@ export type {
   GuardedValidationStatus,
   GuardedValidationSummary,
   PendingSelectorPromotion,
+  PendingSelectorPromotionStatus,
+  PendingSelectorPromotionWriteResult,
   RankedSelfHealingCandidate,
   SelectorCandidateHistory,
+  SelectorCandidateHistoryWriteResult,
   SelectorCandidateHistorySummary,
   SelfHealingActionContext,
   SelfHealingActionType,
   SelfHealingConfig,
   SelfHealingMode,
   SelfHealingPromotionMode,
+  SelfHealingRegistryPersistenceSummary,
   SelfHealingRegistryMode,
+  SelfHealingRegistryWriteStatus,
   SelfHealingSafetyPolicy,
   SelfHealingSatAnalysis,
   SelfHealingSatConfig,

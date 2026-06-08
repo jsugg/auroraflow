@@ -17,6 +17,10 @@
     "guardedArtifacts",
     "guardedAcceptedCount",
     "guardedAccepted",
+    "pendingPromotionCount",
+    "pendingPromotions",
+    "registryPersistenceFailureCount",
+    "registryPersistenceFailures",
     "telemetry"
   ],
   "properties": {
@@ -28,6 +32,7 @@
         "pass",
         "triage_required",
         "blocked_malformed_artifacts",
+        "blocked_registry_persistence_failed",
         "blocked_acknowledgement_required"
       ]
     },
@@ -77,10 +82,28 @@
         "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/guardedAcceptedEvent"
       }
     },
+    "pendingPromotionCount": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "pendingPromotions": {
+      "type": "array",
+      "items": {
+        "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/guardedAcceptedEvent"
+      }
+    },
+    "registryPersistenceFailureCount": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "registryPersistenceFailures": {
+      "type": "array",
+      "items": {
+        "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/guardedAcceptedEvent"
+      }
+    },
     "telemetry": {
       "type": "object",
       "additionalProperties": true,
-      "required": ["modes", "actions", "errorCodes", "guardedAutoHeal"],
+      "required": ["modes", "actions", "errorCodes", "guardedAutoHeal", "pendingPromotionWrites"],
       "properties": {
         "modes": {
           "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/counterMap"
@@ -99,6 +122,22 @@
             "attempted": {
               "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
             },
+            "succeeded": {
+              "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+            },
+            "failed": {
+              "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+            },
+            "skipped": {
+              "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+            }
+          }
+        },
+        "pendingPromotionWrites": {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["succeeded", "failed", "skipped"],
+          "properties": {
             "succeeded": {
               "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
             },
