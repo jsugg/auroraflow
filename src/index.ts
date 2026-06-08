@@ -1,5 +1,6 @@
 export {
   PageActionError,
+  PageActionInputError,
   PageObjectBase,
   type ActionContext,
   type ActionOptions,

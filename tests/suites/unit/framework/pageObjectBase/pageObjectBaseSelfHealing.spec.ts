@@ -15,6 +15,10 @@ class TestPageObject extends PageObjectBase {
   constructor(page: Page) {
     super(page, 'TestPageObject');
   }
+
+  public clickVisible(selector: string): Promise<void> {
+    return this.clickWhenVisible(selector);
+  }
 }
 
 type PageMock = {
@@ -253,6 +257,50 @@ describe('PageObjectBase self-healing integration', () => {
     ).toMatchObject({
       'auroraflow.self_heal.auto_apply.status': 'succeeded',
       'auroraflow.self_heal.accepted_locator_strategy': expect.any(String) as string,
+    });
+  });
+
+  it('auto-applies accepted guarded clickWhenVisible candidates and records success', async () => {
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
+    process.env.SELF_HEAL_MODE = 'guarded';
+    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
+    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
+    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'example.test';
+    pageMock.waitForSelector.mockRejectedValueOnce(new Error('visible wait failed'));
+
+    await expect(pageObject.clickVisible('#submit')).resolves.toBeUndefined();
+
+    expect(pageMock.click).not.toHaveBeenCalled();
+    expect(pageMock.locatorFirst.waitFor).toHaveBeenCalledWith({
+      state: 'visible',
+    });
+    expect(pageMock.locatorFirst.click).toHaveBeenCalledWith({});
+
+    const artifacts = await readdir(artifactsDir);
+    const artifactPath = path.join(artifactsDir, artifacts[0]);
+    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+      action: { type: string; target?: string };
+      guardedAutoHeal?: {
+        attempted: boolean;
+        succeeded: boolean;
+        locator?: string;
+      };
+    };
+
+    expect(content.action).toMatchObject({ type: 'click', target: '#submit' });
+    expect(content.guardedAutoHeal).toMatchObject({
+      attempted: true,
+      succeeded: true,
+    });
+    expect(content.guardedAutoHeal?.locator).toBeTruthy();
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.guardedAutoHealTotal,
+      value: 1,
+      attributes: {
+        'auroraflow.action.type': 'click',
+        'auroraflow.self_heal.status': 'succeeded',
+      },
     });
   });
 

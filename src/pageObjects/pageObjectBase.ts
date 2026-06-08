@@ -42,6 +42,14 @@ export interface ActionContext {
 
 type GuardedAutoHealAction<T> = (acceptedLocator: string) => Promise<T>;
 
+const MAX_ACTION_TIMEOUT_MS = 120_000;
+const MAX_EXPLICIT_WAIT_TIMEOUT_MS = 60_000;
+const VALID_NAVIGATION_WAIT_UNTIL = new Set<NonNullable<NavigationOptions['waitUntil']>>([
+  'load',
+  'domcontentloaded',
+  'networkidle',
+]);
+
 function requiresHttpNavigationResponse(url: string): boolean {
   try {
     const protocol = new URL(url).protocol;
@@ -51,6 +59,36 @@ function requiresHttpNavigationResponse(url: string): boolean {
   }
 }
 
+function validateBoundedInteger(value: number, fieldName: string, min: number, max: number): void {
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new PageActionInputError(
+      `${fieldName} must be an integer between ${min} and ${max} milliseconds.`,
+    );
+  }
+}
+
+function normalizeActionOptions(options: ActionOptions, fieldName: string): ActionOptions {
+  if (options.timeout !== undefined) {
+    validateBoundedInteger(options.timeout, fieldName, 1, MAX_ACTION_TIMEOUT_MS);
+  }
+
+  return { ...options };
+}
+
+function normalizeNavigationOptions(options: NavigationOptions): NavigationOptions {
+  if (options.timeout !== undefined) {
+    validateBoundedInteger(options.timeout, 'NavigationOptions.timeout', 1, MAX_ACTION_TIMEOUT_MS);
+  }
+
+  if (options.waitUntil !== undefined && !VALID_NAVIGATION_WAIT_UNTIL.has(options.waitUntil)) {
+    throw new PageActionInputError(
+      'NavigationOptions.waitUntil must be one of: load, domcontentloaded, networkidle.',
+    );
+  }
+
+  return { ...options };
+}
+
 export class PageActionError extends Error {
   constructor(
     message: string,
@@ -58,6 +96,13 @@ export class PageActionError extends Error {
   ) {
     super(message);
     this.name = 'PageActionError';
+  }
+}
+
+export class PageActionInputError extends RangeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PageActionInputError';
   }
 }
 
@@ -387,9 +432,11 @@ export abstract class PageObjectBase {
     url: string,
     options: NavigationOptions = { waitUntil: 'domcontentloaded' },
   ): Promise<Response | null> {
+    const navigationOptions = normalizeNavigationOptions(options);
+
     return this.safeAction(
       async () => {
-        const response: Response | null = await this.page.goto(url, options);
+        const response: Response | null = await this.page.goto(url, navigationOptions);
         if (!response) {
           if (requiresHttpNavigationResponse(url)) {
             throw new Error(`Navigation to ${url} failed without a main resource response`);
@@ -415,27 +462,48 @@ export abstract class PageObjectBase {
   }
 
   public async getTitle(): Promise<string> {
-    return this.page.title();
+    return this.safeAction(
+      () => this.page.title(),
+      'Retrieved page title',
+      'Error retrieving page title',
+      { type: 'read', target: 'page.title' },
+    );
   }
 
   public async click(selector: string, options: ActionOptions = {}): Promise<void | null> {
+    const actionOptions = normalizeActionOptions(options, 'ActionOptions.timeout');
+
     return this.safeAction(
-      () => this.page.click(selector, options),
+      () => this.page.click(selector, actionOptions),
       `Clicked on selector: ${selector}`,
       `Error clicking on selector ${selector}`,
       { type: 'click', target: selector },
       async (acceptedLocator) => {
         const locator = this.resolveGuardedLocator(acceptedLocator);
-        await locator.first().click(options);
+        await locator.first().click(actionOptions);
         return null;
       },
     );
   }
 
   protected async clickWhenVisible(selector: string, options: ActionOptions = {}): Promise<void> {
-    await this.page.waitForSelector(selector, { state: 'visible', ...options });
-    await this.page.click(selector, options);
-    this.logger.info(`Clicked on visible selector: ${selector}`);
+    const actionOptions = normalizeActionOptions(options, 'ActionOptions.timeout');
+    const waitOptions = { ...actionOptions, state: 'visible' as const };
+
+    return this.safeAction(
+      async () => {
+        await this.page.waitForSelector(selector, waitOptions);
+        await this.page.click(selector, actionOptions);
+      },
+      `Clicked on visible selector: ${selector}`,
+      `Error clicking on visible selector ${selector}`,
+      { type: 'click', target: selector },
+      async (acceptedLocator) => {
+        const locator = this.resolveGuardedLocator(acceptedLocator).first();
+        await locator.waitFor(waitOptions);
+        await locator.click(actionOptions);
+      },
+    );
   }
 
   public async type(
@@ -443,28 +511,32 @@ export abstract class PageObjectBase {
     text: string,
     options: ActionOptions = {},
   ): Promise<void | null> {
+    const actionOptions = normalizeActionOptions(options, 'ActionOptions.timeout');
+
     return this.safeAction(
-      () => this.page.fill(selector, text, options),
+      () => this.page.fill(selector, text, actionOptions),
       `Typed text in selector: ${selector}`,
       `Error typing in selector ${selector}`,
       { type: 'type', target: selector },
       async (acceptedLocator) => {
         const locator = this.resolveGuardedLocator(acceptedLocator);
-        await locator.first().fill(text, options);
+        await locator.first().fill(text, actionOptions);
         return null;
       },
     );
   }
 
   public async getText(selector: string, options: ActionOptions = {}): Promise<string | null> {
+    const actionOptions = normalizeActionOptions(options, 'ActionOptions.timeout');
+
     return this.safeAction(
-      () => this.page.textContent(selector, options),
+      () => this.page.textContent(selector, actionOptions),
       `Retrieved text from selector: ${selector}`,
       `Error retrieving text from selector ${selector}`,
       { type: 'read', target: selector },
       async (acceptedLocator) => {
         const locator = this.resolveGuardedLocator(acceptedLocator);
-        return locator.first().textContent(options);
+        return locator.first().textContent(actionOptions);
       },
     );
   }
@@ -473,22 +545,30 @@ export abstract class PageObjectBase {
     selector: string,
     options: ActionOptions = {},
   ): Promise<ElementHandle<unknown> | null> {
+    const actionOptions = normalizeActionOptions(options, 'ActionOptions.timeout');
+
     return this.safeAction(
-      () => this.page.waitForSelector(selector, options),
+      () => this.page.waitForSelector(selector, actionOptions),
       `Waited for selector: ${selector}`,
       `Error waiting for selector ${selector}`,
       { type: 'wait', target: selector },
       async (acceptedLocator) => {
         const locator = this.resolveGuardedLocator(acceptedLocator).first();
-        await locator.waitFor({ state: 'attached', timeout: options.timeout });
+        await locator.waitFor({ state: 'attached', timeout: actionOptions.timeout });
         return locator.elementHandle();
       },
     );
   }
 
   public async waitForTimeout(timeout: number): Promise<this> {
-    await this.page.waitForTimeout(timeout);
-    this.logger.info(`Waited for timeout: ${timeout}ms`);
+    validateBoundedInteger(timeout, 'waitForTimeout timeout', 0, MAX_EXPLICIT_WAIT_TIMEOUT_MS);
+
+    await this.safeAction(
+      () => this.page.waitForTimeout(timeout),
+      `Waited for timeout: ${timeout}ms`,
+      `Error waiting for timeout ${timeout}ms`,
+      { type: 'wait', target: `timeout:${timeout}` },
+    );
     return this;
   }
 

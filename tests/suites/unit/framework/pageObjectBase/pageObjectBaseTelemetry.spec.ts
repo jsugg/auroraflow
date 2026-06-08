@@ -13,19 +13,31 @@ class TestPageObject extends PageObjectBase {
   constructor(page: Page) {
     super(page, 'TelemetryPageObject');
   }
+
+  public clickVisible(selector: string): Promise<void> {
+    return this.clickWhenVisible(selector);
+  }
 }
 
 type PageMock = {
+  click: ReturnType<typeof vi.fn>;
   fill: ReturnType<typeof vi.fn>;
   screenshot: ReturnType<typeof vi.fn>;
+  title: ReturnType<typeof vi.fn>;
   url: ReturnType<typeof vi.fn>;
+  waitForSelector: ReturnType<typeof vi.fn>;
+  waitForTimeout: ReturnType<typeof vi.fn>;
 };
 
 function createPageMock(): PageMock {
   return {
+    click: vi.fn().mockResolvedValue(undefined),
     fill: vi.fn().mockResolvedValue(undefined),
     screenshot: vi.fn().mockResolvedValue(Buffer.from('ok')),
+    title: vi.fn().mockResolvedValue('Telemetry title'),
     url: vi.fn().mockReturnValue('https://example.test/login'),
+    waitForSelector: vi.fn().mockResolvedValue(null),
+    waitForTimeout: vi.fn().mockResolvedValue(undefined),
   };
 }
 
@@ -86,6 +98,47 @@ describe('PageObjectBase telemetry integration', () => {
       }) as CapturedAttributes,
     });
     expect(telemetry.histograms[0].value).toBeGreaterThanOrEqual(0);
+  });
+
+  it('records telemetry for title, explicit wait, and clickWhenVisible actions', async () => {
+    await expect(pageObject.getTitle()).resolves.toBe('Telemetry title');
+    await expect(pageObject.waitForTimeout(25)).resolves.toBe(pageObject);
+    await expect(pageObject.clickVisible('#submit')).resolves.toBeUndefined();
+
+    expect(telemetry.spans.map((span) => span.attributes['auroraflow.action.type'])).toEqual([
+      'read',
+      'wait',
+      'click',
+    ]);
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.pageActionsTotal,
+      value: 1,
+      attributes: buildPageActionMetricAttributes({
+        pageObjectName: 'TelemetryPageObject',
+        actionType: 'read',
+        status: 'succeeded',
+      }),
+    });
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.pageActionsTotal,
+      value: 1,
+      attributes: buildPageActionMetricAttributes({
+        pageObjectName: 'TelemetryPageObject',
+        actionType: 'wait',
+        status: 'succeeded',
+      }),
+    });
+    expect(telemetry.counters).toContainEqual({
+      name: METRIC_NAMES.pageActionsTotal,
+      value: 1,
+      attributes: buildPageActionMetricAttributes({
+        pageObjectName: 'TelemetryPageObject',
+        actionType: 'click',
+        status: 'succeeded',
+      }),
+    });
+    expect(pageMock.waitForSelector).toHaveBeenCalledWith('#submit', { state: 'visible' });
+    expect(pageMock.click).toHaveBeenCalledWith('#submit', {});
   });
 
   it('records failure counters and normalized error metadata for failed actions', async () => {
