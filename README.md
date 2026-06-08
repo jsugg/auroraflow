@@ -1,216 +1,258 @@
-[![AuroraFlow CI Test Suite](https://github.com/jsugg/auroraflow/actions/workflows/ci.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/ci.yml)
-# AuroraFlow :: Import Joy and Chill into your Test Scripts
+# AuroraFlow
+
+[![Quality Gates](https://github.com/jsugg/auroraflow/actions/workflows/quality.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/quality.yml)
+[![Examples](https://github.com/jsugg/auroraflow/actions/workflows/examples.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/examples.yml)
+[![Security Checks](https://github.com/jsugg/auroraflow/actions/workflows/security.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/security.yml)
+[![E2E Matrix](https://github.com/jsugg/auroraflow/actions/workflows/ci.yml/badge.svg)](https://github.com/jsugg/auroraflow/actions/workflows/ci.yml)
+
 ![AuroraFlow Logo](https://github.com/jsugg/auroraflow/blob/main/.github/assets/auroraflow-logo.png?raw=true)
 
-## ~ A Robust AI-Driven Test Automation Framework you can Rely on ~
+AuroraFlow is a TypeScript Playwright automation framework focused on maintainable page objects,
+mode-gated self-healing diagnostics, Redis-backed selector/data primitives, and deterministic CI
+observability artifacts.
 
-## Objective
+The project is intentionally explicit about what is production-ready foundation versus what is still a
+roadmap item. The current package ships framework primitives from `src/`; examples, tests, scripts, and
+operations assets remain repository tooling.
 
-This document describes AuroraFlow's current Test Automation Framework (TAF) foundation and the target architecture it is growing toward. The implemented repository currently centers on Playwright, TypeScript, Redis data primitives, guarded self-healing artifacts, JSON/Markdown observability reports, configurable structured logging, an opt-in OpenTelemetry facade for framework telemetry, local Prometheus/Grafana/ELK/Jaeger stack configuration, CI observability smoke lanes, remote telemetry export hooks, and production observability reference manifests. AI-driven Selector Analysis Tooling (SAT), Dockerized SAT services, encrypted Redis dump lifecycle, and autonomous selector optimization remain roadmap capabilities until corresponding services and workflows exist in source.
+## Current status
 
-## Current Repository Status (June 2026)
+AuroraFlow is a serious framework foundation, not a complete autonomous testing platform. The
+implementation currently includes:
 
-AuroraFlow currently provides a hardened foundation and examples-first blueprint. The full platform vision in this README remains the target architecture and is not fully implemented yet.
+- Playwright page object and page factory primitives with typed public exports.
+- Page action wrappers that emit logs, screenshots, self-healing artifacts, and optional telemetry.
+- Mode-gated self-healing diagnostics with bounded DOM snapshots, deterministic candidate scoring,
+  guarded dry-run validation, and a single guarded retry for supported actions.
+- Redis configuration/client primitives plus a typed selector registry repository.
+- Deterministic flakiness, SLO dashboard, and alert evaluation reports generated from Playwright JSON
+  output.
+- Opt-in OpenTelemetry instrumentation and a local collector-backed observability stack.
+- CI quality, examples, security, observability smoke, and scheduled E2E matrix workflows.
 
-Implemented now:
+Not implemented yet:
 
-- Playwright + TypeScript framework core with Page Object + Page Factory patterns.
-- Quality/security CI workflows (`quality.yml`, `security.yml`, `examples.yml`, full matrix in `ci.yml`).
-- E2E matrix flakiness analytics artifacts (`flakiness-summary.json` and `flakiness-summary.md`).
-- SLO dashboard and alert policy artifacts from matrix telemetry (`slo-dashboard*.{json,md}`, `slo-alerts*.{json,md}`).
-- Guarded self-healing foundation with artifact capture, candidate ranking, dry-run validation, and guarded auto-apply retry controls.
-- SAT enrichment for failed page actions, including bounded DOM snapshots, allow-listed/redacted attributes, DOM-backed candidate extraction, deterministic candidate IDs, artifact schema parsing, and a deterministic Playwright fixture.
-- Redis data-layer primitives (`RedisClient`, selector registry repository) and Testcontainers integration tests.
-- Opt-in OpenTelemetry telemetry facade with no-op defaults, resource attribute normalization, PageObjectBase action spans/metrics, and trace/span log correlation.
-- Local observability stack configuration with OpenTelemetry Collector, Prometheus, Grafana dashboards, Jaeger, Elasticsearch, Logstash, and Kibana.
-- Collector-only, optional full-stack, and optional remote-export CI observability smoke lanes with uploaded diagnostics.
-- Production observability references with TLS/auth-enabled manifests, runbooks, and dashboard review guidance.
-- Configurable structured logging with default secret redaction and selectable console/file/silent destinations.
-- Runnable deterministic examples for page objects, quickstart, reliability, data-provider abstractions, observability patterns, accessibility checks, and CI templates.
+- Autonomous selector promotion or source-code rewrites.
+- Runtime SAT history loading from Redis or persistent promotion writes.
+- A Dockerized SAT service or a Dockerized framework service.
+- Production-owned observability deployment; production manifests are references that require
+  environment-specific ownership, credentials, storage, DNS, TLS, and network controls.
 
-Planned/roadmap (not fully implemented yet):
+## Feature maturity
 
-- SAT history-backed scoring, promotion workflows, ML pipeline, and autonomous selector optimization lifecycle.
-- Trend-dashboard governance and environment-owned production deployments.
-- Extended platform governance automation and release/signing workflows.
+| Area | What is mature now | Current boundary | Source |
+| --- | --- | --- | --- |
+| Package surface | Root package metadata, declaration output, curated publish files, and broad typed exports are contract-tested. | The published artifact is limited to `dist`, `README.md`, and `LICENSE`; repository examples and scripts are not part of the package API. | `package.json`, `src/index.ts`, `tsconfig.build.json`, `tests/suites/contracts/package/packageSurface.contract.spec.ts` |
+| Page objects | `PageObjectBase` wraps navigation, click, type, read, wait, screenshot, and close actions with initialization, logging, screenshots, self-healing analysis, and telemetry metrics. `PageFactory` caches page object instances. | Protected helpers that call Playwright directly should be reviewed before treating them as instrumented public actions. | `src/pageObjects/pageObjectBase.ts`, `src/helpers/pageFactory.ts` |
+| Self-healing diagnostics | `off`, `suggest`, and `guarded` modes are parsed and enforced. Failure capture can include ranked suggestions, DOM-derived candidates, guarded validation, and one guarded retry for click/type/read/wait. | SAT registry and promotion modes are parsed, but runtime analysis still returns an empty history summary and does not write selector registry records. | `src/framework/selfHealing/config.ts`, `src/framework/selfHealing/analyzer.ts`, `src/framework/selfHealing/guardedValidation.ts`, `docs/architecture/self-healing.md` |
+| Redis data layer | Runtime config validation, namespaced keys, bounded retry with jitter, SCAN-based listing, batched reads, selector record validation, and Testcontainers integration coverage are implemented. | Redis is not yet wired into SAT history scoring or promotion workflows. | `src/utils/redisClient.ts`, `src/data/selectors/selectorRegistry.ts`, `docs/architecture/data-layer.md` |
+| Observability | The telemetry facade is no-op by default, can export OpenTelemetry spans/metrics when enabled, and keeps JSON/Markdown report artifacts as deterministic merge-gate evidence. Local Collector, Prometheus, Grafana, Jaeger, Elasticsearch, Logstash, and Kibana configuration exists. | Dashboards and alert rules are starter operational assets; review their query semantics against emitted attributes before using them as production SLO sources. | `src/framework/observability/*`, `docs/operations/observability-contract.md`, `docs/architecture/observability-stack.md`, `observability/README.md` |
+| CI and security | Pull requests run quality and security gates. Example and smoke lanes are path-filtered. The full E2E matrix runs on `main`, schedule, and manual dispatch. | Some optional observability and remote-export paths need repository variables/secrets and enough runner capacity. | `.github/workflows/quality.yml`, `.github/workflows/examples.yml`, `.github/workflows/security.yml`, `.github/workflows/ci.yml` |
 
-## Target Architecture (Roadmap)
+## Getting started
 
-```mermaid
-graph TD;
-    CI[CI/CD Pipeline]-->|Triggers|TAF[Test Automation Framework];
-    TAF-->|Uses|Redis[Redis for Test Data];
-    TAF-->|Interacts with|Browser[Browsers via Playwright];
-    Redis-.->|Planned data source|SAT[Selector Analysis Tooling];
-    SAT-.->|Planned selector updates|Redis;
-    TAF-->|Generates|Reports[JSON/Markdown Reports & Logs];
-    TAF-->|Opt-in live telemetry|Telemetry[OpenTelemetry Facade];
-    Telemetry-.->|Configured OTLP endpoint|Collector[OpenTelemetry Collector];
-    Reports-.->|Planned production monitoring|Monitoring[Monitoring Tools];
-    Collector-->|Local backend routing|Monitoring;
-    Monitoring-.->Prometheus;
-    Monitoring-.->Grafana;
-    Monitoring-.->ELK[Elasticsearch, Logstash, Kibana];
-    TAF-->|Uses today|Docker[Docker Compose];
-    Docker-->|Manages local Redis|Redis;
-    Docker-.->|Planned service|SAT;
+### Requirements
+
+- Node.js `>=20 <25`
+- npm
+- Playwright browsers for browser tests
+- Docker, when running Redis integration tests or the local observability stack
+
+### Repository setup
+
+```bash
+git clone https://github.com/jsugg/auroraflow.git
+cd auroraflow
+npm ci
+npx playwright install --with-deps
+npm run verify
 ```
 
-This roadmap diagram separates the implemented foundation from planned services. Today, Docker Compose manages local Redis and an optional local observability stack, the OpenTelemetry facade is available as an opt-in framework boundary, CI can smoke-test collector/full-stack/remote telemetry paths, and production hardening is represented by reference manifests and operator docs. SAT services and autonomous selector optimization are target architecture, not current runtime infrastructure.
+Run the smoke suite:
 
-### Core Components
-
-- **Node.js and TypeScript:** Serve as the backbone for the TAF, offering asynchronous execution and strong typing for robust, maintainable code.
-- **Playwright:** Enables automated, cross-browser UI interactions and assertions, facilitating comprehensive test coverage.
-- **Page Object Model (POM) & Page Factory:** Encapsulates UI element interactions, improving test maintenance and reducing redundancy.
-- **Redis:** Provides implemented data-layer primitives for namespaced keys and selector registry records; autonomous selector updates are planned.
-- **Docker Compose:** Currently orchestrates local Redis and an optional local observability stack. Dockerized SAT, TAF services, and Docker Swarm are not implemented yet.
-- **AI-Driven SAT:** Planned capability for dynamic selector identification and updates based on DOM analysis.
-- **Monitoring and Logging:** Currently implemented as redacted structured logs, JSON/Markdown flakiness, SLO, and alert artifacts, an opt-in OpenTelemetry facade, local collector-backed Prometheus/Grafana/ELK/Jaeger configuration, CI smoke lanes, remote export hooks, and production reference manifests.
-- **Computer Vision:** Planned capability for complex or dynamic UI elements.
-
-### Enhanced Features
-
-- **Current Docker Compose support:** Provides a local Redis service with healthcheck and persistent volume for development and integration testing.
-- **Current observability artifacts:** Generates flakiness summaries, SLO dashboards, and SLO alert evaluations as JSON/Markdown artifacts.
-- **Current live telemetry foundation:** Provides opt-in OpenTelemetry spans/metrics for page actions, normalized resource attributes, privacy-preserving action target hashing, and trace/span identifiers in structured logs.
-- **Planned Redis persistence:** Encrypted Redis dump backup/restore across CI runs.
-- **Planned SAT ML:** Custom-built or open-source ML models for DOM analysis and selector optimization.
-- **Local monitoring stack:** Prometheus/Grafana metrics, ELK log analysis, and Jaeger tracing are available through the optional local observability compose overlay.
-- **Failover Mechanisms & Robust Error Handling:** Implemented in framework action wrappers and Redis retry primitives; broader infrastructure failover remains planned.
-
-### TAF Design Best Practices
-
-- **Modularity and Encapsulation:** Page objects encapsulate UI interactions, while helper functions and utilities support reusable logic, promoting clean and modular code.
-- **Asynchronous Programming:** Playwright's asynchronous API is fully leveraged, ensuring non-blocking operations and efficient execution.
-- **Error Handling:** Custom error handling in page actions, with logging and screenshots on failure, enhances debugging and accountability.
-- **Retry Mechanisms:** Implement retry logic with exponential backoff for flaky operations, improving test reliability.
-- **Security:** CI includes dependency review, npm audit, CodeQL, gitleaks, and workflow security checks; encrypted Redis dump handling is planned.
-- **Test Isolation:** Docker Compose and Testcontainers provide Redis isolation for local/integration scenarios; full Dockerized TAF/SAT isolation is planned.
-
-### Project Structure and Setup
-
-- Organized test codebase with clear directories for tests, page objects, helpers, and utilities, using TypeScript for type safety and readability.
-- Configured Playwright for cross-browser testing (Chrome, Firefox, Safari, Edge) and managed test environments with environment variables and configuration files.
-
-### Continuous Integration
-
-- Integrated CI pipelines (GitHub Actions) for automated test execution, leveraging parallel test execution to optimize feedback time.
-- Enhanced error handling and logging, including Playwright's screenshot and video capture on test failures, for improved debugging.
-
-### Code Quality and Scalability
-
-- Enforced coding standards with ESLint and Prettier, and optimized test execution through parallel test runs supported by Playwright.
-
-### Documentation, Accessibility, and Knowledge Sharing
-
-- Maintained comprehensive documentation for the test framework, including setup instructions and test writing guidelines.
-- Incorporated accessibility checks into end-to-end tests, ensuring web applications are accessible to all users.
-
-## Test Execution Flow
-
-```mermaid
-sequenceDiagram
-    participant CI as CI Pipeline
-    participant SAT as Selector Analysis Tooling Job
-    participant TAF as Test Automation Framework Job
-    participant Redis as Redis (Test Data)
-    participant Browser as Browsers
-
-    par SAT Job
-        CI->>+SAT: Clone SAT Repo & Start Analysis
-        SAT->>+Redis: Retrieve Current Selectors
-        SAT->>+Browser: Analyze DOM for Selector Updates
-        Browser-->>-SAT: DOM Analysis Results
-        SAT-->>-Redis: Update Selectors if Needed
-        SAT->>CI: SAT Job Completed
-    and TAF Job
-        CI->>+TAF: Install & Configure TAF
-        note right of TAF: Waits for SAT Completion if Necessary
-        TAF->>+Redis: Retrieve Updated Test Data & Selectors
-        loop Test Execution
-            TAF->>+Browser: Execute Tests
-            Browser-->>-TAF: Test Results
-        end
-        TAF->>CI: Return Test Results & Artifacts
-    end
+```bash
+npm run test:smoke
 ```
 
-This sequence diagram represents the target SAT-integrated flow. Current CI runs TAF test suites and artifact generation; it does not yet clone, run, or wait for a SAT job.
+Run the examples suite:
 
-## Data Management and SAT Workflow
-
-```mermaid
-graph LR;
-    SAT[Selector Analysis Tooling] --> |Analyzes & Updates| Redis[Redis - Test Data];
-    Redis --> |Provides| TAF[Test Automation Framework];
-    TAF --> |Test Execution| Browser[Browsers];
-    TAF --> |Feedback Loop| SAT;
-    Redis --> |Backed Up As| DB_Dump[Encrypted DB dump];
-    DB_Dump --> |Restored For Next Test Run| Redis;
+```bash
+npm run test:examples
 ```
 
-This diagram represents the target data-management workflow. Current source includes Redis client and selector registry primitives, but not SAT-driven Redis updates or encrypted Redis dump backup/restore.
+Build the package surface:
 
-## Implementation Details
-
-### Docker Compose and Redis Configuration
-
-- Use Docker Compose to spin up local Redis for development and integration testing. Current GitHub Actions rely on Testcontainers for Redis integration tests, not a Dockerized SAT stack.
-- Manage Redis as the dynamic data store foundation for test selectors and URLs. Automated SAT updates and encrypted Redis dump backup/restore are planned.
-
-### SAT Development and Integration
-
-- Current SAT support runs inside the self-healing failure path. When `SELF_HEAL_MODE=suggest` or `SELF_HEAL_MODE=guarded`, SAT can capture a bounded DOM snapshot through Playwright, redact sensitive attributes, extract resilient candidates, score them deterministically, and persist the compact analysis under the failure artifact's `sat` field.
-- Runtime SAT controls include `SELF_HEAL_SAT_ENABLED`, `SELF_HEAL_SAT_CAPTURE_DOM`, `SELF_HEAL_MAX_DOM_NODES`, `SELF_HEAL_MAX_CANDIDATES`, `SELF_HEAL_MAX_TEXT_LENGTH`, `SELF_HEAL_ALLOWED_ATTRIBUTES`, `SELF_HEAL_REGISTRY_MODE`, and `SELF_HEAL_PROMOTION_MODE`.
-- Future SAT phases can run as an independent, AI-driven tool in parallel to TAF executions. They should analyze the application's UI, identify selector changes, and promote reviewed selector updates into Redis-backed registry data.
-- Utilize TensorFlow.js for building or customizing ML models, trained on historical test data and web application changes. Incorporate NLP techniques for improved page context understanding.
-
-### CI/CD Pipeline Enhancements
-
-- Implement GitHub Actions workflows to manage future TAF/SAT operations, Dockerized services, and Redis data lifecycle.
-- Encrypt the Redis dump file for secure storage in the TAF repository and automatically decrypt/load it in Redis at the start of test runs.
-
-### Monitoring, Logging, and Tracing Setup
-
-- Current observability emits JSON/Markdown flakiness, SLO dashboard, and alert artifacts from Playwright report data.
-- Live telemetry is opt-in. Set `AURORAFLOW_OBSERVABILITY_ENABLED=true` and configure `OTEL_EXPORTER_OTLP_ENDPOINT` to export framework spans and metrics to an OpenTelemetry Collector or compatible OTLP endpoint.
-- Raw selectors, URLs, request bodies, passwords, tokens, and cookies are not emitted by default. Page action telemetry uses target hashes unless `AURORAFLOW_OBSERVABILITY_EXPORT_RAW_SELECTORS=true` is explicitly enabled.
-- Structured logs include active trace and span identifiers when telemetry is enabled and a span is in scope.
-- Start Prometheus, Grafana, ELK, and Jaeger locally with `npm run observability:up`, then emit telemetry with `AURORAFLOW_OBSERVABILITY_ENABLED=true` and `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`.
-- See [`docs/operations/observability-contract.md`](docs/operations/observability-contract.md) for supported environment variables, resource attributes, span names, metric names, and privacy rules.
-- See [`docs/architecture/observability-stack.md`](docs/architecture/observability-stack.md) and [`observability/README.md`](observability/README.md) for local stack architecture, ports, configuration files, and troubleshooting.
-
-### Best Practices and Security Measures
-
-- Encapsulate UI interactions within page objects, using the Page Factory for instance management, to ensure code modularity and reusability.
-- Implement robust error handling and custom exceptions within page actions, including screenshots on failure for enhanced debugging.
-- Secure test data management with validated Redis configuration and GitHub secret scanning today; encrypted Redis dump handling remains planned.
-
-## Current Infrastructure and Monitoring Status
-
-```mermaid
-graph TD;
-    Docker[Docker Compose]-->|Current local service|Redis[Redis];
-    Tests[Test Suites]-->|Use via RedisClient/Testcontainers|Redis;
-    Tests-->|Generate|PlaywrightReports[Playwright JSON Reports];
-    Tests-->|Opt-in spans/metrics|Telemetry[OpenTelemetry Facade];
-    PlaywrightReports-->|Aggregate|Flakiness[Flakiness Summary JSON/MD];
-    Flakiness-->|Feeds|SLO[SLO Dashboard JSON/MD];
-    SLO-->|Evaluates|Alerts[SLO Alerts JSON/MD];
-    Telemetry-->|Local or external OTLP endpoint when configured|Collector[OpenTelemetry Collector];
-    SAT[Dockerized SAT]-.->|Planned|Redis;
-    Monitoring[Prometheus/Grafana/ELK/Jaeger]-->|Local backend stack|Collector;
-    Monitoring-.->|Planned trend dashboards|Alerts;
+```bash
+npm run build
+npm run pack:dry-run
 ```
 
-Current infrastructure consists of local Redis orchestration, Testcontainers-backed Redis integration tests, artifact-based observability, opt-in OpenTelemetry emission from framework code, a repo-managed local Prometheus/Grafana/ELK/Jaeger stack, CI observability smoke workflows, remote export workflow hooks, and production observability reference manifests. Dockerized SAT services and environment-owned production deployments remain planned until the corresponding runtime services and operational ownership are in place.
+## Minimal page object example
 
-## Rationale Behind Architectural Choices
+```ts
+import type { Page } from 'playwright';
+import { PageFactory, PageObjectBase } from 'auroraflow';
 
-The proposed TAF architecture is designed to address the challenges of dynamic web UI testing at scale. The current implementation establishes the Playwright framework, Redis data primitives, guarded self-healing artifacts, CI observability reports, a vendor-neutral telemetry boundary, local and CI backend smoke paths, and production observability references. Dockerized SAT, autonomous selector updates, and environment-owned production monitoring/tracing remain planned follow-on layers that should be claimed as deployed only after the corresponding services, security controls, and owners exist.
+class LoginPage extends PageObjectBase {
+  constructor(page: Page) {
+    super(page);
+    this.url = 'https://example.test/login';
+  }
+
+  async signIn(email: string, password: string): Promise<void> {
+    await this.open();
+    await this.type('[data-testid="email"]', email);
+    await this.type('[data-testid="password"]', password);
+    await this.click('[data-testid="submit"]');
+  }
+}
+
+const factory = new PageFactory(page);
+const loginPage = factory.getPage(LoginPage);
+await loginPage.signIn('user@example.test', 'correct-horse-battery-staple');
+```
+
+For runnable examples, see [`examples/`](examples/) and `tests/suites/e2e/examples/`.
+
+## Self-healing diagnostics
+
+Self-healing is disabled by default. Enable it only when you want failure artifacts for triage:
+
+```bash
+SELF_HEAL_MODE=suggest npm run test:smoke
+SELF_HEAL_MODE=guarded SELF_HEAL_ALLOWED_DOMAINS=example.test npm run test:smoke
+```
+
+Artifacts are written under `test-results/self-healing/*.json` and can be summarized with:
+
+```bash
+npm run self-heal:governance
+```
+
+Guarded mode is intentionally conservative. It evaluates locator candidates in dry-run mode and can retry
+supported actions once when a candidate is policy-allowed and confidence-eligible. It does not promote
+selectors into Redis, update source code, or maintain SAT history today.
+
+See [`docs/architecture/self-healing.md`](docs/architecture/self-healing.md).
+
+## Redis data layer
+
+Start a local Redis instance:
+
+```bash
+npm run infra:redis:up
+npm run test:integration
+npm run infra:redis:down
+```
+
+Core environment variables:
+
+- `AURORAFLOW_REDIS_URL`
+- `AURORAFLOW_REDIS_HOST`
+- `AURORAFLOW_REDIS_PORT`
+- `AURORAFLOW_REDIS_DB`
+- `AURORAFLOW_REDIS_USERNAME`
+- `AURORAFLOW_REDIS_PASSWORD`
+- `AURORAFLOW_REDIS_TLS`
+- `AURORAFLOW_REDIS_KEY_PREFIX`
+
+See [`docs/architecture/data-layer.md`](docs/architecture/data-layer.md).
+
+## Observability
+
+Live telemetry is opt-in. Without `AURORAFLOW_OBSERVABILITY_ENABLED=true`, the telemetry facade stays
+no-op and report artifacts remain the primary evidence source.
+
+Start the local stack:
+
+```bash
+npm run observability:up
+```
+
+Emit telemetry to the local Collector:
+
+```bash
+AURORAFLOW_OBSERVABILITY_ENABLED=true \
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
+npm run test:smoke
+```
+
+Local tools:
+
+- Grafana: <http://localhost:3000>
+- Prometheus: <http://localhost:9090>
+- Jaeger: <http://localhost:16686>
+- Kibana: <http://localhost:5601>
+- Collector health: <http://localhost:13133>
+
+Stop the stack:
+
+```bash
+npm run observability:down
+```
+
+See [`docs/operations/observability-contract.md`](docs/operations/observability-contract.md),
+[`docs/architecture/observability-stack.md`](docs/architecture/observability-stack.md), and
+[`observability/README.md`](observability/README.md).
+
+## Repository map
+
+```text
+src/
+  data/selectors/          Redis-backed selector registry primitives
+  framework/observability/ Telemetry facade, report aggregation, SLO and alert artifacts
+  framework/selfHealing/   Failure capture, DOM snapshots, candidate scoring, guarded validation
+  helpers/                 Page factory and small utilities
+  pageObjects/             Base page object implementation
+  utils/                   Logger and Redis client
+tests/suites/              Unit, framework, integration, contract, and E2E example suites
+docs/                      Architecture, operations, and development documentation
+examples/                  Runnable usage examples and CI templates
+observability/             Local and reference production observability assets
+configs/                   Playwright and quality configuration
+scripts/                   Report generation, workflow linting, governance, and smoke helpers
+```
+
+## Documentation
+
+- [Development guide](docs/development.md)
+- [Self-healing foundation](docs/architecture/self-healing.md)
+- [Data layer foundation](docs/architecture/data-layer.md)
+- [Observability stack architecture](docs/architecture/observability-stack.md)
+- [Observability contract](docs/operations/observability-contract.md)
+- [SLO dashboard and alerting](docs/operations/slo-dashboard-alerting.md)
+- [Security and secrets](docs/operations/security-secrets.md)
+- [Examples](examples/README.md)
+
+## Roadmap
+
+The next meaningful maturity steps are:
+
+1. Wire SAT analysis to selector registry history and reviewed promotion workflows.
+2. Add promotion governance that records pending selector changes without mutating application tests
+   silently.
+3. Harden live dashboard and alert query semantics against emitted metric attributes.
+4. Continue expanding package-surface contracts and example coverage before widening the public API.
 
 ## Contributing
 
-This exciting project is in the early development phase.
-Hit me up if you are interested in contributing!
+Contributions are welcome when they preserve the repository's current-state framing: implemented features
+should be described as implemented, and roadmap items should stay clearly marked until corresponding source,
+tests, and workflows exist.
+
+Before opening a pull request, run:
+
+```bash
+npm run format:check
+npm run lint
+npm run typecheck
+npm run test:unit
+npm run test:integration
+npm run build
+```
+
+See [`docs/development.md`](docs/development.md) for workflow details and local troubleshooting.
+
+## License
+
+MIT
