@@ -1,10 +1,17 @@
 import type { Page } from 'playwright';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PageObjectBase } from '../../../../../src/pageObjects/pageObjectBase';
+import {
+  PageActionInputError,
+  PageObjectBase,
+} from '../../../../../src/pageObjects/pageObjectBase';
 
 class TestPageObject extends PageObjectBase {
   constructor(page: Page) {
     super(page, 'TestPageObject');
+  }
+
+  public clickVisible(selector: string, options?: { timeout?: number }): Promise<void> {
+    return this.clickWhenVisible(selector, options);
   }
 }
 
@@ -162,5 +169,39 @@ describe('PageObjectBase error propagation', () => {
     );
 
     expect(pageMock.screenshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects invalid action timeouts before invoking Playwright', async () => {
+    await expect(pageObject.click('#submit', { timeout: 0 })).rejects.toThrow(PageActionInputError);
+    await expect(pageObject.type('#username', 'alice', { timeout: -1 })).rejects.toThrow(
+      'ActionOptions.timeout must be an integer between 1 and 120000 milliseconds.',
+    );
+    await expect(pageObject.waitForSelector('#status', { timeout: 120_001 })).rejects.toThrow(
+      PageActionInputError,
+    );
+    await expect(
+      pageObject.clickVisible('#submit', { timeout: Number.POSITIVE_INFINITY }),
+    ).rejects.toThrow(PageActionInputError);
+
+    expect(pageMock.click).not.toHaveBeenCalled();
+    expect(pageMock.fill).not.toHaveBeenCalled();
+    expect(pageMock.waitForSelector).not.toHaveBeenCalled();
+    expect(pageMock.screenshot).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid navigation and explicit wait timeouts before Playwright execution', async () => {
+    await expect(
+      pageObject.navigateTo('https://example.test/app', { timeout: NaN }),
+    ).rejects.toThrow(PageActionInputError);
+    await expect(
+      pageObject.navigateTo('https://example.test/app', { timeout: 120_001 }),
+    ).rejects.toThrow(
+      'NavigationOptions.timeout must be an integer between 1 and 120000 milliseconds.',
+    );
+    await expect(pageObject.waitForTimeout(60_001)).rejects.toThrow(PageActionInputError);
+
+    expect(pageMock.goto).not.toHaveBeenCalled();
+    expect(pageMock.waitForTimeout).not.toHaveBeenCalled();
+    expect(pageMock.screenshot).not.toHaveBeenCalled();
   });
 });

@@ -1,18 +1,21 @@
-import { Page } from '@playwright/test';
+import type { Page } from 'playwright';
+import { PageObjectBase } from '../../../src/pageObjects/pageObjectBase';
 
-export class SampleAppPage {
-  constructor(private readonly page: Page) {}
+export class SampleAppPage extends PageObjectBase {
+  constructor(page: Page) {
+    super(page);
+  }
 
-  public async open(url: string): Promise<void> {
-    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+  public override async open(url: string = this.url): Promise<void> {
+    await this.navigateTo(url, { waitUntil: 'domcontentloaded' });
   }
 
   public async submitName(name: string): Promise<void> {
-    await this.page.getByLabel('Name').fill(name);
-    await this.page.getByRole('button', { name: 'Submit' }).click();
+    await this.type('#name-input', name);
+    await this.click('button[type="submit"]');
   }
 
   public async statusText(): Promise<string> {
-    return (await this.page.locator('#status').innerText()).trim();
+    return ((await this.getText('#status')) ?? '').trim();
   }
 }

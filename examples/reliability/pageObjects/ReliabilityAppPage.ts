@@ -1,21 +1,24 @@
-import { Page } from '@playwright/test';
+import type { Page } from 'playwright';
+import { PageObjectBase } from '../../../src/pageObjects/pageObjectBase';
 
-export class ReliabilityAppPage {
-  constructor(private readonly page: Page) {}
+export class ReliabilityAppPage extends PageObjectBase {
+  constructor(page: Page) {
+    super(page);
+  }
 
-  public async open(url: string): Promise<void> {
-    await this.page.goto(url, { waitUntil: 'domcontentloaded' });
+  public override async open(url: string = this.url): Promise<void> {
+    await this.navigateTo(url, { waitUntil: 'domcontentloaded' });
   }
 
   public async clickFetchMessage(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Fetch Message' }).click();
+    await this.click('#fetch-message');
   }
 
   public async clickRenderDelayedStatus(): Promise<void> {
-    await this.page.getByRole('button', { name: 'Render Delayed Status' }).click();
+    await this.click('#render-delayed');
   }
 
   public async statusText(): Promise<string> {
-    return (await this.page.locator('#status').innerText()).trim();
+    return ((await this.getText('#status')) ?? '').trim();
   }
 }
