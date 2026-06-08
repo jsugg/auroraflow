@@ -174,6 +174,15 @@ export {
 } from './framework/selfHealing/analyzer';
 
 export {
+  createRedisSelfHealingRegistryRuntime,
+  createStoreSelfHealingRegistryRuntime,
+  resolveSelfHealingRegistryRuntime,
+  type RedisSelfHealingRegistryRuntimeOptions,
+  type ResolveSelfHealingRegistryRuntimeOptions,
+  type StoreSelfHealingRegistryRuntimeOptions,
+} from './framework/selfHealing/registryRuntime';
+
+export {
   SelfHealingArtifactSchemaError,
   parseCapturedFailureEvent,
   parseDomSnapshot,

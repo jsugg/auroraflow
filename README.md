@@ -118,7 +118,7 @@ Artifacts are written under `test-results/self-healing/*.json` and can be summar
 npm run self-heal:governance
 ```
 
-Guarded mode is intentionally conservative. It evaluates locator candidates in dry-run mode and can retry supported actions once when a candidate is policy-allowed and confidence-eligible. It does not promote selectors into Redis, update source code, or maintain SAT history today.
+Guarded mode is intentionally conservative. It evaluates locator candidates in dry-run mode and can retry supported actions once when a candidate is policy-allowed and confidence-eligible. SAT can read active selectors and candidate history from a configured registry, but it does not promote selectors into Redis, write pending promotions, or update source code today.
 
 See [`docs/architecture/self-healing.md`](docs/architecture/self-healing.md).
 

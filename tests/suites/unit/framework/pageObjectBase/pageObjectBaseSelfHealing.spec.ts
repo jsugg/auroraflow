@@ -8,16 +8,24 @@ import {
   resetTelemetryForTests,
   setTelemetryForTests,
 } from '../../../../../src/framework/observability/telemetry';
+import type { SelfHealingRegistryRuntime } from '../../../../../src/framework/selfHealing/registryContracts';
 import { PageObjectBase } from '../../../../../src/pageObjects/pageObjectBase';
 import { CapturingTelemetry } from '../observability/capturingTelemetry';
 
 class TestPageObject extends PageObjectBase {
-  constructor(page: Page) {
+  constructor(
+    page: Page,
+    private readonly registryRuntime?: SelfHealingRegistryRuntime,
+  ) {
     super(page, 'TestPageObject');
   }
 
   public clickVisible(selector: string): Promise<void> {
     return this.clickWhenVisible(selector);
+  }
+
+  protected override resolveRegistryRuntime(): SelfHealingRegistryRuntime | undefined {
+    return this.registryRuntime;
   }
 }
 
@@ -257,6 +265,90 @@ describe('PageObjectBase self-healing integration', () => {
     ).toMatchObject({
       'auroraflow.self_heal.auto_apply.status': 'succeeded',
       'auroraflow.self_heal.accepted_locator_strategy': expect.any(String) as string,
+    });
+  });
+
+  it('uses SAT-ranked registry candidates for guarded validation and retry', async () => {
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
+    const registryLocator = "page.getByTestId('submit-order')";
+    const runtime: SelfHealingRegistryRuntime = {
+      selectors: {
+        get: vi.fn().mockResolvedValue({
+          id: 'checkout.submit',
+          pageObjectName: 'TestPageObject',
+          actionType: 'click',
+          locator: registryLocator,
+          confidence: 0.99,
+          updatedAt: '2026-06-08T12:00:00.000Z',
+          version: 4,
+        }),
+        findCandidates: vi.fn().mockResolvedValue([]),
+      },
+      histories: {
+        get: vi.fn().mockResolvedValue(null),
+        getMany: vi.fn().mockResolvedValue(new Map()),
+      },
+      promotions: {
+        get: vi.fn().mockResolvedValue(null),
+        list: vi.fn().mockResolvedValue([]),
+        upsert: vi.fn().mockImplementation(async (promotion) => promotion),
+      },
+      required: false,
+    };
+    pageObject = new TestPageObject(pageMock as unknown as Page, runtime);
+    process.env.SELF_HEAL_MODE = 'guarded';
+    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
+    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
+    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'example.test';
+    pageMock.click.mockRejectedValueOnce(new Error('click failed'));
+
+    await expect(
+      pageObject.click('#legacy-submit', { selectorId: 'checkout.submit' }),
+    ).resolves.toBeNull();
+
+    expect(runtime.selectors.get).toHaveBeenCalledWith('checkout.submit');
+    expect(pageMock.getByTestId).toHaveBeenCalledWith('submit-order');
+    expect(pageMock.locatorFirst.click).toHaveBeenCalledTimes(1);
+
+    const artifacts = await readdir(artifactsDir);
+    const artifactPath = path.join(artifactsDir, artifacts[0]);
+    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+      action: { selectorId?: string };
+      sat?: {
+        candidates: Array<{
+          locator: string;
+          strategy: string;
+          registryRecordId?: string;
+          registryRecordVersion?: number;
+        }>;
+      };
+      guardedValidation?: {
+        acceptedLocator?: string;
+      };
+      guardedAutoHeal?: {
+        succeeded: boolean;
+        locator?: string;
+      };
+    };
+
+    expect(content.action.selectorId).toBe('checkout.submit');
+    expect(content.sat?.candidates[0]).toMatchObject({
+      locator: registryLocator,
+      strategy: 'registry',
+      registryRecordId: 'checkout.submit',
+      registryRecordVersion: 4,
+    });
+    expect(content.guardedValidation?.acceptedLocator).toBe(registryLocator);
+    expect(content.guardedAutoHeal).toMatchObject({
+      succeeded: true,
+      locator: registryLocator,
+    });
+    expect(
+      telemetry.spans.find((span) => span.name === 'auroraflow.page_action')?.attributes,
+    ).toMatchObject({
+      'auroraflow.self_heal.registry.history_loaded_candidates': 0,
+      'auroraflow.self_heal.registry.warning_count': expect.any(Number) as number,
     });
   });
 

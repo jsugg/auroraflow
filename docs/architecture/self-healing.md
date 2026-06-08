@@ -16,7 +16,7 @@ AuroraFlow supports a mode-gated self-healing failure-capture foundation for fai
 
 ## SAT Enrichment
 
-Selector Analysis Tooling (SAT) enriches `suggest` and `guarded` artifacts with bounded DOM evidence and deterministic candidate scoring. SAT is diagnostic in this implementation; selector registry writes and source-code rewrites remain out of scope.
+Selector Analysis Tooling (SAT) enriches `suggest` and `guarded` artifacts with bounded DOM evidence, optional selector-registry reads, optional candidate history reads, and deterministic candidate scoring. SAT remains diagnostic for persistence in this implementation; selector registry writes, pending promotion writes, and source-code rewrites remain out of scope.
 
 - `SELF_HEAL_SAT_ENABLED` defaults to enabled for `suggest` and `guarded`, disabled for `off`.
 - `SELF_HEAL_SAT_CAPTURE_DOM` defaults to true when SAT is enabled.
@@ -24,7 +24,9 @@ Selector Analysis Tooling (SAT) enriches `suggest` and `guarded` artifacts with 
 - `SELF_HEAL_MAX_CANDIDATES` defaults to `10` and is capped at `50`.
 - `SELF_HEAL_MAX_TEXT_LENGTH` defaults to `120` and is capped at `500`.
 - `SELF_HEAL_ALLOWED_ATTRIBUTES` defaults to `data-testid,data-test,id,name,aria-label,placeholder,title,role,type`.
-- `SELF_HEAL_REGISTRY_MODE` accepts `off`, `read`, or `write_pending`; current runtime SAT uses read-only history scaffolding and does not write registry records.
+- `SELF_HEAL_REGISTRY_MODE` accepts `off`, `read`, or `write_pending`; current runtime SAT reads active selector records and candidate history when a registry runtime is configured, but does not write registry records.
+- `SELF_HEAL_REGISTRY_REQUIRED=true` opts into required registry resolution; otherwise read mode is opportunistic when Redis configuration is present.
+- `SELF_HEAL_REGISTRY_NAMESPACE` overrides the active selector namespace; default is `selector-registry`.
 - `SELF_HEAL_PROMOTION_MODE` accepts `manual` or `ci_acknowledged`; promotion workflows remain manual.
 
 DOM snapshots are captured inside the browser through `page.evaluate` and serialized as compact summaries:
@@ -35,9 +37,13 @@ DOM snapshots are captured inside the browser through `page.evaluate` and serial
 - input values are not captured by default.
 - text is whitespace-normalized and capped by `SELF_HEAL_MAX_TEXT_LENGTH`.
 
-SAT candidate sources include current heuristic suggestions plus DOM-backed `getByTestId`, role/name, label, text, and bounded CSS fallback candidates. Candidate IDs are deterministic:
+SAT candidate sources include current heuristic suggestions, DOM-backed `getByTestId`, role/name, label, text, bounded CSS fallback candidates, and registry-backed selector candidates. Candidate IDs are deterministic:
 
 `<pageObjectName>::<actionType>::<failedTargetHash>::<strategy>::<locatorHash>`
+
+When action metadata supplies `selectorId`, SAT emits v2 candidate IDs with a stable selector hash:
+
+`v2::<pageObjectName>::<actionType>::<selectorIdHash>::<strategy>::<locatorHash>`
 
 ## Guarded Safety Policy
 

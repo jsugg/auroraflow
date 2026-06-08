@@ -264,10 +264,7 @@
           "$ref": "#/$defs/nonNegativeInteger"
         },
         "observations": {
-          "type": "array",
-          "items": {
-            "type": "string"
-          }
+          "$ref": "#/$defs/nonNegativeInteger"
         },
         "warnings": {
           "type": "array",

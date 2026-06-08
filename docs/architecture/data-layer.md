@@ -22,6 +22,9 @@ This document defines the current Redis-backed data layer primitives available i
   - large-registry listing via cursor key scans plus bounded batched payload reads.
 - `src/data/selectors/redisSelectorStore.ts`
   - Redis-backed `SelectorStore` adapter with TTL and compare-and-set support.
+- `src/framework/selfHealing/registryRuntime.ts`
+  - runtime adapter that exposes active selectors, candidate history, and pending promotion repositories to SAT without coupling analyzer code to Redis.
+  - read-mode resolver stays opportunistic unless Redis environment variables are present or `SELF_HEAL_REGISTRY_REQUIRED=true`.
 
 ## Environment Variables
 
@@ -37,6 +40,8 @@ This document defines the current Redis-backed data layer primitives available i
 - `AURORAFLOW_REDIS_BASE_BACKOFF_MS` (default: `50`)
 - `AURORAFLOW_REDIS_MAX_BACKOFF_MS` (default: `2000`)
 - `AURORAFLOW_REDIS_KEY_PREFIX` (default: `auroraflow`)
+- `SELF_HEAL_REGISTRY_REQUIRED` (default: `false`): require registry runtime resolution for SAT reads.
+- `SELF_HEAL_REGISTRY_NAMESPACE` (default: `selector-registry`): active selector namespace used by SAT registry runtime adapters.
 
 ## Usage Example
 

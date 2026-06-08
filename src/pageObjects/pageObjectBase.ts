@@ -4,12 +4,18 @@ import { Logger, createChildLogger } from '../utils/logger';
 import { analyzeSelfHealingFailure } from '../framework/selfHealing/analyzer';
 import { resolveSelfHealingConfig } from '../framework/selfHealing/config';
 import { captureFailureEvent } from '../framework/selfHealing/failureCapture';
+import { resolveSelfHealingRegistryRuntime } from '../framework/selfHealing/registryRuntime';
 import { generateRankedLocatorSuggestions } from '../framework/selfHealing/suggestionEngine';
 import {
   evaluateGuardedSuggestionsDryRun,
   resolveLocatorExpression,
 } from '../framework/selfHealing/guardedValidation';
-import type { GuardedAutoHealSummary, SelfHealingActionType } from '../framework/selfHealing/types';
+import type {
+  GuardedAutoHealSummary,
+  SelfHealingActionType,
+  SelfHealingConfig,
+} from '../framework/selfHealing/types';
+import type { SelfHealingRegistryRuntime } from '../framework/selfHealing/registryContracts';
 import { resolveCorrelationIdentifiers } from '../framework/observability/correlation';
 import {
   SPAN_NAMES,
@@ -27,10 +33,6 @@ export interface NavigationOptions {
   timeout?: number;
 }
 
-export interface ActionOptions {
-  timeout?: number;
-}
-
 export interface ActionContext {
   type: SelfHealingActionType;
   target?: string;
@@ -38,6 +40,10 @@ export interface ActionContext {
   expectedRole?: string;
   expectedName?: string;
   selectorId?: string;
+}
+
+export interface ActionOptions extends Omit<ActionContext, 'target' | 'type'> {
+  timeout?: number;
 }
 
 type GuardedAutoHealAction<T> = (acceptedLocator: string) => Promise<T>;
@@ -72,7 +78,7 @@ function normalizeActionOptions(options: ActionOptions, fieldName: string): Acti
     validateBoundedInteger(options.timeout, fieldName, 1, MAX_ACTION_TIMEOUT_MS);
   }
 
-  return { ...options };
+  return options.timeout === undefined ? {} : { timeout: options.timeout };
 }
 
 function normalizeNavigationOptions(options: NavigationOptions): NavigationOptions {
@@ -87,6 +93,21 @@ function normalizeNavigationOptions(options: NavigationOptions): NavigationOptio
   }
 
   return { ...options };
+}
+
+function actionContextFor(
+  type: SelfHealingActionType,
+  target: string,
+  metadata: ActionOptions = {},
+): ActionContext {
+  return {
+    type,
+    target,
+    targetAlias: metadata.targetAlias,
+    expectedRole: metadata.expectedRole,
+    expectedName: metadata.expectedName,
+    selectorId: metadata.selectorId,
+  };
 }
 
 export class PageActionError extends Error {
@@ -168,6 +189,12 @@ export abstract class PageObjectBase {
     });
   }
 
+  protected resolveRegistryRuntime(
+    config: SelfHealingConfig,
+  ): SelfHealingRegistryRuntime | undefined {
+    return resolveSelfHealingRegistryRuntime(process.env, config);
+  }
+
   private async safeActionWithTelemetry<T>({
     action,
     successMessage,
@@ -220,6 +247,7 @@ export abstract class PageObjectBase {
 
       const selfHealingConfig = resolveSelfHealingConfig(process.env);
       span.setAttribute('auroraflow.self_heal.mode', selfHealingConfig.mode);
+      const registryRuntime = this.resolveRegistryRuntime(selfHealingConfig);
       const rankedSuggestions = generateRankedLocatorSuggestions({
         actionType: actionContext.type,
         failedTarget: actionContext.target,
@@ -242,20 +270,38 @@ export abstract class PageObjectBase {
           action: failureActionContext,
           currentUrl,
           existingSuggestions: rankedSuggestions,
+          registryRuntime,
         });
+        if (selfHealingAnalysis.sat) {
+          span.setAttribute(
+            'auroraflow.self_heal.sat.candidate_count',
+            selfHealingAnalysis.sat.candidates.length,
+          );
+          span.setAttribute(
+            'auroraflow.self_heal.registry.history_loaded_candidates',
+            selfHealingAnalysis.sat.history.loadedCandidates,
+          );
+          span.setAttribute(
+            'auroraflow.self_heal.registry.warning_count',
+            selfHealingAnalysis.sat.history.warnings.length,
+          );
+        }
       } catch (analysisError: unknown) {
         this.logger.error('Failed to analyze self-healing failure.', { analysisError });
       }
       let guardedAutoHealResult: T | undefined;
 
       if (selfHealingConfig.mode === 'guarded') {
+        const satCandidates = selfHealingAnalysis?.sat?.candidates ?? [];
+        const guardedSuggestions = satCandidates.length > 0 ? satCandidates : rankedSuggestions;
         guardedValidation = await evaluateGuardedSuggestionsDryRun({
           page: this.page,
           actionType: actionContext.type,
           minConfidence: selfHealingConfig.minConfidence,
-          suggestions: rankedSuggestions,
+          suggestions: guardedSuggestions,
           currentUrl,
           safetyPolicy: selfHealingConfig.safetyPolicy,
+          maxCandidates: selfHealingConfig.sat.maxCandidates,
         });
         const acceptedCandidate = guardedValidation.candidates.find(
           (candidate) => candidate.locator === guardedValidation?.acceptedLocator,
@@ -477,7 +523,7 @@ export abstract class PageObjectBase {
       () => this.page.click(selector, actionOptions),
       `Clicked on selector: ${selector}`,
       `Error clicking on selector ${selector}`,
-      { type: 'click', target: selector },
+      actionContextFor('click', selector, options),
       async (acceptedLocator) => {
         const locator = this.resolveGuardedLocator(acceptedLocator);
         await locator.first().click(actionOptions);
@@ -497,7 +543,7 @@ export abstract class PageObjectBase {
       },
       `Clicked on visible selector: ${selector}`,
       `Error clicking on visible selector ${selector}`,
-      { type: 'click', target: selector },
+      actionContextFor('click', selector, options),
       async (acceptedLocator) => {
         const locator = this.resolveGuardedLocator(acceptedLocator).first();
         await locator.waitFor(waitOptions);
@@ -517,7 +563,7 @@ export abstract class PageObjectBase {
       () => this.page.fill(selector, text, actionOptions),
       `Typed text in selector: ${selector}`,
       `Error typing in selector ${selector}`,
-      { type: 'type', target: selector },
+      actionContextFor('type', selector, options),
       async (acceptedLocator) => {
         const locator = this.resolveGuardedLocator(acceptedLocator);
         await locator.first().fill(text, actionOptions);
@@ -533,7 +579,7 @@ export abstract class PageObjectBase {
       () => this.page.textContent(selector, actionOptions),
       `Retrieved text from selector: ${selector}`,
       `Error retrieving text from selector ${selector}`,
-      { type: 'read', target: selector },
+      actionContextFor('read', selector, options),
       async (acceptedLocator) => {
         const locator = this.resolveGuardedLocator(acceptedLocator);
         return locator.first().textContent(actionOptions);
@@ -551,7 +597,7 @@ export abstract class PageObjectBase {
       () => this.page.waitForSelector(selector, actionOptions),
       `Waited for selector: ${selector}`,
       `Error waiting for selector ${selector}`,
-      { type: 'wait', target: selector },
+      actionContextFor('wait', selector, options),
       async (acceptedLocator) => {
         const locator = this.resolveGuardedLocator(acceptedLocator).first();
         await locator.waitFor({ state: 'attached', timeout: actionOptions.timeout });
