@@ -48,7 +48,7 @@
       "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/ratio"
     },
     "status": {
-      "enum": ["pending", "approved", "rejected", "rolled_back"]
+      "enum": ["pending", "approved", "applied", "rejected", "conflict", "rolled_back"]
     },
     "requestedAt": {
       "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
@@ -70,6 +70,39 @@
     },
     "acknowledged": {
       "type": "boolean"
+    },
+    "reviewedBy": {
+      "type": "string"
+    },
+    "reviewedAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "reviewReason": {
+      "type": "string"
+    },
+    "conflictReason": {
+      "type": "string"
+    },
+    "appliedAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "appliedSelectorVersion": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "previousLocator": {
+      "type": "string"
+    },
+    "previousConfidence": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/ratio"
+    },
+    "previousStrategy": {
+      "type": "string"
+    },
+    "previousNotes": {
+      "type": "string"
+    },
+    "rolledBackAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
     }
   }
 }

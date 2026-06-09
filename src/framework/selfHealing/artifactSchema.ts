@@ -18,7 +18,9 @@ export class SelfHealingArtifactSchemaError extends Error {
 const PENDING_PROMOTION_STATUSES: readonly PendingSelectorPromotionStatus[] = [
   'pending',
   'approved',
+  'applied',
   'rejected',
+  'conflict',
   'rolled_back',
 ];
 const SELF_HEALING_ACTION_TYPES: readonly SelfHealingActionType[] = [
@@ -199,6 +201,7 @@ export function parseSelectorCandidateHistory(raw: unknown): SelectorCandidateHi
     guardedApplyFailed: readNonNegativeInteger(history, 'guardedApplyFailed', 'history'),
     promoted: readNonNegativeInteger(history, 'promoted', 'history'),
     rejected: readNonNegativeInteger(history, 'rejected', 'history'),
+    rolledBack: readNonNegativeInteger(history, 'rolledBack', 'history'),
     lastSeenAt: readOptionalString(history, 'lastSeenAt', 'history'),
     lastSuccessAt: readOptionalString(history, 'lastSuccessAt', 'history'),
     expiresAt: readOptionalString(history, 'expiresAt', 'history'),
@@ -215,7 +218,7 @@ export function parsePendingSelectorPromotion(raw: unknown): PendingSelectorProm
   const status = readOptionalString(promotion, 'status', 'promotion') ?? 'pending';
   if (!isPendingPromotionStatus(status)) {
     throw new SelfHealingArtifactSchemaError(
-      'promotion.status must be pending, approved, rejected, or rolled_back.',
+      'promotion.status must be pending, approved, applied, rejected, conflict, or rolled_back.',
     );
   }
   const actionType = readOptionalString(promotion, 'actionType', 'promotion');
@@ -251,6 +254,21 @@ export function parsePendingSelectorPromotion(raw: unknown): PendingSelectorProm
       promotion.acknowledged === undefined
         ? status !== 'pending'
         : readBoolean(promotion, 'acknowledged', 'promotion'),
+    reviewedBy: readOptionalString(promotion, 'reviewedBy', 'promotion'),
+    reviewedAt: readOptionalString(promotion, 'reviewedAt', 'promotion'),
+    reviewReason: readOptionalString(promotion, 'reviewReason', 'promotion'),
+    conflictReason: readOptionalString(promotion, 'conflictReason', 'promotion'),
+    appliedAt: readOptionalString(promotion, 'appliedAt', 'promotion'),
+    appliedSelectorVersion: readOptionalNonNegativeInteger(
+      promotion,
+      'appliedSelectorVersion',
+      'promotion',
+    ),
+    previousLocator: readOptionalString(promotion, 'previousLocator', 'promotion'),
+    previousConfidence: readOptionalNumber(promotion, 'previousConfidence', 'promotion'),
+    previousStrategy: readOptionalString(promotion, 'previousStrategy', 'promotion'),
+    previousNotes: readOptionalString(promotion, 'previousNotes', 'promotion'),
+    rolledBackAt: readOptionalString(promotion, 'rolledBackAt', 'promotion'),
   };
 }
 

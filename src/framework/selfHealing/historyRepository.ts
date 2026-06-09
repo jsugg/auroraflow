@@ -11,6 +11,7 @@ import type {
 import type { SelectorCandidateHistory } from './types';
 
 export const DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS = 90 * 24 * 60 * 60;
+const MAX_REDIS_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 export interface StoreSelectorCandidateHistoryRepositoryOptions {
   store: SelectorStore;
@@ -22,7 +23,7 @@ function normalizeTtlSeconds(ttlSeconds: number): number {
   if (!Number.isInteger(ttlSeconds) || ttlSeconds <= 0) {
     throw new Error('selector history ttlSeconds must be a positive integer.');
   }
-  return ttlSeconds;
+  return Math.min(ttlSeconds, MAX_REDIS_TTL_SECONDS);
 }
 
 function addSeconds(isoTimestamp: string, seconds: number): string {
@@ -42,7 +43,16 @@ function emptyHistory(candidateId: string): SelectorCandidateHistory {
     guardedApplyFailed: 0,
     promoted: 0,
     rejected: 0,
+    rolledBack: 0,
   };
+}
+
+export interface SelectorCandidateHistoryOutcomeUpdate {
+  candidateId: string;
+  observedAt: string;
+  promoted?: number;
+  rejected?: number;
+  rolledBack?: number;
 }
 
 /** Store-backed SAT candidate-history repository with bounded TTL writes. */
@@ -118,6 +128,31 @@ export class StoreSelectorCandidateHistoryRepository implements SelectorCandidat
       lastSeenAt: observation.observedAt,
       lastSuccessAt: guardedApplySucceeded ? observation.observedAt : existing.lastSuccessAt,
       expiresAt: addSeconds(observation.observedAt, this.ttlSeconds),
+    };
+
+    await this.store.set(this.keyFor(candidateId), JSON.stringify(updated), {
+      ttlSeconds: this.ttlSeconds,
+    });
+    return updated;
+  }
+
+  public async recordOutcome(
+    outcome: SelectorCandidateHistoryOutcomeUpdate,
+  ): Promise<SelectorCandidateHistory> {
+    const candidateId = outcome.candidateId.trim();
+    if (!candidateId) {
+      throw new Error('history outcome candidateId must be non-empty.');
+    }
+
+    const existing = (await this.get(candidateId)) ?? emptyHistory(candidateId);
+    const updated: SelectorCandidateHistory = {
+      ...existing,
+      candidateId,
+      promoted: existing.promoted + Math.max(0, Math.floor(outcome.promoted ?? 0)),
+      rejected: existing.rejected + Math.max(0, Math.floor(outcome.rejected ?? 0)),
+      rolledBack: existing.rolledBack + Math.max(0, Math.floor(outcome.rolledBack ?? 0)),
+      lastSeenAt: outcome.observedAt,
+      expiresAt: addSeconds(outcome.observedAt, this.ttlSeconds),
     };
 
     await this.store.set(this.keyFor(candidateId), JSON.stringify(updated), {

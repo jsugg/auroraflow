@@ -111,6 +111,7 @@ describe('rankSelfHealingCandidates', () => {
       guardedApplyFailed: 0,
       promoted: 1,
       rejected: 0,
+      rolledBack: 0,
     };
 
     const ranked = rankSelfHealingCandidates({

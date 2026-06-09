@@ -198,6 +198,17 @@ export {
 } from './framework/selfHealing/promotionRepository';
 
 export {
+  SelfHealingPromotionWorkflow,
+  type ApprovePromotionInput,
+  type PromotionWorkflowListQuery,
+  type PromotionWorkflowListResult,
+  type PromotionWorkflowResult,
+  type RejectPromotionInput,
+  type RollbackPromotionInput,
+  type SelfHealingPromotionWorkflowOptions,
+} from './framework/selfHealing/promotionWorkflow';
+
+export {
   DEFAULT_PENDING_SELECTOR_PROMOTION_TTL_SECONDS,
   persistSelfHealingRegistryTelemetry,
   type PersistSelfHealingRegistryTelemetryInput,

@@ -172,6 +172,7 @@ describe('self-healing artifact JSON Schemas', () => {
       guardedApplyFailed: 1,
       promoted: 1,
       rejected: 0,
+      rolledBack: 0,
       lastSeenAt: '2026-06-05T12:00:00.000Z',
       lastSuccessAt: '2026-06-05T12:00:00.000Z',
       expiresAt: '2026-09-03T12:00:00.000Z',

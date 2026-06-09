@@ -365,6 +365,7 @@ describe('PageObjectBase self-healing integration', () => {
       guardedApplyFailed: 0,
       promoted: 0,
       rejected: 0,
+      rolledBack: 0,
     });
     const upsertPromotion = vi.fn().mockImplementation(async (promotion) => promotion);
     const runtime: SelfHealingRegistryRuntime = {

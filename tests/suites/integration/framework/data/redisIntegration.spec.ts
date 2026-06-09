@@ -7,6 +7,7 @@ import {
 import { createRedisSelectorStore } from '../../../../../src/data/selectors/redisSelectorStore';
 import { StoreSelectorCandidateHistoryRepository } from '../../../../../src/framework/selfHealing/historyRepository';
 import { StorePendingSelectorPromotionRepository } from '../../../../../src/framework/selfHealing/promotionRepository';
+import { SelfHealingPromotionWorkflow } from '../../../../../src/framework/selfHealing/promotionWorkflow';
 import { RedisClient } from '../../../../../src/utils/redisClient';
 
 interface IntegrationRuntime {
@@ -322,5 +323,132 @@ describe('SelectorRegistryRepository integration', () => {
     await new Promise((resolve) => setTimeout(resolve, 1_200));
     await expect(historyRepository.get('candidate-int')).resolves.toBeNull();
     await expect(promotionRepository.get('evt-int')).resolves.toBeNull();
+  });
+
+  it('approves, rejects, conflicts, and rolls back reviewed promotions', async (context) => {
+    const client = requireClient(context);
+    const store = createRedisSelectorStore(client);
+    const workflow = new SelfHealingPromotionWorkflow({
+      store,
+      activeNamespace: 'selector-registry-review-int',
+      now: () => new Date('2026-06-08T14:00:00.000Z'),
+    });
+    const repository = new SelectorRegistryRepository({
+      store,
+      namespace: 'selector-registry-review-int',
+      now: () => new Date('2026-06-08T14:00:00.000Z'),
+    });
+    const promotionRepository = new StorePendingSelectorPromotionRepository({
+      store,
+      activeNamespace: 'selector-registry-review-int',
+    });
+    const historyRepository = new StoreSelectorCandidateHistoryRepository({
+      store,
+      activeNamespace: 'selector-registry-review-int',
+    });
+
+    await repository.upsert(
+      {
+        id: 'checkout.submit',
+        pageObjectName: 'CheckoutPage',
+        actionType: 'click',
+        locator: '#submit',
+        confidence: 0.42,
+      },
+      { expectedVersion: null },
+    );
+    await promotionRepository.upsert({
+      promotionId: 'promotion:evt-int-approve:candidate',
+      eventId: 'evt-int-approve',
+      candidateId: 'candidate-approve',
+      selectorId: 'checkout.submit',
+      proposedLocator: '#submit-primary',
+      locator: '#submit-primary',
+      baseSelectorVersion: 1,
+      confidence: 0.91,
+      status: 'pending',
+      requestedAt: '2026-06-08T13:30:00.000Z',
+      acknowledged: false,
+    });
+
+    const applied = await workflow.approve({
+      eventId: 'evt-int-approve',
+      reviewer: 'ci-reviewer',
+    });
+
+    expect(applied.status).toBe('applied');
+    await expect(repository.get('checkout.submit')).resolves.toMatchObject({
+      locator: '#submit-primary',
+      version: 2,
+    });
+    await expect(historyRepository.get('candidate-approve')).resolves.toMatchObject({
+      promoted: 1,
+      rejected: 0,
+      rolledBack: 0,
+    });
+
+    await promotionRepository.upsert({
+      promotionId: 'promotion:evt-int-reject:candidate',
+      eventId: 'evt-int-reject',
+      candidateId: 'candidate-reject',
+      selectorId: 'checkout.submit',
+      proposedLocator: '#submit-secondary',
+      locator: '#submit-secondary',
+      baseSelectorVersion: 2,
+      confidence: 0.74,
+      status: 'pending',
+      requestedAt: '2026-06-08T13:31:00.000Z',
+      acknowledged: false,
+    });
+    const rejected = await workflow.reject({
+      eventId: 'evt-int-reject',
+      reviewer: 'ci-reviewer',
+      reason: 'False positive candidate.',
+    });
+
+    expect(rejected.status).toBe('rejected');
+    await expect(historyRepository.get('candidate-reject')).resolves.toMatchObject({
+      rejected: 1,
+      rolledBack: 0,
+    });
+
+    await promotionRepository.upsert({
+      promotionId: 'promotion:evt-int-conflict:candidate',
+      eventId: 'evt-int-conflict',
+      candidateId: 'candidate-conflict',
+      selectorId: 'checkout.submit',
+      proposedLocator: '#submit-tertiary',
+      locator: '#submit-tertiary',
+      baseSelectorVersion: 1,
+      confidence: 0.88,
+      status: 'pending',
+      requestedAt: '2026-06-08T13:32:00.000Z',
+      acknowledged: false,
+    });
+    const conflicted = await workflow.approve({
+      eventId: 'evt-int-conflict',
+      reviewer: 'ci-reviewer',
+    });
+
+    expect(conflicted.status).toBe('conflict');
+    await expect(promotionRepository.get('evt-int-conflict')).resolves.toMatchObject({
+      status: 'conflict',
+    });
+
+    const rolledBack = await workflow.rollback({
+      eventId: 'evt-int-approve',
+      reviewer: 'ci-reviewer',
+      reason: 'Checkout regression.',
+    });
+
+    expect(rolledBack.status).toBe('rolled_back');
+    await expect(repository.get('checkout.submit')).resolves.toMatchObject({
+      locator: '#submit',
+      version: 3,
+    });
+    await expect(historyRepository.get('candidate-approve')).resolves.toMatchObject({
+      promoted: 1,
+      rolledBack: 1,
+    });
   });
 });

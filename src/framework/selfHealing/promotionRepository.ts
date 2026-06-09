@@ -78,6 +78,30 @@ export class StorePendingSelectorPromotionRepository implements PendingSelectorP
     return promotions;
   }
 
+  public async findByPromotionId(promotionId: string): Promise<PendingSelectorPromotion | null> {
+    const normalizedPromotionId = promotionId.trim();
+    if (!normalizedPromotionId) {
+      throw new Error('promotionId must be non-empty.');
+    }
+
+    const keys = await this.listPromotionKeys(Number.POSITIVE_INFINITY);
+    const payloads = this.store.getMany
+      ? await this.store.getMany(keys)
+      : await Promise.all(keys.map((key) => this.store.get(key)));
+
+    for (const payload of payloads) {
+      if (payload === null || payload === undefined) {
+        continue;
+      }
+      const promotion = parsePendingSelectorPromotion(JSON.parse(payload) as unknown);
+      if (promotion.promotionId === normalizedPromotionId) {
+        return promotion;
+      }
+    }
+
+    return null;
+  }
+
   public async upsert(promotion: PendingSelectorPromotion): Promise<PendingSelectorPromotion> {
     const ttlSeconds =
       promotion.expiresAt === undefined ? undefined : ttlSecondsUntil(promotion.expiresAt);
@@ -89,8 +113,14 @@ export class StorePendingSelectorPromotionRepository implements PendingSelectorP
     return promotion;
   }
 
+  public async delete(eventId: string): Promise<number> {
+    return this.store.del(this.keyFor(eventId));
+  }
+
   private async listPromotionKeys(limit = 100): Promise<string[]> {
-    const boundedLimit = Number.isFinite(limit) ? Math.max(1, Math.floor(limit)) : 100;
+    const boundedLimit = Number.isFinite(limit)
+      ? Math.max(1, Math.floor(limit))
+      : Number.MAX_SAFE_INTEGER;
     const pattern = `${this.namespace}:*`;
     const keys: string[] = [];
     if (this.store.scanKeys) {
