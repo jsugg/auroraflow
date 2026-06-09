@@ -22,7 +22,7 @@ AuroraFlow is a serious framework foundation, not a complete autonomous testing 
 
 Not implemented yet:
 
-- Reviewed selector approval/rejection/rollback workflows or source-code rewrites.
+- Source-code rewrites or blind autonomous selector mutation.
 - A Dockerized SAT service or a Dockerized framework service.
 - Production-owned observability deployment; production manifests are references that require environment-specific ownership, credentials, storage, DNS, TLS, and network controls.
 
@@ -32,9 +32,9 @@ Not implemented yet:
 | --- | --- | --- | --- |
 | Package surface | Root package metadata, declaration output, curated publish files, and broad typed exports are contract-tested. | The published artifact is limited to `dist`, `README.md`, and `LICENSE`; repository examples and scripts are not part of the package API. | `package.json`, `src/index.ts`, `tsconfig.build.json`, `tests/suites/contracts/package/packageSurface.contract.spec.ts` |
 | Page objects | `PageObjectBase` wraps navigation, click, type, read, wait, screenshot, and close actions with initialization, logging, screenshots, self-healing analysis, and telemetry metrics. `PageFactory` caches page object instances. | Protected helpers that call Playwright directly should be reviewed before treating them as instrumented public actions. | `src/pageObjects/pageObjectBase.ts`, `src/helpers/pageFactory.ts` |
-| Self-healing diagnostics | `off`, `suggest`, and `guarded` modes are parsed and enforced. Failure capture can include ranked suggestions, DOM-derived candidates, registry-backed history, guarded validation, one guarded retry for click/type/read/wait, history observations, and reviewable pending promotion records. | Pending promotions are review records only. Reviewed approval, rejection, rollback, and active selector mutation workflows are not implemented yet. | `src/framework/selfHealing/config.ts`, `src/framework/selfHealing/analyzer.ts`, `src/framework/selfHealing/guardedValidation.ts`, `docs/architecture/self-healing.md` |
-| Redis data layer | Runtime config validation, namespaced keys, bounded retry with jitter, SCAN-based listing, batched reads, selector record validation, CAS, page/action indexes, TTL-capable stores, SAT history records, pending promotions, and Testcontainers coverage are implemented. | Active selector updates still require future reviewed workflows; no source-code rewrites occur. | `src/utils/redisClient.ts`, `src/data/selectors/selectorRegistry.ts`, `docs/architecture/data-layer.md` |
-| Observability | The telemetry facade is no-op by default, can export OpenTelemetry spans/metrics when enabled, and keeps JSON/Markdown report artifacts as deterministic merge-gate evidence. Local Collector, Prometheus, Grafana, Jaeger, Elasticsearch, Logstash, and Kibana configuration exists. | Dashboards and alert rules are starter operational assets; review their query semantics against emitted attributes before using them as production SLO sources. | `src/framework/observability/*`, `docs/operations/observability-contract.md`, `docs/architecture/observability-stack.md`, `observability/README.md` |
+| Self-healing diagnostics | `off`, `suggest`, and `guarded` modes are parsed and enforced. Failure capture can include ranked suggestions, DOM-derived candidates, registry-backed history, guarded validation, one guarded retry for click/type/read/wait, history observations, reviewable pending promotion records, and audited approve/reject/rollback workflows. | Reviewed promotion scope is registry mutation only; no source-code rewrites or blind unreviewed selector mutation occur. | `src/framework/selfHealing/config.ts`, `src/framework/selfHealing/analyzer.ts`, `src/framework/selfHealing/guardedValidation.ts`, `src/framework/selfHealing/promotionWorkflow.ts`, `docs/architecture/self-healing.md` |
+| Redis data layer | Runtime config validation, namespaced keys, bounded retry with jitter, SCAN-based listing, batched reads, selector record validation, CAS, page/action indexes, TTL-capable stores, SAT history records, pending promotions, audited selector updates, and Testcontainers coverage are implemented. | Production rollout still needs operator-owned Redis retention/backup policy and review process controls. | `src/utils/redisClient.ts`, `src/data/selectors/selectorRegistry.ts`, `docs/architecture/data-layer.md` |
+| Observability | The telemetry facade is no-op by default, can export OpenTelemetry spans/metrics when enabled, and keeps JSON/Markdown report artifacts as deterministic merge-gate evidence. Local Collector, Prometheus, Grafana, Jaeger, Elasticsearch, Logstash, and Kibana configuration exists. Dashboard and alert labels are asserted against live Prometheus label/series/query/rule snapshots. | Production deployment remains reference-only and requires environment-specific ownership, credentials, storage, DNS, TLS, capacity, and network controls. | `src/framework/observability/*`, `scripts/observability-live-export-assert.ts`, `docs/operations/observability-contract.md`, `docs/architecture/observability-stack.md`, `observability/README.md` |
 | CI and security | Pull requests run quality and security gates. Example and smoke lanes are path-filtered. The full E2E matrix runs on `main`, schedule, and manual dispatch. | Some optional observability and remote-export paths need repository variables/secrets and enough runner capacity. | `.github/workflows/quality.yml`, `.github/workflows/examples.yml`, `.github/workflows/security.yml`, `.github/workflows/ci.yml` |
 
 ## Getting started
@@ -162,6 +162,12 @@ OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318 \
 npm run test:smoke
 ```
 
+Assert exported Prometheus labels, dashboard expressions, and alert rules against the local stack:
+
+```bash
+npm run observability:live-assert
+```
+
 Local tools:
 
 - Grafana: <http://localhost:3000>
@@ -212,10 +218,9 @@ scripts/                   Report generation, workflow linting, governance, and 
 
 The next meaningful maturity steps are:
 
-1. Wire SAT analysis to selector registry history and reviewed promotion workflows.
-2. Add promotion governance that records pending selector changes without mutating application tests silently.
-3. Harden live dashboard and alert query semantics against emitted metric attributes.
-4. Continue expanding package-surface contracts and example coverage before widening the public API.
+1. Persist cross-run flakiness, SLO, and governance trends.
+2. Expand API-grade getting-started, authoring, configuration, and operations docs.
+3. Continue package-surface contracts and example coverage before widening the public API.
 
 ## Contributing
 

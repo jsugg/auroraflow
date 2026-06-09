@@ -22,8 +22,8 @@
       "id": 1,
       "targets": [
         {
-          "expr": "sum(rate(auroraflow_test_cases_total[5m])) by (project, shard)",
-          "legendFormat": "{{project}} {{shard}}",
+          "expr": "sum(rate(auroraflow_test_cases_total[5m])) by (auroraflow_project, auroraflow_shard)",
+          "legendFormat": "{{auroraflow_project}} {{auroraflow_shard}}",
           "refId": "A"
         }
       ],
@@ -48,8 +48,8 @@
       "id": 2,
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(auroraflow_test_case_duration_ms_bucket[5m])) by (le, project, shard))",
-          "legendFormat": "{{project}} {{shard}} p95",
+          "expr": "histogram_quantile(0.95, sum(rate(auroraflow_test_case_duration_ms_milliseconds_bucket[5m])) by (le, auroraflow_project, auroraflow_shard))",
+          "legendFormat": "{{auroraflow_project}} {{auroraflow_shard}} p95",
           "refId": "A"
         }
       ],

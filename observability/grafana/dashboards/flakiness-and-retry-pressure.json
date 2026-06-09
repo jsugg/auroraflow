@@ -22,8 +22,8 @@
       "id": 1,
       "targets": [
         {
-          "expr": "sum(increase(auroraflow_flaky_tests_total[1h])) by (project)",
-          "legendFormat": "{{project}}",
+          "expr": "sum(increase(auroraflow_flaky_tests_total[1h])) by (auroraflow_project)",
+          "legendFormat": "{{auroraflow_project}}",
           "refId": "A"
         }
       ],
@@ -48,8 +48,8 @@
       "id": 2,
       "targets": [
         {
-          "expr": "sum(increase(auroraflow_retry_failures_total[1h])) by (project)",
-          "legendFormat": "{{project}}",
+          "expr": "sum(increase(auroraflow_retry_failures_total[1h])) by (auroraflow_project)",
+          "legendFormat": "{{auroraflow_project}}",
           "refId": "A"
         }
       ],

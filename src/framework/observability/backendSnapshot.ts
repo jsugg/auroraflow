@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { METRIC_NAMES } from './metricNames';
 
 export interface ObservabilitySnapshotEndpoints {
   readonly elasticsearchUrl: string;
@@ -42,6 +43,42 @@ type FetchFunction = (input: string, init?: RequestInit) => Promise<Response>;
 const DEFAULT_OUTPUT_DIR = path.join('observability-output', 'snapshot');
 const DEFAULT_TIMEOUT_MS = 5_000;
 const MAX_TIMEOUT_MS = 60_000;
+const PROMETHEUS_SERIES_TARGETS = [
+  {
+    fileName: 'prometheus-series-auroraflow-test-cases.json',
+    metricName: METRIC_NAMES.testCasesTotal,
+  },
+  {
+    fileName: 'prometheus-series-auroraflow-page-actions.json',
+    metricName: METRIC_NAMES.pageActionsTotal,
+  },
+  {
+    fileName: 'prometheus-series-auroraflow-guarded-auto-heal.json',
+    metricName: METRIC_NAMES.guardedAutoHealTotal,
+  },
+  {
+    fileName: 'prometheus-series-auroraflow-redis-operations.json',
+    metricName: METRIC_NAMES.redisOperationsTotal,
+  },
+] as const;
+const PROMETHEUS_QUERY_TARGETS = [
+  {
+    fileName: 'prometheus-query-auroraflow-test-cases.json',
+    query: `sum by (auroraflow_test_status) (${METRIC_NAMES.testCasesTotal})`,
+  },
+  {
+    fileName: 'prometheus-query-auroraflow-page-actions.json',
+    query: `sum by (auroraflow_action_status) (${METRIC_NAMES.pageActionsTotal})`,
+  },
+  {
+    fileName: 'prometheus-query-auroraflow-guarded-auto-heal.json',
+    query: `sum by (auroraflow_self_heal_status) (${METRIC_NAMES.guardedAutoHealTotal})`,
+  },
+  {
+    fileName: 'prometheus-query-auroraflow-redis-operations.json',
+    query: `sum by (auroraflow_redis_operation_status) (${METRIC_NAMES.redisOperationsTotal})`,
+  },
+] as const;
 
 export const DEFAULT_OBSERVABILITY_SNAPSHOT_OPTIONS: ObservabilitySnapshotOptions = {
   allowPartial: false,
@@ -192,6 +229,36 @@ export function buildObservabilitySnapshotTargets(
         `/api/v1/query?query=${encodeURIComponent('auroraflow_test_runs_total')}`,
       ),
     },
+    {
+      backend: 'prometheusUrl',
+      fileName: 'prometheus-labels.json',
+      url: appendPath(options.prometheusUrl, '/api/v1/labels'),
+    },
+    ...PROMETHEUS_SERIES_TARGETS.map(
+      (target): ObservabilitySnapshotTarget => ({
+        backend: 'prometheusUrl',
+        fileName: target.fileName,
+        url: appendPath(
+          options.prometheusUrl,
+          `/api/v1/series?match[]=${encodeURIComponent(target.metricName)}`,
+        ),
+      }),
+    ),
+    {
+      backend: 'prometheusUrl',
+      fileName: 'prometheus-rules.json',
+      url: appendPath(options.prometheusUrl, '/api/v1/rules'),
+    },
+    ...PROMETHEUS_QUERY_TARGETS.map(
+      (target): ObservabilitySnapshotTarget => ({
+        backend: 'prometheusUrl',
+        fileName: target.fileName,
+        url: appendPath(
+          options.prometheusUrl,
+          `/api/v1/query?query=${encodeURIComponent(target.query)}`,
+        ),
+      }),
+    ),
     {
       backend: 'grafanaUrl',
       fileName: 'grafana-health.json',

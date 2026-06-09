@@ -22,8 +22,8 @@
       "id": 1,
       "targets": [
         {
-          "expr": "sum(rate(auroraflow_page_actions_total[5m])) by (action_type, page_object, status)",
-          "legendFormat": "{{page_object}} {{action_type}} {{status}}",
+          "expr": "sum(rate(auroraflow_page_actions_total[5m])) by (auroraflow_action_type, auroraflow_page_object, auroraflow_action_status)",
+          "legendFormat": "{{auroraflow_page_object}} {{auroraflow_action_type}} {{auroraflow_action_status}}",
           "refId": "A"
         }
       ],
@@ -48,8 +48,8 @@
       "id": 2,
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(auroraflow_page_action_duration_ms_bucket[5m])) by (le, action_type))",
-          "legendFormat": "{{action_type}} p95",
+          "expr": "histogram_quantile(0.95, sum(rate(auroraflow_page_action_duration_ms_milliseconds_bucket[5m])) by (le, auroraflow_action_type))",
+          "legendFormat": "{{auroraflow_action_type}} p95",
           "refId": "A"
         }
       ],

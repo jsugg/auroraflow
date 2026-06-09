@@ -3,7 +3,7 @@ groups:
     rules:
       - alert: AuroraFlowPassRateLow
         expr: |
-          sum(rate(auroraflow_test_cases_total{status="passed"}[10m]))
+          sum(rate(auroraflow_test_cases_total{auroraflow_test_status="passed"}[10m]))
             / clamp_min(sum(rate(auroraflow_test_cases_total[10m])), 1) < 0.95
         for: 10m
         labels:
@@ -13,7 +13,7 @@ groups:
 
       - alert: AuroraFlowFailureRateHigh
         expr: |
-          sum(rate(auroraflow_test_cases_total{status="failed"}[10m]))
+          sum(rate(auroraflow_test_cases_total{auroraflow_test_status="failed"}[10m]))
             / clamp_min(sum(rate(auroraflow_test_cases_total[10m])), 1) > 0.05
         for: 10m
         labels:
@@ -39,7 +39,7 @@ groups:
 
       - alert: AuroraFlowGuardedAutoHealFailureRateHigh
         expr: |
-          sum(rate(auroraflow_guarded_auto_heal_total{status="failure"}[30m]))
+          sum(rate(auroraflow_guarded_auto_heal_total{auroraflow_self_heal_status="failed"}[30m]))
             / clamp_min(sum(rate(auroraflow_guarded_auto_heal_total[30m])), 1) > 0.1
         for: 10m
         labels:
@@ -50,7 +50,7 @@ groups:
   - name: auroraflow-operations
     rules:
       - alert: AuroraFlowPageActionLatencyHigh
-        expr: histogram_quantile(0.95, sum(rate(auroraflow_page_action_duration_ms_bucket[10m])) by (le)) > 5000
+        expr: histogram_quantile(0.95, sum(rate(auroraflow_page_action_duration_ms_milliseconds_bucket[10m])) by (le)) > 5000
         for: 10m
         labels:
           severity: warning
@@ -59,7 +59,7 @@ groups:
 
       - alert: AuroraFlowRedisFailureRateHigh
         expr: |
-          sum(rate(auroraflow_redis_operations_total{status="failure"}[10m]))
+          sum(rate(auroraflow_redis_operations_total{auroraflow_redis_operation_status="failed"}[10m]))
             / clamp_min(sum(rate(auroraflow_redis_operations_total[10m])), 1) > 0.05
         for: 10m
         labels:
