@@ -22,8 +22,8 @@
       "id": 1,
       "targets": [
         {
-          "expr": "sum(rate(auroraflow_redis_operations_total[5m])) by (operation, status)",
-          "legendFormat": "{{operation}} {{status}}",
+          "expr": "sum(rate(auroraflow_redis_operations_total[5m])) by (auroraflow_redis_operation, auroraflow_redis_operation_status)",
+          "legendFormat": "{{auroraflow_redis_operation}} {{auroraflow_redis_operation_status}}",
           "refId": "A"
         }
       ],
@@ -48,8 +48,8 @@
       "id": 2,
       "targets": [
         {
-          "expr": "histogram_quantile(0.95, sum(rate(auroraflow_redis_operation_duration_ms_bucket[5m])) by (le, operation))",
-          "legendFormat": "{{operation}} p95",
+          "expr": "histogram_quantile(0.95, sum(rate(auroraflow_redis_operation_duration_ms_milliseconds_bucket[5m])) by (le, auroraflow_redis_operation))",
+          "legendFormat": "{{auroraflow_redis_operation}} p95",
           "refId": "A"
         }
       ],

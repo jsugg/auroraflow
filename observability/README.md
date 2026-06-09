@@ -34,6 +34,14 @@ npm run observability:snapshot
 
 The command writes Prometheus, Grafana, Jaeger, Elasticsearch, and Kibana responses plus a `manifest.json` into `observability-output/snapshot`. Use `-- --allow-partial` to keep successful snapshots when one backend is unavailable.
 
+To assert dashboards and alert rules against real Prometheus labels and status values:
+
+```bash
+npm run observability:live-assert
+```
+
+The command polls Prometheus metric series, validates dashboard/rule label references, and writes `observability-label-snapshot.json`.
+
 ## Files
 
 - `docker-compose.observability.yml` starts the Collector, Prometheus, Grafana, Jaeger, Elasticsearch, Logstash, and Kibana.
@@ -45,6 +53,7 @@ The command writes Prometheus, Grafana, Jaeger, Elasticsearch, and Kibana respon
 - `observability/kibana/saved-objects` provides importable data views for log and self-healing exploration.
 - `observability/production` provides reference manifests for TLS/auth-enabled shared deployments.
 - `scripts/observability-export-snapshot.ts` captures backend health and data-source snapshots into deterministic diagnostic files.
+- `scripts/observability-live-export-assert.ts` verifies Prometheus label/series/query/rule semantics before dashboards or rules are trusted.
 
 ## Environment
 
@@ -92,6 +101,7 @@ The collector-only lane does not start Grafana, Prometheus, Jaeger, Elasticsearc
 Pull-request CI runs the full-stack smoke job for observability-related changes and on `main`. The job sets `AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED=true`, starts the local stack, applies Elasticsearch templates, imports Kibana data views, emits smoke telemetry, and uploads:
 
 - Prometheus target and metric API snapshots.
+- Prometheus label, series, query, and rule snapshots plus `observability-label-snapshot.json`.
 - Grafana health and datasource snapshots.
 - Jaeger trace query output.
 - Elasticsearch health and index snapshots.

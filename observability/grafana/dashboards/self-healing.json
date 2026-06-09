@@ -22,8 +22,8 @@
       "id": 1,
       "targets": [
         {
-          "expr": "sum(rate(auroraflow_self_healing_artifacts_total[5m])) by (mode, action_type)",
-          "legendFormat": "{{mode}} {{action_type}}",
+          "expr": "sum(rate(auroraflow_self_healing_artifacts_total[5m])) by (auroraflow_self_heal_mode, auroraflow_action_type)",
+          "legendFormat": "{{auroraflow_self_heal_mode}} {{auroraflow_action_type}}",
           "refId": "A"
         }
       ],
@@ -48,8 +48,8 @@
       "id": 2,
       "targets": [
         {
-          "expr": "sum(rate(auroraflow_guarded_validation_candidates_total[5m])) by (status, strategy)",
-          "legendFormat": "{{status}} {{strategy}}",
+          "expr": "sum(rate(auroraflow_guarded_validation_candidates_total[5m])) by (auroraflow_self_heal_status, auroraflow_self_heal_strategy)",
+          "legendFormat": "{{auroraflow_self_heal_status}} {{auroraflow_self_heal_strategy}}",
           "refId": "A"
         }
       ],

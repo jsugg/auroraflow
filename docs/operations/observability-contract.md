@@ -70,6 +70,22 @@ Every emitted signal should carry these attributes when the value is known:
 - `auroraflow_redis_operation_duration_ms`
 - `auroraflow_redis_operation_retries_total`
 
+## Prometheus Export Contract
+
+The OpenTelemetry Collector Prometheus exporter normalizes dotted attributes into underscore labels. Dashboards and alert rules must use labels proven by `npm run observability:live-assert`, which writes `observability-label-snapshot.json` from real `/api/v1/labels`, `/api/v1/series`, `/api/v1/query`, and `/api/v1/rules` responses.
+
+Primary normalized labels:
+
+- `auroraflow_test_status`, `auroraflow_project`, `auroraflow_shard`
+- `auroraflow_page_object`, `auroraflow_action_type`, `auroraflow_action_status`
+- `auroraflow_self_heal_mode`, `auroraflow_self_heal_status`, `auroraflow_self_heal_strategy`
+- `auroraflow_redis_operation`, `auroraflow_redis_operation_status`
+- `auroraflow_alert_severity`, `auroraflow_slo_metric`
+
+Status values used by reference rules are `passed`/`failed` for tests, `failed` for guarded auto-heal failures, and `failed` for Redis operation failures. The older `status="failure"` matcher is not part of the emitted AuroraFlow metric contract.
+
+Histogram metric names use the Collector's Prometheus unit suffix. For example, `auroraflow_page_action_duration_ms` is queried as `auroraflow_page_action_duration_ms_milliseconds_bucket` in p95 PromQL.
+
 ## Privacy Rules
 
 Raw selectors, URLs, request bodies, passwords, tokens, and cookies must not be emitted by default. Action spans use `auroraflow.action.target_hash` plus `auroraflow.action.target_kind`; the raw target is present only when `AURORAFLOW_OBSERVABILITY_EXPORT_RAW_SELECTORS=true`.

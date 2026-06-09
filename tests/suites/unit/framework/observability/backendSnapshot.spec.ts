@@ -68,6 +68,16 @@ describe('buildObservabilitySnapshotTargets', () => {
     expect(targets.map((target) => target.fileName)).toEqual([
       'prometheus-targets.json',
       'prometheus-auroraflow-test-runs.json',
+      'prometheus-labels.json',
+      'prometheus-series-auroraflow-test-cases.json',
+      'prometheus-series-auroraflow-page-actions.json',
+      'prometheus-series-auroraflow-guarded-auto-heal.json',
+      'prometheus-series-auroraflow-redis-operations.json',
+      'prometheus-rules.json',
+      'prometheus-query-auroraflow-test-cases.json',
+      'prometheus-query-auroraflow-page-actions.json',
+      'prometheus-query-auroraflow-guarded-auto-heal.json',
+      'prometheus-query-auroraflow-redis-operations.json',
       'grafana-health.json',
       'grafana-datasources.json',
       'jaeger-traces.json',
@@ -84,6 +94,15 @@ describe('buildObservabilitySnapshotTargets', () => {
     expect(
       targets.find((target) => target.fileName === 'prometheus-auroraflow-test-runs.json')?.url,
     ).toContain('/api/v1/query?query=auroraflow_test_runs_total');
+    expect(
+      targets.find((target) => target.fileName === 'prometheus-series-auroraflow-page-actions.json')
+        ?.url,
+    ).toContain('/api/v1/series?match[]=auroraflow_page_actions_total');
+    expect(
+      targets.find(
+        (target) => target.fileName === 'prometheus-query-auroraflow-redis-operations.json',
+      )?.url,
+    ).toContain('auroraflow_redis_operation_status');
   });
 });
 
@@ -105,8 +124,8 @@ describe('collectObservabilitySnapshot', () => {
     });
 
     expect(result.failed).toBe(0);
-    expect(result.succeeded).toBe(9);
-    expect(requestedUrls).toHaveLength(9);
+    expect(result.succeeded).toBe(19);
+    expect(requestedUrls).toHaveLength(19);
     await expect(
       readFile(path.join(outputDir, 'prometheus-targets.json'), 'utf8'),
     ).resolves.toContain('/api/v1/targets');

@@ -22,8 +22,8 @@
       "id": 1,
       "targets": [
         {
-          "expr": "sum(rate(auroraflow_test_cases_total[5m])) by (status)",
-          "legendFormat": "{{status}}",
+          "expr": "sum(rate(auroraflow_test_cases_total[5m])) by (auroraflow_test_status)",
+          "legendFormat": "{{auroraflow_test_status}}",
           "refId": "A"
         }
       ],
@@ -48,8 +48,8 @@
       "id": 2,
       "targets": [
         {
-          "expr": "sum(rate(auroraflow_slo_alert_breaches_total[5m])) by (policy)",
-          "legendFormat": "{{policy}}",
+          "expr": "sum(rate(auroraflow_slo_alert_breaches_total{auroraflow_slo_metric!=\"\"}[5m])) by (auroraflow_alert_severity, auroraflow_slo_metric)",
+          "legendFormat": "{{auroraflow_alert_severity}} {{auroraflow_slo_metric}}",
           "refId": "A"
         }
       ],

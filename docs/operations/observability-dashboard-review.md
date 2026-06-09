@@ -4,6 +4,7 @@ Use this checklist before merging dashboard or alert changes.
 
 - [ ] Panels query source-controlled data sources only.
 - [ ] Prometheus labels remain low-cardinality.
+- [ ] `npm run observability:live-assert` passes and refreshes `observability-label-snapshot.json` for changed dashboard/rule semantics.
 - [ ] Dashboard variables do not expose raw selectors, URLs, tokens, cookies, or request bodies.
 - [ ] Panels have units, thresholds, and descriptions for operational interpretation.
 - [ ] Alerts map to documented SLO or operational runbooks.

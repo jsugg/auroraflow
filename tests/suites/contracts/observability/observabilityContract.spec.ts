@@ -120,6 +120,7 @@ describe('observability contract documentation', () => {
     expect(workflow).toContain('observability-output/ci');
     expect(packageJson).toContain('"observability:ci:smoke"');
     expect(packageJson).toContain('"observability:snapshot"');
+    expect(packageJson).toContain('"observability:live-assert"');
   });
 
   it('provides full-stack and secret-gated remote-export CI observability lanes', () => {
@@ -135,6 +136,8 @@ describe('observability contract documentation', () => {
     );
     expect(workflow).not.toContain('vars.AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED');
     expect(workflow).toContain('prometheus-targets.json');
+    expect(workflow).toContain('observability:live-assert');
+    expect(workflow).toContain('observability-label-snapshot.json');
     expect(workflow).toContain('grafana-datasources.json');
     expect(workflow).toContain('jaeger-traces.json');
     expect(workflow).toContain('elasticsearch-indices.json');
@@ -151,6 +154,28 @@ describe('observability contract documentation', () => {
     expect(workflow).toContain('secrets.OTEL_EXPORTER_OTLP_ENDPOINT');
     expect(workflow).toContain('secrets.OTEL_EXPORTER_OTLP_HEADERS');
     expect(workflow).toContain('observability-remote-export-diagnostics');
+  });
+
+  it('uses snapshot-proven Prometheus labels in dashboards and rules', () => {
+    const rules = readFileSync(
+      path.join(OBSERVABILITY_ROOT, 'prometheus', 'rules', 'auroraflow.yml'),
+      'utf8',
+    );
+    const dashboards = readdirSync(path.join(OBSERVABILITY_ROOT, 'grafana', 'dashboards'))
+      .filter((fileName) => fileName.endsWith('.json'))
+      .map((fileName) =>
+        readFileSync(path.join(OBSERVABILITY_ROOT, 'grafana', 'dashboards', fileName), 'utf8'),
+      )
+      .join('\n');
+
+    expect(rules).toContain('auroraflow_test_status="passed"');
+    expect(rules).toContain('auroraflow_self_heal_status="failed"');
+    expect(rules).toContain('auroraflow_redis_operation_status="failed"');
+    expect(rules).not.toContain('status="failure"');
+    expect(dashboards).toContain('auroraflow_action_status');
+    expect(dashboards).toContain('auroraflow_redis_operation_status');
+    expect(dashboards).not.toContain(' by (status)');
+    expect(dashboards).not.toContain('{{status}}');
   });
 
   it('ships valid Grafana dashboard JSON files', () => {

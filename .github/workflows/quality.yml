@@ -50,6 +50,9 @@ jobs:
               - 'docs/architecture/observability-stack.md'
               - 'docs/operations/observability-contract.md'
               - 'observability/**'
+              - 'scripts/observability-*.ts'
+              - 'src/framework/observability/**'
+              - 'tests/suites/unit/framework/observability/**'
               - 'package.json'
               - 'package-lock.json'
               - 'scripts/observability-ci-smoke.ts'
@@ -344,6 +347,10 @@ jobs:
           curl --fail --silent --show-error http://localhost:5601/api/status > "${OBSERVABILITY_DIAGNOSTICS_DIR}/kibana-status.json"
           curl --fail --silent --show-error -H 'kbn-xsrf: auroraflow' 'http://localhost:5601/api/saved_objects/_find?type=index-pattern&search_fields=title&search=auroraflow*' > "${OBSERVABILITY_DIAGNOSTICS_DIR}/kibana-data-views.json"
           grep -q 'auroraflow-logs-*' "${OBSERVABILITY_DIAGNOSTICS_DIR}/kibana-data-views.json"
+
+          npm run observability:live-assert -- --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}"
+          test -s "${OBSERVABILITY_DIAGNOSTICS_DIR}/observability-label-snapshot.json"
+          npm run observability:snapshot -- --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}"
 
       - name: Capture full-stack service logs
         if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true' && always()

@@ -9,10 +9,10 @@ Implemented in source:
 - OpenTelemetry telemetry facade with no-op defaults.
 - Page action, Redis, self-healing, flakiness, SLO dashboard, and SLO alert telemetry hooks.
 - Local Docker Compose overlay for OpenTelemetry Collector, Prometheus, Grafana, Jaeger, Elasticsearch, Logstash, and Kibana.
-- Opt-in CI lanes for collector-only, full-stack backend snapshot, and remote OTLP export smoke validation.
+- Opt-in CI lanes for collector-only, full-stack backend snapshot, live Prometheus label assertions, and remote OTLP export smoke validation.
 - Version-controlled Collector, Prometheus, Grafana provisioning, dashboard, Logstash, Elasticsearch, and Kibana config.
 - Reference production manifests with TLS/auth settings, storage budgets, backup guidance, runbooks, and dashboard review controls.
-- Contract tests that assert required stack files, services, ports, scrape targets, data sources, and dashboard JSON are present.
+- Contract tests that assert required stack files, services, ports, scrape targets, data sources, dashboard JSON, and Prometheus label semantics are present.
 
 Environment-specific work remains outside this repository:
 
@@ -79,7 +79,9 @@ npm run observability:down
 
 Telemetry remains opt-in. Raw selectors, URLs, request bodies, passwords, tokens, and cookies are not emitted by default. Page action telemetry uses stable target hashes and low-cardinality metric labels. `AURORAFLOW_OBSERVABILITY_EXPORT_RAW_SELECTORS=true` is only for local debugging and should stay disabled in CI and shared environments.
 
-Prometheus labels should remain bounded to dimensions such as action type, page object, status, project, shard, operation, mode, and strategy. High-cardinality data belongs in traces or logs after hashing or redaction.
+Prometheus labels should remain bounded to normalized dimensions such as `auroraflow_action_type`, `auroraflow_page_object`, `auroraflow_action_status`, `auroraflow_project`, `auroraflow_shard`, `auroraflow_redis_operation`, `auroraflow_redis_operation_status`, `auroraflow_self_heal_mode`, and `auroraflow_self_heal_strategy`. High-cardinality data belongs in traces or logs after hashing or redaction.
+
+Run `npm run observability:live-assert` against the local stack to poll Prometheus series and write `observability-label-snapshot.json`; dashboard expressions and alert rules must reference only exported labels/status values captured there.
 
 ## Configuration Files
 
@@ -88,7 +90,7 @@ Prometheus labels should remain bounded to dimensions such as action type, page 
 - `observability/prometheus/prometheus.yml`: Collector scrape and local rule loading.
 - `observability/prometheus/rules/auroraflow.yml`: warning-level local SLO and operations alerts.
 - `observability/grafana/provisioning`: Prometheus, Elasticsearch, Jaeger data sources and dashboard provider.
-- `observability/grafana/dashboards`: starter dashboards for overview, CI matrix, flakiness, self-healing, page actions, Redis, and Collector health.
+- `observability/grafana/dashboards`: starter dashboards for overview, CI matrix, flakiness, self-healing, page actions, Redis, and Collector health using snapshot-asserted Prometheus labels.
 - `observability/logstash/pipeline/auroraflow.conf`: local log and self-healing artifact ingestion.
 - `observability/elastic/elasticsearch.yml` and `observability/kibana/kibana.yml`: local single-node settings.
 - `observability/production`: reference production manifests that enable TLS/auth and persistent storage.
