@@ -18,7 +18,13 @@ export interface SelfHealingSafetyPolicy {
 export type SelfHealingRegistryMode = 'off' | 'read' | 'write_pending';
 
 export type SelfHealingPromotionMode = 'manual' | 'ci_acknowledged';
-export type PendingSelectorPromotionStatus = 'pending' | 'approved' | 'rejected' | 'rolled_back';
+export type PendingSelectorPromotionStatus =
+  | 'pending'
+  | 'approved'
+  | 'applied'
+  | 'rejected'
+  | 'conflict'
+  | 'rolled_back';
 
 export interface SelfHealingSatConfig {
   enabled: boolean;
@@ -136,6 +142,7 @@ export interface SelectorCandidateHistory {
   guardedApplyFailed: number;
   promoted: number;
   rejected: number;
+  rolledBack: number;
   lastSeenAt?: string;
   lastSuccessAt?: string;
   expiresAt?: string;
@@ -158,6 +165,17 @@ export interface PendingSelectorPromotion {
   pageObjectName?: string;
   actionType?: SelfHealingActionType;
   acknowledged: boolean;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewReason?: string;
+  conflictReason?: string;
+  appliedAt?: string;
+  appliedSelectorVersion?: number;
+  previousLocator?: string;
+  previousConfidence?: number;
+  previousStrategy?: string;
+  previousNotes?: string;
+  rolledBackAt?: string;
 }
 
 export interface RankedSelfHealingCandidate {

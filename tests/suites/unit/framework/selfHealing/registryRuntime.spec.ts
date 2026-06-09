@@ -3,10 +3,7 @@ import {
   SelectorRegistryRepository,
   type SelectorStore,
 } from '../../../../../src/data/selectors/selectorRegistry';
-import {
-  DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS,
-  StoreSelectorCandidateHistoryRepository,
-} from '../../../../../src/framework/selfHealing/historyRepository';
+import { StoreSelectorCandidateHistoryRepository } from '../../../../../src/framework/selfHealing/historyRepository';
 import { StorePendingSelectorPromotionRepository } from '../../../../../src/framework/selfHealing/promotionRepository';
 import {
   createStoreSelfHealingRegistryRuntime,
@@ -120,6 +117,7 @@ describe('self-healing registry runtime', () => {
         guardedApplyFailed: 0,
         promoted: 0,
         rejected: 0,
+        rolledBack: 0,
       }),
     );
 
@@ -194,11 +192,9 @@ describe('self-healing registry runtime', () => {
       guardedApplyFailed: 0,
       lastSeenAt: '2026-06-08T12:00:00.000Z',
       lastSuccessAt: '2026-06-08T12:00:00.000Z',
-      expiresAt: '2026-09-06T12:00:00.000Z',
+      expiresAt: '2026-07-08T12:00:00.000Z',
     });
-    expect(store.ttlSecondsByKey.get(`selector-history:${rankedCandidate.id}`)).toBe(
-      DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS,
-    );
+    expect(store.ttlSecondsByKey.get(`selector-history:${rankedCandidate.id}`)).toBe(2_592_000);
 
     const secondHistory = await repository.recordObservation({
       candidate: rankedCandidate,
@@ -271,6 +267,7 @@ describe('self-healing registry runtime', () => {
         guardedApplyFailed: 0,
         promoted: 0,
         rejected: 0,
+        rolledBack: 0,
         expiresAt: '2026-06-08T11:59:00.000Z',
       }),
     );

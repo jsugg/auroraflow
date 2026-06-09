@@ -176,6 +176,7 @@ function runtime(overrides: Partial<SelfHealingRegistryRuntime> = {}): SelfHeali
         guardedApplyFailed: 0,
         promoted: 0,
         rejected: 0,
+        rolledBack: 0,
       }),
     },
     promotions: {

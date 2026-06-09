@@ -11,7 +11,8 @@
     "guardedApplySucceeded",
     "guardedApplyFailed",
     "promoted",
-    "rejected"
+    "rejected",
+    "rolledBack"
   ],
   "properties": {
     "candidateId": {
@@ -34,6 +35,9 @@
       "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
     },
     "rejected": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+    },
+    "rolledBack": {
       "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
     },
     "lastSeenAt": {

@@ -46,6 +46,7 @@
     "test:integration:local": "npm run infra:redis:up && npm run test:integration",
     "test-report": "npx playwright show-report test-reports",
     "self-heal:governance": "node scripts/self-healing-governance.mjs",
+    "self-heal:promotions": "node -r ts-node/register scripts/self-healing-promotions.ts",
     "self-heal:cleanup": "node -r ts-node/register scripts/self-healing-registry-cleanup.ts",
     "flakiness:report": "node -r ts-node/register scripts/flakiness-report.ts",
     "slo:dashboard": "node -r ts-node/register scripts/slo-dashboard.ts",
