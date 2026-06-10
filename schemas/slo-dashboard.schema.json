@@ -63,7 +63,9 @@
       "additionalProperties": true,
       "required": [
         "triageRequired",
+        "pendingPromotionCount",
         "guardedAcceptedCount",
+        "registryPersistenceFailureCount",
         "guardedAutoHealAttempts",
         "guardedAutoHealSucceeded",
         "guardedAutoHealFailed",
@@ -76,7 +78,13 @@
         "triageRequired": {
           "type": "boolean"
         },
+        "pendingPromotionCount": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
         "guardedAcceptedCount": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "registryPersistenceFailureCount": {
           "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
         },
         "guardedAutoHealAttempts": {

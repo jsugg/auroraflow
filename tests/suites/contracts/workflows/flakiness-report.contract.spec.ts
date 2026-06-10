@@ -17,7 +17,9 @@ describe('ci.yml flakiness report contract', () => {
     expect(ciWorkflow).toContain('flakiness-report:');
     expect(ciWorkflow).toContain('name: Flakiness Report');
     expect(ciWorkflow).toContain('pattern: e2e-matrix-artifacts-*');
-    expect(ciWorkflow).toContain('run: npm run flakiness:report --');
+    expect(ciWorkflow).toContain('npm run flakiness:report --');
+    expect(ciWorkflow).toContain('Restore flakiness trend history');
+    expect(ciWorkflow).toContain('--trend-output .auroraflow-trends/flakiness-trends.jsonl');
     expect(ciWorkflow).toContain('name: flakiness-report');
   });
 });

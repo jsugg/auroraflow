@@ -13,9 +13,11 @@ describe('ci.yml SLO dashboard and alerting contract', () => {
   });
 
   it('generates dashboard and alert artifacts with repository policy config', () => {
-    expect(ciWorkflow).toContain('run: npm run slo:dashboard --');
+    expect(ciWorkflow).toContain('npm run slo:dashboard --');
     expect(ciWorkflow).toContain('npm run slo:alerts --');
     expect(ciWorkflow).toContain('configs/quality/slo-alert-policy.json');
+    expect(ciWorkflow).toContain('Restore SLO trend history');
+    expect(ciWorkflow).toContain('--trend-output .auroraflow-trends/slo-trends.jsonl');
     expect(ciWorkflow).toContain('name: slo-dashboard-alerts');
   });
 });

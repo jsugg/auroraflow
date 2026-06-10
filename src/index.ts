@@ -164,6 +164,28 @@ export {
 } from './framework/observability/alertPolicies';
 
 export {
+  DEFAULT_OBSERVABILITY_TREND_LIMIT,
+  MAX_OBSERVABILITY_TREND_LIMIT,
+  OBSERVABILITY_TREND_SCHEMA_VERSION,
+  ObservabilityTrendPersistenceError,
+  appendObservabilityTrendPoint,
+  buildObservabilityTrendPointFromFlakinessSummary,
+  buildObservabilityTrendPointFromSloDashboard,
+  parseObservabilityTrendPoint,
+  readObservabilityTrendPoints,
+  resolveTrendLimit,
+  resolveTrendOutputPath,
+  type ObservabilityTrendGovernance,
+  type ObservabilityTrendGuardedAutoHeal,
+  type ObservabilityTrendPoint,
+  type ObservabilityTrendRates,
+  type ObservabilityTrendSlo,
+  type ObservabilityTrendSource,
+  type ObservabilityTrendTotals,
+  type ObservabilityTrendWriteResult,
+} from './framework/observability/trends';
+
+export {
   DEFAULT_SELF_HEAL_MAX_CANDIDATES,
   DEFAULT_SELF_HEAL_MAX_DOM_NODES,
   DEFAULT_SELF_HEAL_MAX_TEXT_LENGTH,

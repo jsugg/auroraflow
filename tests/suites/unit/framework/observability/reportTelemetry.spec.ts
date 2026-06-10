@@ -86,7 +86,9 @@ function createDashboard(): SloDashboard {
     },
     selfHealing: {
       triageRequired: false,
+      pendingPromotionCount: 0,
       guardedAcceptedCount: 1,
+      registryPersistenceFailureCount: 0,
       guardedAutoHealAttempts: 2,
       guardedAutoHealSucceeded: 1,
       guardedAutoHealFailed: 1,

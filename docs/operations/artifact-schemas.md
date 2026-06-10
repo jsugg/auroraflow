@@ -12,6 +12,7 @@ AuroraFlow publishes JSON Schemas for generated governance and observability art
 - `flakiness-summary.schema.json`
 - `slo-dashboard.schema.json`
 - `slo-alert-evaluation.schema.json`
+- `observability-trend-point.schema.json`
 
 Run validation with:
 
@@ -19,7 +20,7 @@ Run validation with:
 npm run schemas:check
 ```
 
-The command compiles all schema files and validates generated artifacts found under `test-results/`. When no artifacts are present, it still verifies that every schema compiles.
+The command compiles all schema files and validates generated artifacts found under `test-results/`. It also validates JSONL trend points in `test-results/*trend*.jsonl` and `.auroraflow-trends/*trend*.jsonl`. When no artifacts are present, it still verifies that every schema compiles.
 
 ## Compatibility Policy
 
@@ -30,4 +31,4 @@ The command compiles all schema files and validates generated artifacts found un
 
 ## Runtime Status
 
-These schemas define contracts for current artifacts, selector-history records, and pending promotion review records. Pending promotion records are runtime-written in `SELF_HEAL_REGISTRY_MODE=write_pending`, but reviewed approval/rejection/rollback workflows are still planned; schemas alone do not make SAT autonomous.
+These schemas define contracts for current artifacts, selector-history records, pending promotion review records, and observability trend points. Pending promotion records are runtime-written in `SELF_HEAL_REGISTRY_MODE=write_pending`; reviewed approval/rejection/rollback workflows operate on registry records only and do not rewrite source code.
