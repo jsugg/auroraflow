@@ -61,7 +61,9 @@ export interface SloDashboard {
   selfHealing: {
     governanceStatus?: string;
     triageRequired: boolean;
+    pendingPromotionCount: number;
     guardedAcceptedCount: number;
+    registryPersistenceFailureCount: number;
     guardedAutoHealAttempts: number;
     guardedAutoHealSucceeded: number;
     guardedAutoHealFailed: number;
@@ -229,7 +231,9 @@ export function buildSloDashboard({
     selfHealing: {
       governanceStatus: governance?.status,
       triageRequired: governance?.triageRequired ?? false,
+      pendingPromotionCount: valueOrZero(governance?.pendingPromotionCount),
       guardedAcceptedCount: valueOrZero(governance?.guardedAcceptedCount),
+      registryPersistenceFailureCount: valueOrZero(governance?.registryPersistenceFailureCount),
       guardedAutoHealAttempts: guardedAttempts,
       guardedAutoHealSucceeded: guardedSucceeded,
       guardedAutoHealFailed: guardedFailed,

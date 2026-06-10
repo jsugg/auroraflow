@@ -15,12 +15,21 @@ Optional flags:
 - `--output-json <path>`: default `test-results/flakiness-summary.json`
 - `--output-md <path>`: default `test-results/flakiness-summary.md`
 - `--top-limit <n>`: number of top flaky cases in markdown table (default `10`)
+- `--trend-output <path>`: append a bounded JSONL trend point
+- `--trend-limit <n>`: max retained trend points (default `100`)
 
 Input discovery behavior:
 
 - The command recursively scans `--input-dir`.
 - It reads files named `playwright-results-*.json`.
 - Missing input files produce a `no-input` summary status instead of failing the command.
+
+Trend output can also be enabled with:
+
+- `AURORAFLOW_TREND_OUTPUT`
+- `AURORAFLOW_TREND_LIMIT`
+
+Trend points include run metadata (`runId`, branch, commit, workflow, project), pass/fail/flake/retry totals and rates, plus empty self-healing/governance fields when only flakiness data is available.
 
 ## CI Integration
 
@@ -31,6 +40,8 @@ In `.github/workflows/ci.yml`:
 - report outputs are uploaded as `flakiness-report` artifacts:
   - `flakiness-summary.json`
   - `flakiness-summary.md`
+  - `flakiness-trends.jsonl`
+- `.auroraflow-trends/flakiness-trends.jsonl` is restored through a branch-scoped cache and uploaded for triage.
 
 Use this artifact to identify:
 

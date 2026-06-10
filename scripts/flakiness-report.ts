@@ -10,12 +10,20 @@ import {
 } from '../src/framework/observability/flakinessReport';
 import { runFlakinessReportTelemetry } from '../src/framework/observability/reportTelemetry';
 import { shutdownTelemetry } from '../src/framework/observability/telemetry';
+import {
+  appendObservabilityTrendPoint,
+  buildObservabilityTrendPointFromFlakinessSummary,
+  resolveTrendLimit,
+  resolveTrendOutputPath,
+} from '../src/framework/observability/trends';
 
 interface CliOptions {
   inputDir: string;
   outputJson: string;
   outputMarkdown: string;
   topLimit: number;
+  trendOutput?: string;
+  trendLimit: number;
 }
 
 const DEFAULT_INPUT_DIR = path.join('test-results');
@@ -28,6 +36,8 @@ function parseCliOptions(argv: string[]): CliOptions {
     outputJson: DEFAULT_OUTPUT_JSON,
     outputMarkdown: DEFAULT_OUTPUT_MARKDOWN,
     topLimit: 10,
+    trendOutput: resolveTrendOutputPath(),
+    trendLimit: resolveTrendLimit(),
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -66,6 +76,22 @@ function parseCliOptions(argv: string[]): CliOptions {
         throw new Error('--top-limit must be a positive integer.');
       }
       options.topLimit = parsed;
+      index += 1;
+      continue;
+    }
+    if (argument === '--trend-output') {
+      if (!value) {
+        throw new Error('Missing value for --trend-output.');
+      }
+      options.trendOutput = resolveTrendOutputPath({ value });
+      index += 1;
+      continue;
+    }
+    if (argument === '--trend-limit') {
+      if (!value) {
+        throw new Error('Missing value for --trend-limit.');
+      }
+      options.trendLimit = resolveTrendLimit({ value });
       index += 1;
       continue;
     }
@@ -146,6 +172,14 @@ async function main(): Promise<number> {
 
       await writeFile(options.outputJson, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
       await writeFile(options.outputMarkdown, `${markdown}\n`, 'utf8');
+      if (options.trendOutput) {
+        const trend = await appendObservabilityTrendPoint({
+          filePath: options.trendOutput,
+          limit: options.trendLimit,
+          point: buildObservabilityTrendPointFromFlakinessSummary({ summary }),
+        });
+        console.log(`Trend history: ${trend.filePath} points=${trend.points}`);
+      }
 
       console.log(
         `Flakiness report generated: status=${summary.status} sourceFiles=${summary.sourceFiles} flakyTests=${summary.flakyTests} failedTests=${summary.failedTests}`,

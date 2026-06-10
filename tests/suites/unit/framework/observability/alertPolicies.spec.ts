@@ -23,7 +23,9 @@ function createDashboard(overrides: Partial<SloDashboard> = {}): SloDashboard {
     },
     selfHealing: {
       triageRequired: false,
+      pendingPromotionCount: 0,
       guardedAcceptedCount: 0,
+      registryPersistenceFailureCount: 0,
       guardedAutoHealAttempts: 10,
       guardedAutoHealSucceeded: 10,
       guardedAutoHealFailed: 0,

@@ -7,6 +7,7 @@ import process from 'node:process';
 export const ARTIFACT_SCHEMA_FILES = {
   domSnapshot: 'dom-snapshot.schema.json',
   flakinessSummary: 'flakiness-summary.schema.json',
+  observabilityTrendPoint: 'observability-trend-point.schema.json',
   pendingSelectorPromotion: 'pending-selector-promotion.schema.json',
   selectorCandidateHistory: 'selector-candidate-history.schema.json',
   selfHealingFailureEvent: 'self-healing-failure-event.schema.json',
@@ -25,6 +26,7 @@ interface CliOptions {
 interface GeneratedArtifactInput {
   artifactPath: string;
   schemaFile: ArtifactSchemaFile;
+  format: 'json' | 'jsonl';
 }
 
 export interface ArtifactSchemaValidator {
@@ -123,6 +125,29 @@ async function readJsonRecord(filePath: string): Promise<Record<string, unknown>
   return parsed;
 }
 
+async function readJsonLines(filePath: string): Promise<unknown[]> {
+  const content = await readFile(filePath, 'utf8');
+  const values: unknown[] = [];
+
+  const lines = content.split(/\r?\n/u);
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index].trim();
+    if (line.length === 0) {
+      continue;
+    }
+    try {
+      values.push(JSON.parse(line) as unknown);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      throw new ArtifactSchemaConfigurationError(
+        `${filePath} line ${index + 1} must contain valid JSON: ${message}`,
+      );
+    }
+  }
+
+  return values;
+}
+
 async function listSchemaFiles(schemaDirectory: string): Promise<string[]> {
   const entries = await readdir(schemaDirectory, { withFileTypes: true });
   return entries
@@ -160,14 +185,19 @@ export async function createArtifactSchemaValidator(
   });
   addFormats(ajv);
 
+  const schemaRecords = new Map<string, Record<string, unknown>>();
   for (const schemaFile of schemaFiles) {
     const schema = await readJsonRecord(path.join(schemaDirectory, schemaFile));
+    schemaRecords.set(schemaFile, schema);
     ajv.addSchema(schema);
   }
 
   const validators = new Map<ArtifactSchemaFile, ValidateFunction>();
   for (const schemaFile of TARGET_SCHEMA_FILES) {
-    const schema = await readJsonRecord(path.join(schemaDirectory, schemaFile));
+    const schema = schemaRecords.get(schemaFile);
+    if (!schema) {
+      throw new ArtifactSchemaConfigurationError(`Missing artifact schema: ${schemaFile}`);
+    }
     const schemaId = schema.$id;
     if (typeof schemaId !== 'string' || schemaId.length === 0) {
       throw new ArtifactSchemaConfigurationError(`${schemaFile} must declare a non-empty $id.`);
@@ -213,8 +243,40 @@ async function listSelfHealingFailureArtifacts(
     .map((entry) => ({
       artifactPath: path.join(artifactsDirectory, entry.name),
       schemaFile: ARTIFACT_SCHEMA_FILES.selfHealingFailureEvent,
+      format: 'json' as const,
     }))
     .sort((left, right) => left.artifactPath.localeCompare(right.artifactPath));
+}
+
+async function listObservabilityTrendArtifacts(
+  artifactsRoot: string,
+): Promise<GeneratedArtifactInput[]> {
+  const directories = [
+    path.join(artifactsRoot, 'test-results'),
+    path.join(artifactsRoot, '.auroraflow-trends'),
+  ];
+  const artifacts: GeneratedArtifactInput[] = [];
+
+  for (const directory of directories) {
+    if (!(await fileExists(directory))) {
+      continue;
+    }
+    const entries = await readdir(directory, { withFileTypes: true });
+    artifacts.push(
+      ...entries
+        .filter(
+          (entry) =>
+            entry.isFile() && entry.name.endsWith('.jsonl') && entry.name.includes('trend'),
+        )
+        .map((entry) => ({
+          artifactPath: path.join(directory, entry.name),
+          schemaFile: ARTIFACT_SCHEMA_FILES.observabilityTrendPoint,
+          format: 'jsonl' as const,
+        })),
+    );
+  }
+
+  return artifacts.sort((left, right) => left.artifactPath.localeCompare(right.artifactPath));
 }
 
 async function collectGeneratedArtifactInputs(
@@ -222,12 +284,14 @@ async function collectGeneratedArtifactInputs(
 ): Promise<GeneratedArtifactInput[]> {
   const artifactInputs: GeneratedArtifactInput[] = [
     ...(await listSelfHealingFailureArtifacts(artifactsRoot)),
+    ...(await listObservabilityTrendArtifacts(artifactsRoot)),
   ];
 
   const defaultArtifacts: readonly GeneratedArtifactInput[] = [
     {
       artifactPath: path.join(artifactsRoot, 'test-results', 'flakiness-summary.json'),
       schemaFile: ARTIFACT_SCHEMA_FILES.flakinessSummary,
+      format: 'json',
     },
     {
       artifactPath: path.join(
@@ -236,14 +300,17 @@ async function collectGeneratedArtifactInputs(
         'self-healing-governance-summary.json',
       ),
       schemaFile: ARTIFACT_SCHEMA_FILES.selfHealingGovernanceSummary,
+      format: 'json',
     },
     {
       artifactPath: path.join(artifactsRoot, 'test-results', 'slo-dashboard.json'),
       schemaFile: ARTIFACT_SCHEMA_FILES.sloDashboard,
+      format: 'json',
     },
     {
       artifactPath: path.join(artifactsRoot, 'test-results', 'slo-alerts.json'),
       schemaFile: ARTIFACT_SCHEMA_FILES.sloAlertEvaluation,
+      format: 'json',
     },
   ];
 
@@ -256,6 +323,32 @@ async function collectGeneratedArtifactInputs(
   return artifactInputs;
 }
 
+async function validateGeneratedArtifactInput({
+  validator,
+  artifactInput,
+}: {
+  validator: ArtifactSchemaValidator;
+  artifactInput: GeneratedArtifactInput;
+}): Promise<void> {
+  if (artifactInput.format === 'jsonl') {
+    const values = await readJsonLines(artifactInput.artifactPath);
+    for (let index = 0; index < values.length; index += 1) {
+      validator.validate(
+        artifactInput.schemaFile,
+        values[index],
+        `${artifactInput.artifactPath} line ${index + 1}`,
+      );
+    }
+    return;
+  }
+
+  validator.validate(
+    artifactInput.schemaFile,
+    await readJsonRecord(artifactInput.artifactPath),
+    artifactInput.artifactPath,
+  );
+}
+
 export async function validateGeneratedArtifacts({
   artifactsRoot = DEFAULT_ARTIFACTS_ROOT,
   schemaDirectory = DEFAULT_SCHEMA_DIRECTORY,
@@ -264,11 +357,7 @@ export async function validateGeneratedArtifacts({
   const artifactInputs = await collectGeneratedArtifactInputs(artifactsRoot);
 
   for (const artifactInput of artifactInputs) {
-    validator.validate(
-      artifactInput.schemaFile,
-      await readJsonRecord(artifactInput.artifactPath),
-      artifactInput.artifactPath,
-    );
+    await validateGeneratedArtifactInput({ validator, artifactInput });
   }
 
   return {

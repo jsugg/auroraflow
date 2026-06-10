@@ -11,6 +11,12 @@ import {
 import { runSloAlertTelemetry } from '../src/framework/observability/reportTelemetry';
 import { shutdownTelemetry } from '../src/framework/observability/telemetry';
 import { type SloDashboard } from '../src/framework/observability/sloDashboard';
+import {
+  appendObservabilityTrendPoint,
+  buildObservabilityTrendPointFromSloDashboard,
+  resolveTrendLimit,
+  resolveTrendOutputPath,
+} from '../src/framework/observability/trends';
 
 interface CliOptions {
   dashboardJsonPath: string;
@@ -18,6 +24,8 @@ interface CliOptions {
   outputJsonPath: string;
   outputMarkdownPath: string;
   failOnBreach: boolean;
+  trendOutput?: string;
+  trendLimit: number;
 }
 
 const DEFAULT_DASHBOARD_JSON_PATH = path.join('test-results', 'slo-dashboard.json');
@@ -32,6 +40,8 @@ function parseCliOptions(argv: string[]): CliOptions {
     outputJsonPath: DEFAULT_OUTPUT_JSON_PATH,
     outputMarkdownPath: DEFAULT_OUTPUT_MARKDOWN_PATH,
     failOnBreach: false,
+    trendOutput: resolveTrendOutputPath(),
+    trendLimit: resolveTrendLimit(),
   };
 
   for (let index = 0; index < argv.length; index += 1) {
@@ -76,6 +86,22 @@ function parseCliOptions(argv: string[]): CliOptions {
 
     if (argument === '--fail-on-breach') {
       options.failOnBreach = true;
+      continue;
+    }
+    if (argument === '--trend-output') {
+      if (!value) {
+        throw new Error('Missing value for --trend-output.');
+      }
+      options.trendOutput = resolveTrendOutputPath({ value });
+      index += 1;
+      continue;
+    }
+    if (argument === '--trend-limit') {
+      if (!value) {
+        throw new Error('Missing value for --trend-limit.');
+      }
+      options.trendLimit = resolveTrendLimit({ value });
+      index += 1;
       continue;
     }
 
@@ -148,6 +174,18 @@ async function main(): Promise<number> {
       await ensureParentDirectory(options.outputMarkdownPath);
       await writeFile(options.outputJsonPath, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
       await writeFile(options.outputMarkdownPath, `${markdown}\n`, 'utf8');
+      if (options.trendOutput) {
+        const trend = await appendObservabilityTrendPoint({
+          filePath: options.trendOutput,
+          limit: options.trendLimit,
+          point: buildObservabilityTrendPointFromSloDashboard({
+            dashboard,
+            alertEvaluation: result,
+            metadata: { source: 'slo-alerts' },
+          }),
+        });
+        console.log(`Trend history: ${trend.filePath} points=${trend.points}`);
+      }
 
       if (result.breachCount > 0) {
         emitBreachWarnings(result);

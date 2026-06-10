@@ -218,8 +218,8 @@ scripts/                   Report generation, workflow linting, governance, and 
 
 The next meaningful maturity steps are:
 
-1. Persist cross-run flakiness, SLO, and governance trends.
-2. Expand API-grade getting-started, authoring, configuration, and operations docs.
+1. Expand API-grade getting-started, authoring, configuration, and operations docs.
+2. Add richer trend triage views on top of the persisted JSONL history.
 3. Continue package-surface contracts and example coverage before widening the public API.
 
 ## Contributing

@@ -123,8 +123,23 @@ jobs:
           path: aggregated-e2e-artifacts
           merge-multiple: true
 
+      - name: Restore flakiness trend history
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .auroraflow-trends/flakiness-trends.jsonl
+          key: ${{ runner.os }}-auroraflow-flakiness-trends-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-auroraflow-flakiness-trends-${{ github.ref_name }}-
+
       - name: Generate flakiness summary
-        run: npm run flakiness:report -- --input-dir aggregated-e2e-artifacts/test-results --output-json aggregated-e2e-artifacts/flakiness-summary.json --output-md aggregated-e2e-artifacts/flakiness-summary.md
+        run: |
+          mkdir -p .auroraflow-trends
+          npm run flakiness:report -- \
+            --input-dir aggregated-e2e-artifacts/test-results \
+            --output-json aggregated-e2e-artifacts/flakiness-summary.json \
+            --output-md aggregated-e2e-artifacts/flakiness-summary.md \
+            --trend-output .auroraflow-trends/flakiness-trends.jsonl \
+            --trend-limit 250
 
       - name: Upload flakiness report artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -135,6 +150,7 @@ jobs:
           path: |
             aggregated-e2e-artifacts/flakiness-summary.json
             aggregated-e2e-artifacts/flakiness-summary.md
+            .auroraflow-trends/flakiness-trends.jsonl
 
   slo-dashboard:
     name: SLO Dashboard and Alerts
@@ -165,17 +181,45 @@ jobs:
           name: flakiness-report
           path: observability-input
 
+      - name: Restore SLO trend history
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        with:
+          path: .auroraflow-trends/slo-trends.jsonl
+          key: ${{ runner.os }}-auroraflow-slo-trends-${{ github.ref_name }}-${{ github.run_id }}
+          restore-keys: |
+            ${{ runner.os }}-auroraflow-slo-trends-${{ github.ref_name }}-
+
       - name: Generate SLO dashboard
-        run: npm run slo:dashboard -- --flakiness-json observability-input/flakiness-summary.json --output-json observability-output/slo-dashboard.json --output-md observability-output/slo-dashboard.md
+        run: |
+          mkdir -p .auroraflow-trends
+          npm run slo:dashboard -- \
+            --flakiness-json observability-input/flakiness-summary.json \
+            --output-json observability-output/slo-dashboard.json \
+            --output-md observability-output/slo-dashboard.md \
+            --trend-output .auroraflow-trends/slo-trends.jsonl \
+            --trend-limit 250
 
       - name: Evaluate SLO alert policies
         env:
           SLO_ALERT_FAIL_ON_BREACH: ${{ vars.SLO_ALERT_FAIL_ON_BREACH }}
         run: |
           if [ "${SLO_ALERT_FAIL_ON_BREACH}" = "true" ]; then
-            npm run slo:alerts -- --dashboard-json observability-output/slo-dashboard.json --policy-file configs/quality/slo-alert-policy.json --output-json observability-output/slo-alerts.json --output-md observability-output/slo-alerts.md --fail-on-breach
+            npm run slo:alerts -- \
+              --dashboard-json observability-output/slo-dashboard.json \
+              --policy-file configs/quality/slo-alert-policy.json \
+              --output-json observability-output/slo-alerts.json \
+              --output-md observability-output/slo-alerts.md \
+              --trend-output .auroraflow-trends/slo-trends.jsonl \
+              --trend-limit 250 \
+              --fail-on-breach
           else
-            npm run slo:alerts -- --dashboard-json observability-output/slo-dashboard.json --policy-file configs/quality/slo-alert-policy.json --output-json observability-output/slo-alerts.json --output-md observability-output/slo-alerts.md
+            npm run slo:alerts -- \
+              --dashboard-json observability-output/slo-dashboard.json \
+              --policy-file configs/quality/slo-alert-policy.json \
+              --output-json observability-output/slo-alerts.json \
+              --output-md observability-output/slo-alerts.md \
+              --trend-output .auroraflow-trends/slo-trends.jsonl \
+              --trend-limit 250
           fi
 
       - name: Upload SLO dashboard and alert artifacts
@@ -189,3 +233,4 @@ jobs:
             observability-output/slo-dashboard.md
             observability-output/slo-alerts.json
             observability-output/slo-alerts.md
+            .auroraflow-trends/slo-trends.jsonl

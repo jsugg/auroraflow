@@ -1,0 +1,193 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auroraflow.dev/schemas/observability-trend-point.schema.json",
+  "title": "AuroraFlow observability trend point",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schemaVersion",
+    "generatedAt",
+    "source",
+    "runId",
+    "branch",
+    "commit",
+    "workflow",
+    "project",
+    "status",
+    "totals",
+    "rates",
+    "guardedAutoHeal",
+    "governance",
+    "slo"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "generatedAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "source": {
+      "enum": ["flakiness-report", "slo-dashboard", "slo-alerts"]
+    },
+    "runId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "branch": {
+      "type": "string",
+      "minLength": 1
+    },
+    "commit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "workflow": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": ["complete", "no-input"]
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "sourceFiles",
+        "tests",
+        "passedTests",
+        "failedTests",
+        "flakyTests",
+        "skippedTests",
+        "interruptedTests",
+        "attempts",
+        "failedAttempts",
+        "retryAttempts"
+      ],
+      "properties": {
+        "sourceFiles": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "tests": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "passedTests": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "failedTests": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "flakyTests": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "skippedTests": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "interruptedTests": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "attempts": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "failedAttempts": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "retryAttempts": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "rates": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["passRate", "failureRate", "flakeRate", "retryFailureRate"],
+      "properties": {
+        "passRate": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nullableRatio"
+        },
+        "failureRate": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nullableRatio"
+        },
+        "flakeRate": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nullableRatio"
+        },
+        "retryFailureRate": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nullableRatio"
+        }
+      }
+    },
+    "guardedAutoHeal": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["attempted", "succeeded", "failed", "skipped", "successRate", "failureRate"],
+      "properties": {
+        "attempted": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "succeeded": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "failed": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "skipped": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "successRate": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nullableRatio"
+        },
+        "failureRate": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nullableRatio"
+        }
+      }
+    },
+    "governance": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "status",
+        "triageRequired",
+        "pendingPromotionCount",
+        "guardedAcceptedCount",
+        "registryPersistenceFailureCount"
+      ],
+      "properties": {
+        "status": {
+          "type": ["string", "null"]
+        },
+        "triageRequired": {
+          "type": "boolean"
+        },
+        "pendingPromotionCount": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "guardedAcceptedCount": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "registryPersistenceFailureCount": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        }
+      }
+    },
+    "slo": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["overallStatus", "alertBreachCount", "blockingAlertBreachCount"],
+      "properties": {
+        "overallStatus": {
+          "enum": ["healthy", "degraded", "insufficient_data", null]
+        },
+        "alertBreachCount": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        },
+        "blockingAlertBreachCount": {
+          "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/nonNegativeInteger"
+        }
+      }
+    }
+  }
+}

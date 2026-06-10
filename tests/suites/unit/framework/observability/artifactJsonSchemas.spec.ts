@@ -13,12 +13,14 @@ import {
   buildSloDashboard,
   type SelfHealingGovernanceSummary,
 } from '../../../../../src/framework/observability/sloDashboard';
+import { buildObservabilityTrendPointFromSloDashboard } from '../../../../../src/framework/observability/trends';
 import {
   evaluateAlertPolicy,
   parseAlertPolicy,
 } from '../../../../../src/framework/observability/alertPolicies';
 
 const validatorPromise = createArtifactSchemaValidator();
+const SCHEMA_TEST_TIMEOUT_MS = 15_000;
 
 async function expectSchemaValid(schemaFile: ArtifactSchemaFile, payload: unknown): Promise<void> {
   const validator = await validatorPromise;
@@ -140,127 +142,176 @@ function createGovernanceArtifact(): Record<string, unknown> {
 }
 
 describe('observability artifact JSON Schemas', () => {
-  it('validates generated flakiness summaries', async () => {
-    const summary = buildFlakinessSummary({
-      sourceFiles: 1,
-      cases: createTestCases(),
-      generatedAt: new Date('2026-06-05T12:00:00.000Z'),
-    });
-
-    await expectSchemaValid(ARTIFACT_SCHEMA_FILES.flakinessSummary, summary);
-  });
-
-  it('validates generated SLO dashboards and alert evaluations', async () => {
-    const flakiness = buildFlakinessSummary({
-      sourceFiles: 1,
-      cases: createTestCases(),
-      generatedAt: new Date('2026-06-05T12:00:00.000Z'),
-    });
-    const dashboard = buildSloDashboard({
-      flakiness,
-      governance: createGovernanceSummary(),
-      generatedAt: new Date('2026-06-05T12:15:00.000Z'),
-    });
-    const policy = parseAlertPolicy({
-      version: '1.0.0',
-      alerts: [
-        {
-          id: 'pass-rate-low',
-          metric: 'passRate',
-          operator: 'lt',
-          threshold: 0.98,
-          severity: 'warning',
-          description: 'Pass rate below SLO.',
-        },
-      ],
-    });
-    const alertEvaluation = evaluateAlertPolicy({
-      dashboard,
-      policy,
-      generatedAt: new Date('2026-06-05T12:20:00.000Z'),
-    });
-
-    await expectSchemaValid(ARTIFACT_SCHEMA_FILES.sloDashboard, dashboard);
-    await expectSchemaValid(ARTIFACT_SCHEMA_FILES.sloAlertEvaluation, alertEvaluation);
-  });
-
-  it('validates current self-healing governance summaries', async () => {
-    await expectSchemaValid(
-      ARTIFACT_SCHEMA_FILES.selfHealingGovernanceSummary,
-      createGovernanceArtifact(),
-    );
-  });
-
-  it('rejects malformed generated reports with actionable diagnostics', async () => {
-    const validator = await validatorPromise;
-
-    expect(() =>
-      validator.validate(ARTIFACT_SCHEMA_FILES.flakinessSummary, {
-        generatedAt: '2026-06-05T12:00:00.000Z',
-        status: 'complete',
+  it(
+    'validates generated flakiness summaries',
+    async () => {
+      const summary = buildFlakinessSummary({
         sourceFiles: 1,
-        totalTests: 1,
-        flakyTests: 0,
-        failedTests: 0,
-        passedTests: 1,
-        skippedTests: 0,
-        interruptedTests: 0,
-        totalAttempts: 1,
-        totalFailedAttempts: 0,
-        projectBreakdown: [],
-        topFlakyCases: [],
-        testCases: [
+        cases: createTestCases(),
+        generatedAt: new Date('2026-06-05T12:00:00.000Z'),
+      });
+
+      await expectSchemaValid(ARTIFACT_SCHEMA_FILES.flakinessSummary, summary);
+    },
+    SCHEMA_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'validates generated SLO dashboards and alert evaluations',
+    async () => {
+      const flakiness = buildFlakinessSummary({
+        sourceFiles: 1,
+        cases: createTestCases(),
+        generatedAt: new Date('2026-06-05T12:00:00.000Z'),
+      });
+      const dashboard = buildSloDashboard({
+        flakiness,
+        governance: createGovernanceSummary(),
+        generatedAt: new Date('2026-06-05T12:15:00.000Z'),
+      });
+      const policy = parseAlertPolicy({
+        version: '1.0.0',
+        alerts: [
           {
-            caseId: 'case',
-            projectName: 'Google Chrome',
-            file: 'test.spec.ts',
-            line: 1,
-            column: 1,
-            titlePath: ['test'],
-            fullTitle: 'test',
-            attempts: -1,
-            retriesUsed: 0,
-            failedAttempts: 0,
-            durationMs: 1,
-            finalStatus: 'passed',
-            flaky: false,
+            id: 'pass-rate-low',
+            metric: 'passRate',
+            operator: 'lt',
+            threshold: 0.98,
+            severity: 'warning',
+            description: 'Pass rate below SLO.',
           },
         ],
-      }),
-    ).toThrow(ArtifactSchemaValidationError);
-    expect(() =>
-      validator.validate(ARTIFACT_SCHEMA_FILES.flakinessSummary, {
-        generatedAt: '2026-06-05T12:00:00.000Z',
-        status: 'complete',
+      });
+      const alertEvaluation = evaluateAlertPolicy({
+        dashboard,
+        policy,
+        generatedAt: new Date('2026-06-05T12:20:00.000Z'),
+      });
+
+      await expectSchemaValid(ARTIFACT_SCHEMA_FILES.sloDashboard, dashboard);
+      await expectSchemaValid(ARTIFACT_SCHEMA_FILES.sloAlertEvaluation, alertEvaluation);
+    },
+    SCHEMA_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'validates generated observability trend points',
+    async () => {
+      const flakiness = buildFlakinessSummary({
         sourceFiles: 1,
-        totalTests: 1,
-        flakyTests: 0,
-        failedTests: 0,
-        passedTests: 1,
-        skippedTests: 0,
-        interruptedTests: 0,
-        totalAttempts: 1,
-        totalFailedAttempts: 0,
-        projectBreakdown: [],
-        topFlakyCases: [],
-        testCases: [
-          {
-            caseId: 'case',
-            projectName: 'Google Chrome',
-            file: 'test.spec.ts',
-            line: 1,
-            column: 1,
-            titlePath: ['test'],
-            fullTitle: 'test',
-            attempts: -1,
-            retriesUsed: 0,
-            failedAttempts: 0,
-            durationMs: 1,
-            finalStatus: 'passed',
-            flaky: false,
+        cases: createTestCases(),
+        generatedAt: new Date('2026-06-05T12:00:00.000Z'),
+      });
+      const dashboard = buildSloDashboard({
+        flakiness,
+        governance: createGovernanceSummary(),
+        generatedAt: new Date('2026-06-05T12:15:00.000Z'),
+      });
+
+      await expectSchemaValid(
+        ARTIFACT_SCHEMA_FILES.observabilityTrendPoint,
+        buildObservabilityTrendPointFromSloDashboard({
+          dashboard,
+          metadata: {
+            env: {
+              AURORAFLOW_RUN_ID: 'run-1',
+              GITHUB_REF_NAME: 'main',
+              GITHUB_SHA: 'abc123',
+              GITHUB_WORKFLOW: 'Quality',
+              AURORAFLOW_PROJECT: 'auroraflow',
+            },
           },
-        ],
-      }),
-    ).toThrow('/testCases/0/attempts');
-  });
+        }),
+      );
+    },
+    SCHEMA_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'validates current self-healing governance summaries',
+    async () => {
+      await expectSchemaValid(
+        ARTIFACT_SCHEMA_FILES.selfHealingGovernanceSummary,
+        createGovernanceArtifact(),
+      );
+    },
+    SCHEMA_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'rejects malformed generated reports with actionable diagnostics',
+    async () => {
+      const validator = await validatorPromise;
+
+      expect(() =>
+        validator.validate(ARTIFACT_SCHEMA_FILES.flakinessSummary, {
+          generatedAt: '2026-06-05T12:00:00.000Z',
+          status: 'complete',
+          sourceFiles: 1,
+          totalTests: 1,
+          flakyTests: 0,
+          failedTests: 0,
+          passedTests: 1,
+          skippedTests: 0,
+          interruptedTests: 0,
+          totalAttempts: 1,
+          totalFailedAttempts: 0,
+          projectBreakdown: [],
+          topFlakyCases: [],
+          testCases: [
+            {
+              caseId: 'case',
+              projectName: 'Google Chrome',
+              file: 'test.spec.ts',
+              line: 1,
+              column: 1,
+              titlePath: ['test'],
+              fullTitle: 'test',
+              attempts: -1,
+              retriesUsed: 0,
+              failedAttempts: 0,
+              durationMs: 1,
+              finalStatus: 'passed',
+              flaky: false,
+            },
+          ],
+        }),
+      ).toThrow(ArtifactSchemaValidationError);
+      expect(() =>
+        validator.validate(ARTIFACT_SCHEMA_FILES.flakinessSummary, {
+          generatedAt: '2026-06-05T12:00:00.000Z',
+          status: 'complete',
+          sourceFiles: 1,
+          totalTests: 1,
+          flakyTests: 0,
+          failedTests: 0,
+          passedTests: 1,
+          skippedTests: 0,
+          interruptedTests: 0,
+          totalAttempts: 1,
+          totalFailedAttempts: 0,
+          projectBreakdown: [],
+          topFlakyCases: [],
+          testCases: [
+            {
+              caseId: 'case',
+              projectName: 'Google Chrome',
+              file: 'test.spec.ts',
+              line: 1,
+              column: 1,
+              titlePath: ['test'],
+              fullTitle: 'test',
+              attempts: -1,
+              retriesUsed: 0,
+              failedAttempts: 0,
+              durationMs: 1,
+              finalStatus: 'passed',
+              flaky: false,
+            },
+          ],
+        }),
+      ).toThrow('/testCases/0/attempts');
+    },
+    SCHEMA_TEST_TIMEOUT_MS,
+  );
 });

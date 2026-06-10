@@ -15,7 +15,8 @@ AuroraFlow can derive KPI-oriented SLO metrics from flakiness telemetry and eval
 npm run slo:dashboard -- \
   --flakiness-json test-results/flakiness-summary.json \
   --output-json test-results/slo-dashboard.json \
-  --output-md test-results/slo-dashboard.md
+  --output-md test-results/slo-dashboard.md \
+  --trend-output test-results/slo-trends.jsonl
 ```
 
 Optional governance enrichment:
@@ -33,7 +34,8 @@ npm run slo:alerts -- \
   --dashboard-json test-results/slo-dashboard.json \
   --policy-file configs/quality/slo-alert-policy.json \
   --output-json test-results/slo-alerts.json \
-  --output-md test-results/slo-alerts.md
+  --output-md test-results/slo-alerts.md \
+  --trend-output test-results/slo-trends.jsonl
 ```
 
 Behavior:
@@ -41,6 +43,8 @@ Behavior:
 - Breaches emit warning annotations in CI logs.
 - Blocking rules (`blockOnBreach: true`) fail the command.
 - `--fail-on-breach` fails on any breach regardless of `blockOnBreach`.
+- `--trend-output` appends SLO dashboard and alert-evaluation trend points to bounded JSONL.
+- `--trend-limit <n>` controls retained trend points (default `100`); environment fallbacks are `AURORAFLOW_TREND_OUTPUT` and `AURORAFLOW_TREND_LIMIT`.
 
 ## CI Integration
 
@@ -52,7 +56,8 @@ In `.github/workflows/ci.yml`:
   - `slo-dashboard.md`
   - `slo-alerts.json`
   - `slo-alerts.md`
-- Artifacts are uploaded as `slo-dashboard-alerts`.
+  - `slo-trends.jsonl`
+- `.auroraflow-trends/slo-trends.jsonl` is restored through a branch-scoped cache and uploaded as part of `slo-dashboard-alerts`.
 
 Optional strict gate:
 

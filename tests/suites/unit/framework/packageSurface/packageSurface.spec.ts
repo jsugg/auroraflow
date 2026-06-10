@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   AlertPolicyValidationError,
+  DEFAULT_OBSERVABILITY_TREND_LIMIT,
   DEFAULT_SELF_HEAL_MAX_CANDIDATES,
   DEFAULT_PENDING_SELECTOR_PROMOTION_TTL_SECONDS,
   DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS,
@@ -8,6 +9,8 @@ import {
   DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
   LoggerConfigError,
   METRIC_NAMES,
+  OBSERVABILITY_TREND_SCHEMA_VERSION,
+  ObservabilityTrendPersistenceError,
   PageFactory,
   PageObjectBase,
   RESOURCE_ATTRIBUTE_NAMES,
@@ -19,6 +22,7 @@ import {
   StoreSelectorCandidateHistoryRepository,
   analyzeSelfHealingFailure,
   buildFlakinessSummary,
+  buildObservabilityTrendPointFromFlakinessSummary,
   buildSelfHealingCandidateId,
   buildSloDashboard,
   captureFailureEvent,
@@ -52,6 +56,7 @@ import {
   type FlakinessSummary,
   type LogDestination,
   type LoggerRuntimeConfig,
+  type ObservabilityTrendPoint,
   type RankedSelfHealingCandidate,
   type RedisRuntimeConfig,
   type ResolveSelfHealingRegistryRuntimeOptions,
@@ -76,9 +81,11 @@ describe('public package surface', () => {
     expect(SelectorRegistryRepository).toBeTypeOf('function');
     expect(AlertPolicyValidationError).toBeTypeOf('function');
     expect(LoggerConfigError).toBeTypeOf('function');
+    expect(ObservabilityTrendPersistenceError).toBeTypeOf('function');
     expect(SelfHealingArtifactSchemaError).toBeTypeOf('function');
     expect(StorePendingSelectorPromotionRepository).toBeTypeOf('function');
     expect(StoreSelectorCandidateHistoryRepository).toBeTypeOf('function');
+    expect(DEFAULT_OBSERVABILITY_TREND_LIMIT).toBeGreaterThan(0);
     expect(DEFAULT_PENDING_SELECTOR_PROMOTION_TTL_SECONDS).toBeGreaterThan(0);
     expect(DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS).toBeGreaterThan(0);
     expect(DEFAULT_SELF_HEAL_MIN_CONFIDENCE).toBe(0.92);
@@ -88,6 +95,7 @@ describe('public package surface', () => {
 
     expect(analyzeSelfHealingFailure).toBeTypeOf('function');
     expect(buildFlakinessSummary).toBeTypeOf('function');
+    expect(buildObservabilityTrendPointFromFlakinessSummary).toBeTypeOf('function');
     expect(buildSelfHealingCandidateId).toBeTypeOf('function');
     expect(buildSloDashboard).toBeTypeOf('function');
     expect(captureFailureEvent).toBeTypeOf('function');
@@ -175,6 +183,9 @@ describe('public package surface', () => {
     expectTypeOf<DomSnapshot['schemaVersion']>().toEqualTypeOf<'1.0.0'>();
     expectTypeOf<AlertPolicy>().toMatchTypeOf<{ version: '1.0.0'; alerts: unknown[] }>();
     expectTypeOf<FlakinessSummary['status']>().toEqualTypeOf<'complete' | 'no-input'>();
+    expectTypeOf<ObservabilityTrendPoint['schemaVersion']>().toEqualTypeOf<
+      typeof OBSERVABILITY_TREND_SCHEMA_VERSION
+    >();
     expectTypeOf<SloDashboard['overallStatus']>().toEqualTypeOf<
       'healthy' | 'degraded' | 'insufficient_data'
     >();
