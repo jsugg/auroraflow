@@ -209,6 +209,8 @@ scripts/                   Report generation, workflow linting, governance, and 
 - [Configuration](docs/configuration.md)
 - [API](docs/api.md)
 - [Development guide](docs/development.md)
+- [Architecture decision log](docs/architecture/decision-log.md)
+- [Phase 0 validation baseline](docs/architecture/phase-0-validation-baseline.md)
 - [Self-healing foundation](docs/architecture/self-healing.md)
 - [Data layer foundation](docs/architecture/data-layer.md)
 - [Observability stack architecture](docs/architecture/observability-stack.md)
