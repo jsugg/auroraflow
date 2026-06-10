@@ -2270,13 +2270,13 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | Field | Value |
 | --- | --- |
 | Current phase | Phase 0 |
-| Current task | `AUR-IMPL-001` and `AUR-IMPL-008` complete as docs-only PR-00A |
+| Current task | `AUR-IMPL-002` and `AUR-IMPL-004` implemented in working tree |
 | Branch | `main` |
-| Latest commit | `f21d6c8` |
-| Working tree status | Pre-existing `docs/.keep` deletion and untracked architecture planning docs observed before docs-only edits; runtime code untouched |
+| Latest commit | `35e4887` |
+| Working tree status | Runtime/docs/config changes for `AUR-IMPL-002`/`AUR-IMPL-004`; pre-existing staged `docs/.keep` deletion remains separate |
 | Blocked decision gates | None; `AUR-DEC-001`-`AUR-DEC-013` resolved by operator on 2026-06-10 |
-| Last validation run | 2026-06-10 `AUR-VAL-026`: `npm run format:check` passed; `npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts` passed |
-| Next recommended action | Start `AUR-IMPL-002` only after reviewing `docs/architecture/decision-log.md` and `docs/architecture/phase-0-validation-baseline.md` |
+| Last validation run | 2026-06-10 `AUR-IMPL-002`/`AUR-IMPL-004`: targeted unit/integration suites passed; `npm run typecheck`, `npm run format:check`, and `npm run lint` passed |
+| Next recommended action | Start `AUR-IMPL-003` structured-candidate regression safety net |
 
 ### 15.3 Task Progress Log
 
@@ -2287,6 +2287,7 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | 2026-06-10 | Codex | `AUR-IMPL-001`, `AUR-IMPL-008` | Started docs-only PR-00A; created repository decision log and Phase 0 validation baseline | `docs/architecture/decision-log.md`, `docs/architecture/phase-0-validation-baseline.md`, `README.md`, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk git status --short`; task-card and docs-contract inspection | Docs edited; runtime code not touched | Run `AUR-VAL-026` docs validation |
 | 2026-06-10 | Codex | `AUR-IMPL-001`, `AUR-IMPL-008`, `AUR-VAL-026` | Completed docs-only PR-00A and docs validation | `docs/architecture/decision-log.md`, `docs/architecture/phase-0-validation-baseline.md`, `README.md`, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk npm run format:check`; `rtk npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts` | Passed; 16 Vitest files / 58 tests passed through the integration/contracts script | Next task: `AUR-IMPL-002` guarded-healing bootstrap policy |
 | 2026-06-10 | Operator + planning agent | Planning | Expanded suggested future prompts from 6 to a complete 26-prompt sequence executing all 40 implementation tasks, one prompt per Section 10 PR group | `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | Plan read/edit; `npm run format:check` | Prompt sequence complete and aligned with PR plan and dependency graph | Coding agents follow prompts in order starting at PR-00A |
+| 2026-06-10 | Codex | `AUR-IMPL-002`, `AUR-IMPL-004` | Implemented registry-curated guarded reachability tests, scoring/SLO policy constants, drift contract, and warning-only SLO policy/rules | `src/framework/selfHealing/scoringPolicy.ts`, `src/framework/observability/sloThresholds.ts`, self-healing/observability source, tests, docs, `configs/quality/slo-alert-policy.json`, `observability/prometheus/rules/auroraflow.yml` | `rtk npm run test:unit -- --run tests/suites/unit/framework/selfHealing/candidateScoring.spec.ts tests/suites/unit/framework/selfHealing/guardedValidation.spec.ts tests/suites/unit/framework/observability/sloDashboard.spec.ts`; `rtk npm run test:integration -- --run tests/suites/contracts/workflows/slo-dashboard-alerting.contract.spec.ts`; `rtk npm run typecheck`; `rtk npm run format:check`; `rtk npm run lint` | Passed; unit script ran 38 files / 184 tests, integration script ran 16 files / 60 tests | Next task: `AUR-IMPL-003` |
 
 ### 15.4 Command Log
 
@@ -2305,6 +2306,12 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | 2026-06-10 | `rtk npx prettier docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md docs/architecture/decision-log.md docs/architecture/phase-0-validation-baseline.md --write` | Format touched Markdown after initial `format:check` warning | Completed | Docs-only formatting; no runtime files touched |
 | 2026-06-10 | `rtk npm run format:check` | Docs validation formatting gate | Passed | First run warned on three touched Markdown files; rerun passed after docs-only Prettier |
 | 2026-06-10 | `rtk npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts` | Docs validation contract gate | Passed | Vitest ran existing integration/contracts command shape: 16 files, 58 tests passed |
+| 2026-06-10 | `rtk grep` / `rtk sed` on decision and task docs | Read `AUR-DEC-002`, `AUR-DEC-003`, `AUR-IMPL-002`, and `AUR-IMPL-004` | Completed | Confirmed registry-curated default and QA/SRE warn-by-default SLO policy |
+| 2026-06-10 | `rtk npm run test:unit -- --run tests/suites/unit/framework/selfHealing/candidateScoring.spec.ts tests/suites/unit/framework/selfHealing/guardedValidation.spec.ts tests/suites/unit/framework/observability/sloDashboard.spec.ts` | Validate guarded reachability and SLO dashboard unit coverage | Passed | Existing script ran 38 unit/framework files, 184 tests |
+| 2026-06-10 | `rtk npm run test:integration -- --run tests/suites/contracts/workflows/slo-dashboard-alerting.contract.spec.ts` | Validate scoring/threshold/SLO drift contract | Passed | Existing script ran 16 integration/contract files, 60 tests |
+| 2026-06-10 | `rtk npm run typecheck` | TypeScript strictness gate | Passed | No errors |
+| 2026-06-10 | `rtk npm run format:check` | Formatting gate | Passed | Prettier clean after targeted write |
+| 2026-06-10 | `rtk npm run lint` | ESLint gate | Passed | No errors |
 
 ### 15.5 Decision Log
 

@@ -7,7 +7,7 @@ AuroraFlow reads configuration from explicit function inputs, CLI flags, and env
 | Variable | Values | Default | Purpose |
 | --- | --- | --- | --- |
 | `SELF_HEAL_MODE` | `off`, `suggest`, `guarded` | `off` | Enables self-healing capture and guarded validation. |
-| `SELF_HEAL_MIN_CONFIDENCE` | `0..1` | `0.92` | Confidence floor for guarded candidate acceptance. |
+| `SELF_HEAL_MIN_CONFIDENCE` | `0..1` | `0.92` | Safety floor for guarded candidate acceptance. |
 | `SELF_HEAL_ALLOWED_ACTIONS` | comma-separated action types | `click,type,read,wait,screenshot` | Action types eligible for guarded validation. |
 | `SELF_HEAL_ALLOWED_DOMAINS` | comma-separated hosts | empty | Optional host allow-list for guarded validation. |
 
@@ -27,6 +27,8 @@ AuroraFlow reads configuration from explicit function inputs, CLI flags, and env
 | `SELF_HEAL_PROMOTION_MODE` | `manual`, `ci_acknowledged` | `manual` | Promotion workflow posture. |
 
 Read mode is opportunistic unless Redis configuration is present or `SELF_HEAL_REGISTRY_REQUIRED=true`. Write-pending mode records SAT history and pending promotions when a registry runtime is configured.
+
+Default guarded healing is registry-curated by policy: fresh heuristic and DOM candidates are diagnostic below the `0.92` floor, while curated registry entries at or above the floor and strongly validated candidate history can pass guarded dry-run validation. Lower thresholds require reachability tests and an updated decision record.
 
 ## Redis
 

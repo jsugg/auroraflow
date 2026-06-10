@@ -3,10 +3,166 @@ import {
   buildSelfHealingCandidateId,
   rankSelfHealingCandidates,
 } from '../../../../../src/framework/selfHealing/candidateScoring';
+import { DEFAULT_SELF_HEAL_MIN_CONFIDENCE } from '../../../../../src/framework/selfHealing/config';
+import { generateRankedLocatorSuggestions } from '../../../../../src/framework/selfHealing/suggestionEngine';
 import type { SelfHealingCandidateSeed } from '../../../../../src/framework/selfHealing/candidateTypes';
 import type { SelectorCandidateHistory } from '../../../../../src/framework/selfHealing/types';
 
 describe('rankSelfHealingCandidates', () => {
+  it('keeps fresh heuristic and DOM candidates below the default guarded threshold', () => {
+    const failedTarget = '#submit-order';
+    const heuristicSuggestions = generateRankedLocatorSuggestions({
+      actionType: 'click',
+      failedTarget,
+      maxCandidates: 10,
+    });
+    const freshDomCandidates: SelfHealingCandidateSeed[] = [
+      {
+        locator: "page.getByTestId('submit-order')",
+        strategy: 'testId',
+        rationale: 'Stable test id.',
+        evidence: {
+          elementId: 'dom-1',
+          source: 'dom',
+          uniqueInSnapshot: true,
+          visible: true,
+          accessibleName: 'Submit order',
+          role: 'button',
+          matchedAttributes: ['data-testid'],
+        },
+      },
+      {
+        locator: "page.getByRole('button', { name: /submit order/i })",
+        strategy: 'roleName',
+        rationale: 'Role and accessible name.',
+        evidence: {
+          elementId: 'dom-1',
+          source: 'dom',
+          uniqueInSnapshot: true,
+          visible: true,
+          accessibleName: 'Submit order',
+          role: 'button',
+          matchedAttributes: ['role', 'accessibleName'],
+        },
+      },
+    ];
+
+    const freshDomRanked = rankSelfHealingCandidates({
+      pageObjectName: 'CheckoutPage',
+      actionType: 'click',
+      failedTarget: "page.getByTestId('submit-order')",
+      heuristicSuggestions: [],
+      domCandidates: freshDomCandidates,
+      maxCandidates: 10,
+    });
+
+    expect(Math.max(...heuristicSuggestions.map((suggestion) => suggestion.score))).toBeLessThan(
+      DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
+    );
+    expect(freshDomRanked).toHaveLength(2);
+    expect(Math.max(...freshDomRanked.map((candidate) => candidate.score))).toBeLessThan(
+      DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
+    );
+  });
+
+  it('lets only curated registry confidence reach the default guarded threshold', () => {
+    const locator = "page.getByTestId('submit-order')";
+    const ranked = rankSelfHealingCandidates({
+      pageObjectName: 'CheckoutPage',
+      actionType: 'click',
+      failedTarget: '#legacy-submit',
+      selectorId: 'checkout.submit',
+      heuristicSuggestions: [],
+      domCandidates: [],
+      registryCandidates: [
+        {
+          id: 'checkout.submit.default',
+          pageObjectName: 'CheckoutPage',
+          actionType: 'click',
+          locator,
+          updatedAt: '2026-06-08T12:00:00.000Z',
+          version: 1,
+        },
+        {
+          id: 'checkout.submit.curated',
+          pageObjectName: 'CheckoutPage',
+          actionType: 'click',
+          locator: "page.getByRole('button', { name: /submit order/i })",
+          confidence: 0.94,
+          updatedAt: '2026-06-08T12:00:00.000Z',
+          version: 2,
+        },
+      ],
+      maxCandidates: 10,
+    });
+
+    const defaultRegistry = ranked.find(
+      (candidate) => candidate.registryRecordId === 'checkout.submit.default',
+    );
+    const curatedRegistry = ranked.find(
+      (candidate) => candidate.registryRecordId === 'checkout.submit.curated',
+    );
+
+    expect(defaultRegistry?.score).toBeLessThan(DEFAULT_SELF_HEAL_MIN_CONFIDENCE);
+    expect(curatedRegistry?.score).toBeGreaterThanOrEqual(DEFAULT_SELF_HEAL_MIN_CONFIDENCE);
+  });
+
+  it('allows prior validated history to bootstrap a candidate without lowering defaults', () => {
+    const locator = "page.getByRole('button', { name: /submit order/i })";
+    const candidateId = buildSelfHealingCandidateId({
+      pageObjectName: 'CheckoutPage',
+      actionType: 'click',
+      failedTarget: locator,
+      strategy: 'roleName',
+      locator,
+    });
+    const history: SelectorCandidateHistory = {
+      candidateId,
+      attempts: 10,
+      validated: 10,
+      guardedApplySucceeded: 10,
+      guardedApplyFailed: 0,
+      promoted: 1,
+      rejected: 0,
+      rolledBack: 0,
+    };
+
+    const ranked = rankSelfHealingCandidates({
+      pageObjectName: 'CheckoutPage',
+      actionType: 'click',
+      failedTarget: locator,
+      heuristicSuggestions: [],
+      domCandidates: [
+        {
+          locator,
+          strategy: 'roleName',
+          rationale: 'Role and accessible name.',
+          evidence: {
+            elementId: 'dom-1',
+            source: 'dom',
+            uniqueInSnapshot: true,
+            visible: true,
+            accessibleName: 'Submit order',
+            role: 'button',
+            matchedAttributes: ['role', 'accessibleName'],
+          },
+        },
+      ],
+      candidateHistories: new Map([[candidateId, history]]),
+      maxCandidates: 10,
+    });
+
+    expect(ranked[0]).toMatchObject({
+      id: candidateId,
+      history: {
+        enabled: true,
+        loadedCandidates: 1,
+        observations: 10,
+      },
+    });
+    expect(ranked[0]?.score).toBeGreaterThanOrEqual(DEFAULT_SELF_HEAL_MIN_CONFIDENCE);
+  });
+
   it('prefers visible unique test-id evidence over CSS fallbacks', () => {
     const domCandidates: SelfHealingCandidateSeed[] = [
       {

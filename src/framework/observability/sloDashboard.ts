@@ -1,13 +1,7 @@
 import type { FlakinessSummary } from './flakinessReport';
+import { SLO_METRIC_TARGETS, type SloMetricKey, type SloMetricTarget } from './sloThresholds';
 
-export type SloMetricKey =
-  | 'passRate'
-  | 'failureRate'
-  | 'flakeRate'
-  | 'retryFailureRate'
-  | 'guardedAutoHealFailureRate';
-
-export type SloMetricComparator = 'gte' | 'lte';
+export type { SloMetricComparator, SloMetricKey, SloMetricTarget } from './sloThresholds';
 export type SloMetricStatus = 'met' | 'breached' | 'insufficient_data';
 
 export interface SelfHealingGovernanceSummary {
@@ -29,12 +23,6 @@ export interface SelfHealingGovernanceSummary {
       skipped?: number;
     };
   };
-}
-
-export interface SloMetricTarget {
-  comparator: SloMetricComparator;
-  threshold: number;
-  rationale: string;
 }
 
 export interface SloMetric {
@@ -71,34 +59,6 @@ export interface SloDashboard {
   };
   metrics: SloMetric[];
 }
-
-const TARGETS: Readonly<Record<SloMetricKey, SloMetricTarget>> = Object.freeze({
-  passRate: {
-    comparator: 'gte',
-    threshold: 0.98,
-    rationale: 'Keep successful final outcomes at or above 98%.',
-  },
-  failureRate: {
-    comparator: 'lte',
-    threshold: 0.02,
-    rationale: 'Keep hard-fail outcomes at or below 2%.',
-  },
-  flakeRate: {
-    comparator: 'lte',
-    threshold: 0.02,
-    rationale: 'Keep flaky outcomes at or below 2%.',
-  },
-  retryFailureRate: {
-    comparator: 'lte',
-    threshold: 0.1,
-    rationale: 'Keep failed-attempt pressure at or below 10% of all attempts.',
-  },
-  guardedAutoHealFailureRate: {
-    comparator: 'lte',
-    threshold: 0.05,
-    rationale: 'Keep guarded auto-heal apply failures at or below 5% of attempts.',
-  },
-});
 
 function toRatio(numerator: number, denominator: number): number | null {
   if (denominator <= 0) {
@@ -179,38 +139,38 @@ export function buildSloDashboard({
       key: 'passRate',
       label: 'Pass Rate',
       value: metricValues.passRate,
-      target: TARGETS.passRate,
-      status: toMetricStatus(metricValues.passRate, TARGETS.passRate),
+      target: SLO_METRIC_TARGETS.passRate,
+      status: toMetricStatus(metricValues.passRate, SLO_METRIC_TARGETS.passRate),
     },
     {
       key: 'failureRate',
       label: 'Failure Rate',
       value: metricValues.failureRate,
-      target: TARGETS.failureRate,
-      status: toMetricStatus(metricValues.failureRate, TARGETS.failureRate),
+      target: SLO_METRIC_TARGETS.failureRate,
+      status: toMetricStatus(metricValues.failureRate, SLO_METRIC_TARGETS.failureRate),
     },
     {
       key: 'flakeRate',
       label: 'Flake Rate',
       value: metricValues.flakeRate,
-      target: TARGETS.flakeRate,
-      status: toMetricStatus(metricValues.flakeRate, TARGETS.flakeRate),
+      target: SLO_METRIC_TARGETS.flakeRate,
+      status: toMetricStatus(metricValues.flakeRate, SLO_METRIC_TARGETS.flakeRate),
     },
     {
       key: 'retryFailureRate',
       label: 'Retry Failure Rate',
       value: metricValues.retryFailureRate,
-      target: TARGETS.retryFailureRate,
-      status: toMetricStatus(metricValues.retryFailureRate, TARGETS.retryFailureRate),
+      target: SLO_METRIC_TARGETS.retryFailureRate,
+      status: toMetricStatus(metricValues.retryFailureRate, SLO_METRIC_TARGETS.retryFailureRate),
     },
     {
       key: 'guardedAutoHealFailureRate',
       label: 'Guarded Auto-Heal Failure Rate',
       value: metricValues.guardedAutoHealFailureRate,
-      target: TARGETS.guardedAutoHealFailureRate,
+      target: SLO_METRIC_TARGETS.guardedAutoHealFailureRate,
       status: toMetricStatus(
         metricValues.guardedAutoHealFailureRate,
-        TARGETS.guardedAutoHealFailureRate,
+        SLO_METRIC_TARGETS.guardedAutoHealFailureRate,
       ),
     },
   ];

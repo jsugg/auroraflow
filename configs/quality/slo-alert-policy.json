@@ -15,7 +15,7 @@
       "metric": "failureRate",
       "operator": "gt",
       "threshold": 0.02,
-      "severity": "critical",
+      "severity": "warning",
       "description": "Failure rate exceeded 2% SLO.",
       "blockOnBreach": false
     },
@@ -24,7 +24,7 @@
       "metric": "flakeRate",
       "operator": "gt",
       "threshold": 0.02,
-      "severity": "critical",
+      "severity": "warning",
       "description": "Flake rate exceeded 2% SLO.",
       "blockOnBreach": false
     },

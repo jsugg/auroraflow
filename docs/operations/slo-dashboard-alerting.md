@@ -40,11 +40,14 @@ npm run slo:alerts -- \
 
 Behavior:
 
-- Breaches emit warning annotations in CI logs.
-- Blocking rules (`blockOnBreach: true`) fail the command.
+- Breaches emit warning annotations in CI logs by default.
+- Repository policy rules use warning severity and `blockOnBreach: false`; changing either requires an updated QA/SRE decision.
+- Blocking rules (`blockOnBreach: true`) fail the command when an explicit policy opts in.
 - `--fail-on-breach` fails on any breach regardless of `blockOnBreach`.
 - `--trend-output` appends SLO dashboard and alert-evaluation trend points to bounded JSONL.
 - `--trend-limit <n>` controls retained trend points (default `100`); environment fallbacks are `AURORAFLOW_TREND_OUTPUT` and `AURORAFLOW_TREND_LIMIT`.
+
+Dashboard targets, `configs/quality/slo-alert-policy.json`, and local Prometheus SLO rules are covered by a drift contract test so warn-by-default thresholds stay aligned.
 
 ## CI Integration
 

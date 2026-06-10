@@ -13,6 +13,8 @@ AuroraFlow supports a mode-gated self-healing failure-capture foundation for fai
 - `SELF_HEAL_MIN_CONFIDENCE` controls the confidence floor used by downstream self-healing decisions.
 - Accepted range is `0` to `1`.
 - Invalid or missing values default to `0.92`.
+- The default `0.92` floor is a safety-first, registry-curated policy: fresh heuristic and DOM candidates are expected to remain below the floor, while curated registry entries and strongly validated candidate history can pass.
+- Lowering the default threshold or broadening DOM-pass behavior requires reachability fixtures and a decision-log update.
 
 ## SAT Enrichment
 
@@ -87,6 +89,7 @@ JSON Schema contracts for self-healing artifacts live in [`../operations/artifac
 When mode is `guarded`, AuroraFlow evaluates ranked locator suggestions in dry-run mode before writing the failure artifact:
 
 - Candidates below `SELF_HEAL_MIN_CONFIDENCE` are marked as skipped.
+- With default scoring, fresh heuristic and DOM candidates remain diagnostic unless a maintainer explicitly lowers the threshold; registry-curated candidates can pass when their confidence meets the floor.
 - Supported locator expressions are resolved against the current page and checked for matches and visibility.
 - The first confidence-eligible visible candidate is marked as `accepted` for operator review.
 - No action is auto-applied in this stage; validation is diagnostic and auditable only.

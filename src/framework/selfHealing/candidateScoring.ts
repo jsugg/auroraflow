@@ -1,6 +1,10 @@
 import { createHash } from 'node:crypto';
 import type { SelfHealingCandidateSeed } from './candidateTypes';
 import type { SelectorRegistryEntry } from './registryContracts';
+import {
+  SELF_HEALING_SCORE_WEIGHTS,
+  SELF_HEALING_VALIDATED_STRATEGY_RELIABILITY,
+} from './scoringPolicy';
 import type {
   CandidateEvidence,
   RankedSelfHealingCandidate,
@@ -23,28 +27,6 @@ export interface CandidateScoringInput {
   candidateHistories?: ReadonlyMap<string, SelectorCandidateHistory>;
   maxCandidates: number;
 }
-
-const SCORE_WEIGHTS = Object.freeze({
-  roleSignal: 0.28,
-  accessibleNameSignal: 0.22,
-  uniquenessSignal: 0.25,
-  historicalSignal: 0.15,
-  similaritySignal: 0.1,
-} satisfies Record<keyof SelfHealingSuggestionSignals, number>);
-
-const STRATEGY_RELIABILITY: Readonly<Record<SelfHealingSuggestionStrategy, number>> = Object.freeze(
-  {
-    original: 0.36,
-    testId: 1,
-    roleName: 0.9,
-    ariaLabel: 0.82,
-    text: 0.58,
-    cssFallback: 0.42,
-    fallback: 0.2,
-    registry: 0.88,
-    domEvidence: 0.68,
-  },
-);
 
 function clamp(value: number): number {
   if (!Number.isFinite(value)) {
@@ -120,11 +102,11 @@ export function buildSelfHealingCandidateId({
 
 function scoreSignals(signals: SelfHealingSuggestionSignals): number {
   const rawScore =
-    signals.roleSignal * SCORE_WEIGHTS.roleSignal +
-    signals.accessibleNameSignal * SCORE_WEIGHTS.accessibleNameSignal +
-    signals.uniquenessSignal * SCORE_WEIGHTS.uniquenessSignal +
-    signals.historicalSignal * SCORE_WEIGHTS.historicalSignal +
-    signals.similaritySignal * SCORE_WEIGHTS.similaritySignal;
+    signals.roleSignal * SELF_HEALING_SCORE_WEIGHTS.roleSignal +
+    signals.accessibleNameSignal * SELF_HEALING_SCORE_WEIGHTS.accessibleNameSignal +
+    signals.uniquenessSignal * SELF_HEALING_SCORE_WEIGHTS.uniquenessSignal +
+    signals.historicalSignal * SELF_HEALING_SCORE_WEIGHTS.historicalSignal +
+    signals.similaritySignal * SELF_HEALING_SCORE_WEIGHTS.similaritySignal;
   return Number(clamp(rawScore).toFixed(3));
 }
 
@@ -135,7 +117,7 @@ function scoreDomCandidate({
   seed: SelfHealingCandidateSeed;
   failedTarget?: string;
 }): { score: number; signals: SelfHealingSuggestionSignals } {
-  const reliability = STRATEGY_RELIABILITY[seed.strategy];
+  const reliability = SELF_HEALING_VALIDATED_STRATEGY_RELIABILITY[seed.strategy];
   const signals: SelfHealingSuggestionSignals = {
     roleSignal: seed.evidence.role || seed.strategy === 'roleName' ? 1 : 0,
     accessibleNameSignal: seed.evidence.accessibleName ? 1 : 0,
@@ -205,7 +187,8 @@ function applyHistory(
     historicalSignal,
   };
   const scoreDelta =
-    (historicalSignal - candidate.signals.historicalSignal) * SCORE_WEIGHTS.historicalSignal;
+    (historicalSignal - candidate.signals.historicalSignal) *
+    SELF_HEALING_SCORE_WEIGHTS.historicalSignal;
 
   return {
     ...candidate,
@@ -222,11 +205,13 @@ function scoreRegistryCandidate({
   entry: SelectorRegistryEntry;
   failedTarget?: string;
 }): { score: number; signals: SelfHealingSuggestionSignals } {
-  const confidence = clamp(entry.confidence ?? STRATEGY_RELIABILITY.registry);
+  const confidence = clamp(
+    entry.confidence ?? SELF_HEALING_VALIDATED_STRATEGY_RELIABILITY.registry,
+  );
   const signals: SelfHealingSuggestionSignals = {
     roleSignal: 0,
     accessibleNameSignal: 0,
-    uniquenessSignal: STRATEGY_RELIABILITY.registry,
+    uniquenessSignal: SELF_HEALING_VALIDATED_STRATEGY_RELIABILITY.registry,
     historicalSignal: 0.5,
     similaritySignal: similaritySignal(entry.locator, failedTarget),
   };
