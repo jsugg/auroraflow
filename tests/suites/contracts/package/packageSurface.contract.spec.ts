@@ -27,7 +27,7 @@ describe('package surface contract', () => {
       default: './dist/index.js',
     });
     expect(packageJson.exports?.['./package.json']).toBe('./package.json');
-    expect(packageJson.files).toEqual(['dist', 'README.md', 'LICENSE']);
+    expect(packageJson.files).toEqual(['dist', 'docs', 'schemas', 'README.md', 'LICENSE']);
     expect(packageJson.license).toBe('MIT');
   });
 

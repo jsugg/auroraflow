@@ -16,7 +16,7 @@ AuroraFlow supports a mode-gated self-healing failure-capture foundation for fai
 
 ## SAT Enrichment
 
-Selector Analysis Tooling (SAT) enriches `suggest` and `guarded` artifacts with bounded DOM evidence, optional selector-registry reads, optional candidate history reads, deterministic candidate scoring, and write-pending registry telemetry. SAT can write history observations and pending promotion review records, but reviewed approval/rejection/rollback flows and source-code rewrites remain out of scope.
+Selector Analysis Tooling (SAT) enriches `suggest` and `guarded` artifacts with bounded DOM evidence, optional selector-registry reads, optional candidate history reads, deterministic candidate scoring, and write-pending registry telemetry. SAT can write history observations and pending promotion review records. Reviewed approve, reject, conflict, and rollback workflows operate on selector registry records only; source-code rewrites remain out of scope.
 
 - `SELF_HEAL_SAT_ENABLED` defaults to enabled for `suggest` and `guarded`, disabled for `off`.
 - `SELF_HEAL_SAT_CAPTURE_DOM` defaults to true when SAT is enabled.
@@ -27,7 +27,7 @@ Selector Analysis Tooling (SAT) enriches `suggest` and `guarded` artifacts with 
 - `SELF_HEAL_REGISTRY_MODE` accepts `off`, `read`, or `write_pending`; `read` loads active selector records/history, while `write_pending` also stores history observations and reviewable pending promotion records after successful guarded auto-apply.
 - `SELF_HEAL_REGISTRY_REQUIRED=true` opts into required registry resolution; otherwise read mode is opportunistic when Redis configuration is present.
 - `SELF_HEAL_REGISTRY_NAMESPACE` overrides the active selector namespace; default is `selector-registry`.
-- `SELF_HEAL_PROMOTION_MODE` accepts `manual` or `ci_acknowledged`; promotion workflows remain manual.
+- `SELF_HEAL_PROMOTION_MODE` accepts `manual` or `ci_acknowledged`; reviewed workflows still require explicit acknowledgement or reviewer identity before active selector records change.
 
 DOM snapshots are captured inside the browser through `page.evaluate` and serialized as compact summaries:
 
@@ -116,6 +116,28 @@ When `SELF_HEAL_REGISTRY_MODE=write_pending` and a registry runtime is configure
 - Redis TTLs for historical SAT telemetry and pending promotion review records.
 
 Pending promotion records share `eventId`, `candidateId`, and `selectorId` with the file artifact. They are review records only; AuroraFlow does not mutate active selector records or source files in this step.
+
+## Reviewed Promotion Workflow
+
+Reviewed workflow commands are available through:
+
+```bash
+npm run self-heal:promotions -- list --selector-id <selector-id>
+npm run self-heal:promotions -- approve --promotion-id <promotion-id> --reviewer <name>
+npm run self-heal:promotions -- reject --promotion-id <promotion-id> --reviewer <name> --reason "<reason>"
+npm run self-heal:promotions -- rollback --promotion-id <promotion-id> --reviewer <name>
+npm run self-heal:promotions -- cleanup
+```
+
+Behavior:
+
+- `list` returns pending review records, with optional selector/candidate filters.
+- `approve` requires reviewer identity, applies the proposed locator with expected-version compare-and-set, writes audit metadata, and marks conflicts explicitly.
+- `reject` requires reviewer identity and a reason, marks the promotion rejected, and accounts candidate rejection history.
+- `rollback` restores the previous selector snapshot with compare-and-set, writes rollback audit metadata, and accounts rollback history.
+- `cleanup` removes expired history and promotion records from non-active keyspaces.
+
+Statuses include `pending`, `approved`, `applied`, `rejected`, `conflict`, and `rolled_back`. Conflicts never silently overwrite active selector records.
 
 ## CI Governance and Triage
 

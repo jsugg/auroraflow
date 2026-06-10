@@ -8,11 +8,12 @@ AuroraFlow documentation should describe implemented behavior first and roadmap 
 
 Important current boundaries:
 
-- Self-healing SAT is diagnostic and guarded; it does not autonomously update selectors.
-- `SELF_HEAL_REGISTRY_MODE` and `SELF_HEAL_PROMOTION_MODE` are parsed configuration today, not active persistence workflows.
-- Redis selector registry primitives are implemented, but SAT history and promotion logic are not wired to Redis yet.
+- Self-healing SAT is diagnostic and guarded; it does not blindly or autonomously update selectors.
+- `SELF_HEAL_REGISTRY_MODE=read` can load active selector records and candidate history when a registry runtime is configured.
+- `SELF_HEAL_REGISTRY_MODE=write_pending` can persist SAT history observations and reviewable pending promotion records.
+- Reviewed approve, reject, conflict, and rollback workflows mutate selector registry records only; they do not rewrite source files.
 - The observability stack is suitable for local development and CI smoke validation. Production deployment requires environment-owned credentials, TLS, storage, retention, network policy, and operations support.
-- The package build emits only `src/**/*.ts` declarations and JavaScript into `dist`.
+- The package build emits `src/**/*.ts` declarations and JavaScript into `dist`; the package also includes curated `docs/` and `schemas/`.
 
 ## Prerequisites
 
@@ -97,7 +98,7 @@ npm run build
 npm run pack:dry-run
 ```
 
-`tsconfig.build.json` uses `src` as the root and excludes tests, examples, and scripts. Package contracts expect `dist`, `README.md`, and `LICENSE` as the packaged files.
+`tsconfig.build.json` uses `src` as the root and excludes tests, examples, and scripts. Package contracts expect `dist`, `docs`, `schemas`, `README.md`, and `LICENSE` as the packaged files.
 
 ## Redis development
 
