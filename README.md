@@ -6,7 +6,7 @@
 
 AuroraFlow is a TypeScript Playwright automation framework focused on maintainable page objects, mode-gated self-healing diagnostics, Redis-backed selector/data primitives, and deterministic CI observability artifacts.
 
-The project is intentionally explicit about what is production-ready foundation versus what is still a roadmap item. The current package ships framework primitives from `src/`; examples, tests, scripts, and operations assets remain repository tooling.
+The project is intentionally explicit about what is production-ready foundation versus what is still a roadmap item. The current package ships built framework primitives, curated docs, JSON Schemas, the README, and the license; examples, tests, scripts, workflow files, and observability stack assets remain repository tooling.
 
 ## Current status
 
@@ -30,7 +30,7 @@ Not implemented yet:
 
 | Area | What is mature now | Current boundary | Source |
 | --- | --- | --- | --- |
-| Package surface | Root package metadata, declaration output, curated publish files, and broad typed exports are contract-tested. | The published artifact is limited to `dist`, `README.md`, and `LICENSE`; repository examples and scripts are not part of the package API. | `package.json`, `src/index.ts`, `tsconfig.build.json`, `tests/suites/contracts/package/packageSurface.contract.spec.ts` |
+| Package surface | Root package metadata, declaration output, curated publish files, broad typed exports, API docs, operations docs, and artifact schemas are contract-tested. | Repository examples, tests, scripts, workflow files, and observability stack assets are not part of the package API. | `package.json`, `src/index.ts`, `tsconfig.build.json`, `tests/suites/contracts/package/packageSurface.contract.spec.ts` |
 | Page objects | `PageObjectBase` wraps navigation, click, type, read, wait, screenshot, and close actions with initialization, logging, screenshots, self-healing analysis, and telemetry metrics. `PageFactory` caches page object instances. | Protected helpers that call Playwright directly should be reviewed before treating them as instrumented public actions. | `src/pageObjects/pageObjectBase.ts`, `src/helpers/pageFactory.ts` |
 | Self-healing diagnostics | `off`, `suggest`, and `guarded` modes are parsed and enforced. Failure capture can include ranked suggestions, DOM-derived candidates, registry-backed history, guarded validation, one guarded retry for click/type/read/wait, history observations, reviewable pending promotion records, and audited approve/reject/rollback workflows. | Reviewed promotion scope is registry mutation only; no source-code rewrites or blind unreviewed selector mutation occur. | `src/framework/selfHealing/config.ts`, `src/framework/selfHealing/analyzer.ts`, `src/framework/selfHealing/guardedValidation.ts`, `src/framework/selfHealing/promotionWorkflow.ts`, `docs/architecture/self-healing.md` |
 | Redis data layer | Runtime config validation, namespaced keys, bounded retry with jitter, SCAN-based listing, batched reads, selector record validation, CAS, page/action indexes, TTL-capable stores, SAT history records, pending promotions, audited selector updates, and Testcontainers coverage are implemented. | Production rollout still needs operator-owned Redis retention/backup policy and review process controls. | `src/utils/redisClient.ts`, `src/data/selectors/selectorRegistry.ts`, `docs/architecture/data-layer.md` |
@@ -204,6 +204,10 @@ scripts/                   Report generation, workflow linting, governance, and 
 
 ## Documentation
 
+- [Getting started](docs/getting-started.md)
+- [Writing tests](docs/writing-tests.md)
+- [Configuration](docs/configuration.md)
+- [API](docs/api.md)
 - [Development guide](docs/development.md)
 - [Self-healing foundation](docs/architecture/self-healing.md)
 - [Data layer foundation](docs/architecture/data-layer.md)
@@ -218,9 +222,9 @@ scripts/                   Report generation, workflow linting, governance, and 
 
 The next meaningful maturity steps are:
 
-1. Expand API-grade getting-started, authoring, configuration, and operations docs.
-2. Add richer trend triage views on top of the persisted JSONL history.
-3. Continue package-surface contracts and example coverage before widening the public API.
+1. Add richer trend triage views on top of the persisted JSONL history.
+2. Continue package-surface contracts and example coverage before widening the public API.
+3. Keep production observability guidance aligned with measured Collector and Prometheus behavior.
 
 ## Contributing
 
