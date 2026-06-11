@@ -5,6 +5,7 @@ import {
   DEFAULT_SELF_HEAL_MAX_CANDIDATES,
   DEFAULT_PENDING_SELECTOR_PROMOTION_TTL_SECONDS,
   DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS,
+  MAX_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS,
   SelfHealingArtifactSchemaError,
   DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
   LoggerConfigError,
@@ -47,6 +48,10 @@ import {
   resolveRedisRuntimeConfig,
   resolveSelfHealingRegistryRuntime,
   resolveSelfHealingConfig,
+  resolveSelfHealingConfigWithDiagnostics,
+  describeEffectiveSelfHealingConfig,
+  SELF_HEAL_CONFIG_STRICT_ENV,
+  SelfHealingConfigError,
   resolveTelemetryConfig,
   retry,
   type AlertPolicy,
@@ -61,6 +66,8 @@ import {
   type RedisRuntimeConfig,
   type ResolveSelfHealingRegistryRuntimeOptions,
   type SelfHealingConfig,
+  type SelfHealingConfigDiagnostic,
+  type SelfHealingConfigResolution,
   type SelfHealingRegistryPersistenceSummary,
   type SelfHealingRegistryRuntime,
   type SelectorCandidateHistoryRepository,
@@ -87,7 +94,8 @@ describe('public package surface', () => {
     expect(StoreSelectorCandidateHistoryRepository).toBeTypeOf('function');
     expect(DEFAULT_OBSERVABILITY_TREND_LIMIT).toBeGreaterThan(0);
     expect(DEFAULT_PENDING_SELECTOR_PROMOTION_TTL_SECONDS).toBeGreaterThan(0);
-    expect(DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS).toBeGreaterThan(0);
+    expect(DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS).toBe(2_592_000);
+    expect(MAX_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS).toBe(2_592_000);
     expect(DEFAULT_SELF_HEAL_MIN_CONFIDENCE).toBe(0.92);
     expect(DEFAULT_SELF_HEAL_MAX_CANDIDATES).toBe(10);
     expect(METRIC_NAMES.pageActionsTotal).toBe('auroraflow_page_actions_total');
@@ -120,6 +128,10 @@ describe('public package surface', () => {
     expect(resolveRedisRuntimeConfig).toBeTypeOf('function');
     expect(resolveSelfHealingRegistryRuntime).toBeTypeOf('function');
     expect(resolveSelfHealingConfig).toBeTypeOf('function');
+    expect(resolveSelfHealingConfigWithDiagnostics).toBeTypeOf('function');
+    expect(describeEffectiveSelfHealingConfig).toBeTypeOf('function');
+    expect(SELF_HEAL_CONFIG_STRICT_ENV).toBe('AURORAFLOW_CONFIG_STRICT');
+    expect(SelfHealingConfigError).toBeTypeOf('function');
     expect(resolveTelemetryConfig).toBeTypeOf('function');
     expect(retry).toBeTypeOf('function');
   });
@@ -149,6 +161,16 @@ describe('public package surface', () => {
     expectTypeOf<SelfHealingConfig['sat']['registryMode']>().toEqualTypeOf<
       'off' | 'read' | 'write_pending'
     >();
+    expectTypeOf<SelfHealingConfigResolution>().toMatchTypeOf<{
+      config: SelfHealingConfig;
+      diagnostics: SelfHealingConfigDiagnostic[];
+      strict: boolean;
+    }>();
+    expectTypeOf<SelfHealingConfigDiagnostic>().toMatchTypeOf<{
+      envVar: string;
+      message: string;
+      applied: string;
+    }>();
     expectTypeOf<SelfHealingRegistryRuntime>().toMatchTypeOf<{
       selectors: SelectorRegistryReader;
       histories: SelectorCandidateHistoryRepository;
