@@ -2,6 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://auroraflow.dev/schemas/selector-candidate-history.schema.json",
   "title": "AuroraFlow selector candidate history",
+  "$comment": "Candidate history retention uses a 2592000-second (30-day) default and hard cap; expiresAt mirrors the clamped TTL. Redis data is consumer-owned.",
   "type": "object",
   "additionalProperties": true,
   "required": [
@@ -47,7 +48,23 @@
       "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
     },
     "expiresAt": {
+      "description": "ISO timestamp computed from the clamped selector-candidate-history TTL. Default and maximum retention are 2592000 seconds (30 days).",
       "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
     }
-  }
+  },
+  "examples": [
+    {
+      "candidateId": "v2::CheckoutPage::click::candidate",
+      "attempts": 1,
+      "validated": 1,
+      "guardedApplySucceeded": 1,
+      "guardedApplyFailed": 0,
+      "promoted": 0,
+      "rejected": 0,
+      "rolledBack": 0,
+      "lastSeenAt": "2026-06-08T12:00:00.000Z",
+      "lastSuccessAt": "2026-06-08T12:00:00.000Z",
+      "expiresAt": "2026-07-08T12:00:00.000Z"
+    }
+  ]
 }

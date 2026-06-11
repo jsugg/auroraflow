@@ -58,6 +58,15 @@ export interface SelectorStoreSetOptions {
   ttlSeconds?: number;
 }
 
+export type SelectorStoreJsonPrimitive = string | number | boolean | null;
+export type SelectorStoreJsonObject = Readonly<Record<string, SelectorStoreJsonPrimitive>>;
+
+export interface SelectorStoreJsonMergePatch {
+  defaultValue: SelectorStoreJsonObject;
+  increments?: Readonly<Record<string, number>>;
+  set?: SelectorStoreJsonObject;
+}
+
 export interface SelectorStoreCompareAndSetOptions extends SelectorStoreSetOptions {
   expectedVersion: number | null;
 }
@@ -76,6 +85,16 @@ export interface SelectorStore {
     value: string,
     options: SelectorStoreCompareAndSetOptions,
   ): Promise<SelectorStoreCompareAndSetResult>;
+  /**
+   * Atomically merges JSON object fields at one key.
+   *
+   * Cross-process stores must implement this as a single backend-side operation.
+   */
+  atomicJsonMerge?(
+    key: string,
+    patch: SelectorStoreJsonMergePatch,
+    options?: SelectorStoreSetOptions,
+  ): Promise<string>;
   del(key: string): Promise<number>;
   keys(pattern: string): Promise<string[]>;
   scanKeys?(pattern: string): AsyncIterable<string>;

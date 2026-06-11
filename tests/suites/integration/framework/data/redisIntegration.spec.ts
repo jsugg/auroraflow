@@ -8,6 +8,7 @@ import { createRedisSelectorStore } from '../../../../../src/data/selectors/redi
 import { StoreSelectorCandidateHistoryRepository } from '../../../../../src/framework/selfHealing/historyRepository';
 import { StorePendingSelectorPromotionRepository } from '../../../../../src/framework/selfHealing/promotionRepository';
 import { SelfHealingPromotionWorkflow } from '../../../../../src/framework/selfHealing/promotionWorkflow';
+import type { RankedSelfHealingCandidate } from '../../../../../src/framework/selfHealing/types';
 import { RedisClient } from '../../../../../src/utils/redisClient';
 
 interface IntegrationRuntime {
@@ -23,6 +24,26 @@ const runtime: IntegrationRuntime = {
 };
 const CONTAINER_STARTUP_TIMEOUT_MS = 45_000;
 const INTEGRATION_SETUP_TIMEOUT_MS = 60_000;
+const concurrentHistoryCandidate: RankedSelfHealingCandidate = {
+  id: 'candidate-concurrent-int',
+  locator: '#submit',
+  strategy: 'cssFallback',
+  score: 0.8,
+  rationale: 'CSS fallback candidate.',
+  signals: {
+    roleSignal: 0,
+    accessibleNameSignal: 0,
+    uniquenessSignal: 1,
+    historicalSignal: 0,
+    similaritySignal: 0.5,
+  },
+  evidence: {
+    source: 'heuristic',
+    uniqueInSnapshot: true,
+    visible: true,
+    matchedAttributes: [],
+  },
+};
 
 function toErrorMessage(error: unknown): string {
   if (error instanceof Error) {
@@ -323,6 +344,44 @@ describe('SelectorRegistryRepository integration', () => {
     await new Promise((resolve) => setTimeout(resolve, 1_200));
     await expect(historyRepository.get('candidate-int')).resolves.toBeNull();
     await expect(promotionRepository.get('evt-int')).resolves.toBeNull();
+  });
+
+  it('preserves exact SAT history counters under concurrent Redis observations', async (context) => {
+    const client = requireClient(context);
+    const store = createRedisSelectorStore(client);
+    const activeNamespace = 'selector-registry-history-concurrency-int';
+    const historyRepository = new StoreSelectorCandidateHistoryRepository({
+      store,
+      activeNamespace,
+    });
+    const historyKey = `${activeNamespace}-history:${concurrentHistoryCandidate.id}`;
+    const observationCount = 120;
+
+    await store.del(historyKey);
+    await Promise.all(
+      Array.from({ length: observationCount }, async (_, index) =>
+        historyRepository.recordObservation({
+          candidate: concurrentHistoryCandidate,
+          eventId: `evt-concurrent-int-${index}`,
+          observedAt: '2026-06-08T12:00:00.000Z',
+          selectorId: 'checkout.submit',
+          validationStatus: index % 2 === 0 ? 'accepted' : 'no_matches',
+          validationAccepted: index % 2 === 0,
+          guardedApplySucceeded: index % 3 === 0,
+          guardedApplyFailed: index % 5 === 0,
+        }),
+      ),
+    );
+
+    await expect(historyRepository.get(concurrentHistoryCandidate.id)).resolves.toMatchObject({
+      candidateId: concurrentHistoryCandidate.id,
+      attempts: observationCount,
+      validated: 60,
+      guardedApplySucceeded: 40,
+      guardedApplyFailed: 24,
+      expiresAt: '2026-07-08T12:00:00.000Z',
+    });
+    await store.del(historyKey);
   });
 
   it('approves, rejects, conflicts, and rolls back reviewed promotions', async (context) => {
