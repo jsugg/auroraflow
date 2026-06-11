@@ -42,25 +42,55 @@ function resolveNameOption(rawValue: string): string | RegExp {
   if (regexMatch) {
     return new RegExp(regexMatch[1], regexMatch[2]);
   }
-  return rawValue.replace(/^['"`]|['"`]$/g, '');
+  const quotedValue = parseQuotedStringLiteral(rawValue);
+  return quotedValue ?? rawValue.replace(/^['"`]|['"`]$/g, '');
+}
+
+function parseQuotedStringLiteral(rawValue: string): string | null {
+  const trimmedValue = rawValue.trim();
+  if (trimmedValue.length < 2) {
+    return null;
+  }
+
+  const quote = trimmedValue[0];
+  if (quote !== "'" && quote !== '"' && quote !== '`') {
+    return null;
+  }
+  if (trimmedValue[trimmedValue.length - 1] !== quote) {
+    return null;
+  }
+
+  // TODO(AUR-IMPL-020): Remove legacy string-DSL quote recovery after structured candidates land.
+  return trimmedValue
+    .slice(1, -1)
+    .replace(/\\\\/g, '\\')
+    .replace(/\\(['"`])/g, '$1');
+}
+
+function parsePageStringArgument(expression: string, methodName: string): string | null {
+  const prefix = `page.${methodName}(`;
+  if (!expression.startsWith(prefix) || !expression.endsWith(')')) {
+    return null;
+  }
+  return parseQuotedStringLiteral(expression.slice(prefix.length, -1));
 }
 
 export function resolveLocatorExpression(page: Page, expression: string): Locator | null {
   const trimmedExpression = expression.trim();
 
-  const testIdMatch = trimmedExpression.match(/^page\.getByTestId\((['"`])([^'"`]+)\1\)$/);
-  if (testIdMatch?.[2]) {
-    return page.getByTestId(testIdMatch[2]);
+  const testIdValue = parsePageStringArgument(trimmedExpression, 'getByTestId');
+  if (testIdValue !== null) {
+    return page.getByTestId(testIdValue);
   }
 
-  const textMatch = trimmedExpression.match(/^page\.getByText\((['"`])([^'"`]+)\1\)$/);
-  if (textMatch?.[2]) {
-    return page.getByText(textMatch[2]);
+  const textValue = parsePageStringArgument(trimmedExpression, 'getByText');
+  if (textValue !== null) {
+    return page.getByText(textValue);
   }
 
-  const labelMatch = trimmedExpression.match(/^page\.getByLabel\((['"`])([^'"`]+)\1\)$/);
-  if (labelMatch?.[2]) {
-    return page.getByLabel(labelMatch[2]);
+  const labelValue = parsePageStringArgument(trimmedExpression, 'getByLabel');
+  if (labelValue !== null) {
+    return page.getByLabel(labelValue);
   }
 
   const roleMatch = trimmedExpression.match(
@@ -76,9 +106,9 @@ export function resolveLocatorExpression(page: Page, expression: string): Locato
     return page.getByRole(role, { name });
   }
 
-  const locatorMatch = trimmedExpression.match(/^page\.locator\((['"`])(.+)\1\)$/);
-  if (locatorMatch?.[2]) {
-    return page.locator(locatorMatch[2]);
+  const locatorValue = parsePageStringArgument(trimmedExpression, 'locator');
+  if (locatorValue !== null) {
+    return page.locator(locatorValue);
   }
 
   return null;
