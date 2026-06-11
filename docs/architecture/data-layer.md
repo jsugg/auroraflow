@@ -11,6 +11,7 @@ This document defines the current Redis-backed data layer primitives available i
   - cursor-based key discovery through `SCAN`/`scanKeys()` instead of blocking `KEYS`.
   - batched value loading through `mget()` for list/read-heavy registry paths.
   - atomic JSON record compare-and-set through Redis `EVAL` for versioned selector writes.
+  - atomic JSON merge through Redis `EVAL` for selector-candidate-history counters.
   - explicit connection lifecycle with `connect()` and `disconnect()`.
 - `src/data/selectors/selectorRegistry.ts`
   - typed selector record schema.
@@ -21,7 +22,7 @@ This document defines the current Redis-backed data layer primitives available i
   - distinct namespaces for active records, indexes, candidate history, pending promotions, and audit records.
   - large-registry listing via cursor key scans plus bounded batched payload reads.
 - `src/data/selectors/redisSelectorStore.ts`
-  - Redis-backed `SelectorStore` adapter with TTL and compare-and-set support.
+  - Redis-backed `SelectorStore` adapter with TTL, compare-and-set, and atomic JSON merge support.
 - `src/framework/selfHealing/registryRuntime.ts`
   - runtime adapter that exposes active selectors, candidate history, and pending promotion repositories to SAT without coupling analyzer code to Redis.
   - read-mode resolver stays opportunistic unless Redis environment variables are present or `SELF_HEAL_REGISTRY_REQUIRED=true`.
@@ -85,6 +86,8 @@ await registry.upsert(
 - Exhausted operation retries throw `RedisOperationError` with operation name and attempts.
 - Invalid selector payload/schema throws `SelectorRegistryValidationError` or `SelectorRegistryDataError`.
 - Stale expected-version writes throw `SelectorRegistryConflictError` and do not overwrite active records.
+- Candidate-history writes require `SelectorStore.atomicJsonMerge`; Redis implements this as one Lua `EVAL`, not a process-local lock. Missing atomic merge support fails write paths explicitly.
+- Candidate-history TTL follows shortest-useful retention: default and hard cap are both `2,592,000` seconds (30 days), and higher custom TTLs are clamped.
 
 ## Integration Testing
 
@@ -98,7 +101,7 @@ npm run test:integration
 
 Behavior notes:
 
-- When Docker is available, tests validate real Redis connectivity, namespaced key behavior, TTL handling, selector registry versioning, Redis-backed CAS, and indexed selector lookup.
+- When Docker is available, tests validate real Redis connectivity, namespaced key behavior, TTL handling, selector registry versioning, Redis-backed CAS, atomic candidate-history counters, and indexed selector lookup.
 - When Docker/Testcontainers is unavailable, tests skip with an explicit reason rather than hanging.
 
 ## Local Redis Orchestration (Docker Compose)

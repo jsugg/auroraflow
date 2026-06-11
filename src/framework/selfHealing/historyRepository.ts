@@ -2,6 +2,8 @@ import {
   DEFAULT_SELECTOR_REGISTRY_NAMESPACES,
   buildSelectorRegistryNamespaces,
   type SelectorStore,
+  type SelectorStoreJsonMergePatch,
+  type SelectorStoreJsonObject,
 } from '../../data/selectors/selectorRegistry';
 import { parseSelectorCandidateHistory } from './artifactSchema';
 import type {
@@ -10,8 +12,9 @@ import type {
 } from './registryContracts';
 import type { SelectorCandidateHistory } from './types';
 
-export const DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS = 90 * 24 * 60 * 60;
-const MAX_REDIS_TTL_SECONDS = 30 * 24 * 60 * 60;
+export const MAX_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS = 30 * 24 * 60 * 60;
+export const DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS =
+  MAX_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS;
 
 export interface StoreSelectorCandidateHistoryRepositoryOptions {
   store: SelectorStore;
@@ -23,7 +26,7 @@ function normalizeTtlSeconds(ttlSeconds: number): number {
   if (!Number.isInteger(ttlSeconds) || ttlSeconds <= 0) {
     throw new Error('selector history ttlSeconds must be a positive integer.');
   }
-  return Math.min(ttlSeconds, MAX_REDIS_TTL_SECONDS);
+  return Math.min(ttlSeconds, MAX_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS);
 }
 
 function addSeconds(isoTimestamp: string, seconds: number): string {
@@ -34,7 +37,7 @@ function addSeconds(isoTimestamp: string, seconds: number): string {
   return new Date(timestampMs + seconds * 1000).toISOString();
 }
 
-function emptyHistory(candidateId: string): SelectorCandidateHistory {
+function defaultHistoryFields(candidateId: string): SelectorStoreJsonObject {
   return {
     candidateId,
     attempts: 0,
@@ -114,26 +117,25 @@ export class StoreSelectorCandidateHistoryRepository implements SelectorCandidat
       throw new Error('history observation candidate.id must be non-empty.');
     }
 
-    const existing = (await this.get(candidateId)) ?? emptyHistory(candidateId);
     const guardedApplySucceeded = observation.guardedApplySucceeded === true;
     const guardedApplyFailed = observation.guardedApplyFailed === true;
     const validationAccepted = observation.validationAccepted === true;
-    const updated: SelectorCandidateHistory = {
-      ...existing,
-      candidateId,
-      attempts: existing.attempts + 1,
-      validated: existing.validated + (validationAccepted ? 1 : 0),
-      guardedApplySucceeded: existing.guardedApplySucceeded + (guardedApplySucceeded ? 1 : 0),
-      guardedApplyFailed: existing.guardedApplyFailed + (guardedApplyFailed ? 1 : 0),
+    const set: SelectorStoreJsonObject = {
       lastSeenAt: observation.observedAt,
-      lastSuccessAt: guardedApplySucceeded ? observation.observedAt : existing.lastSuccessAt,
       expiresAt: addSeconds(observation.observedAt, this.ttlSeconds),
+      ...(guardedApplySucceeded ? { lastSuccessAt: observation.observedAt } : {}),
     };
 
-    await this.store.set(this.keyFor(candidateId), JSON.stringify(updated), {
-      ttlSeconds: this.ttlSeconds,
+    return this.mergeHistory(candidateId, {
+      defaultValue: defaultHistoryFields(candidateId),
+      increments: {
+        attempts: 1,
+        validated: validationAccepted ? 1 : 0,
+        guardedApplySucceeded: guardedApplySucceeded ? 1 : 0,
+        guardedApplyFailed: guardedApplyFailed ? 1 : 0,
+      },
+      set,
     });
-    return updated;
   }
 
   public async recordOutcome(
@@ -144,21 +146,34 @@ export class StoreSelectorCandidateHistoryRepository implements SelectorCandidat
       throw new Error('history outcome candidateId must be non-empty.');
     }
 
-    const existing = (await this.get(candidateId)) ?? emptyHistory(candidateId);
-    const updated: SelectorCandidateHistory = {
-      ...existing,
-      candidateId,
-      promoted: existing.promoted + Math.max(0, Math.floor(outcome.promoted ?? 0)),
-      rejected: existing.rejected + Math.max(0, Math.floor(outcome.rejected ?? 0)),
-      rolledBack: existing.rolledBack + Math.max(0, Math.floor(outcome.rolledBack ?? 0)),
-      lastSeenAt: outcome.observedAt,
-      expiresAt: addSeconds(outcome.observedAt, this.ttlSeconds),
-    };
+    return this.mergeHistory(candidateId, {
+      defaultValue: defaultHistoryFields(candidateId),
+      increments: {
+        promoted: Math.max(0, Math.floor(outcome.promoted ?? 0)),
+        rejected: Math.max(0, Math.floor(outcome.rejected ?? 0)),
+        rolledBack: Math.max(0, Math.floor(outcome.rolledBack ?? 0)),
+      },
+      set: {
+        lastSeenAt: outcome.observedAt,
+        expiresAt: addSeconds(outcome.observedAt, this.ttlSeconds),
+      },
+    });
+  }
 
-    await this.store.set(this.keyFor(candidateId), JSON.stringify(updated), {
+  private async mergeHistory(
+    candidateId: string,
+    patch: SelectorStoreJsonMergePatch,
+  ): Promise<SelectorCandidateHistory> {
+    if (!this.store.atomicJsonMerge) {
+      throw new Error(
+        'SelectorStore.atomicJsonMerge is required for atomic candidate history writes.',
+      );
+    }
+
+    const payload = await this.store.atomicJsonMerge(this.keyFor(candidateId), patch, {
       ttlSeconds: this.ttlSeconds,
     });
-    return updated;
+    return parseSelectorCandidateHistory(JSON.parse(payload) as unknown);
   }
 
   private keyFor(candidateId: string): string {

@@ -3,6 +3,8 @@ import type {
   SelectorStore,
   SelectorStoreCompareAndSetOptions,
   SelectorStoreCompareAndSetResult,
+  SelectorStoreJsonMergePatch,
+  SelectorStoreJsonObject,
   SelectorStoreSetOptions,
 } from '../../../../../src/data/selectors/selectorRegistry';
 import { SelfHealingPromotionWorkflow } from '../../../../../src/framework/selfHealing/promotionWorkflow';
@@ -43,6 +45,32 @@ class InMemorySelectorStore implements SelectorStore {
     return keys.map((key) => this.records.get(key) ?? null);
   }
 
+  public async atomicJsonMerge(
+    key: string,
+    patch: SelectorStoreJsonMergePatch,
+    options?: SelectorStoreSetOptions,
+  ): Promise<string> {
+    void options;
+    const current = this.records.get(key);
+    const record =
+      current === undefined ? { ...patch.defaultValue } : parseJsonObjectForTest(current);
+
+    for (const [fieldName, value] of Object.entries(patch.defaultValue)) {
+      record[fieldName] ??= value;
+    }
+    for (const [fieldName, increment] of Object.entries(patch.increments ?? {})) {
+      const currentValue = record[fieldName];
+      record[fieldName] = (typeof currentValue === 'number' ? currentValue : 0) + increment;
+    }
+    for (const [fieldName, value] of Object.entries(patch.set ?? {})) {
+      record[fieldName] = value;
+    }
+
+    const serialized = JSON.stringify(record);
+    this.records.set(key, serialized);
+    return serialized;
+  }
+
   public async keys(pattern: string): Promise<string[]> {
     const matcher = new RegExp(
       `^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`,
@@ -65,6 +93,32 @@ class InMemorySelectorStore implements SelectorStore {
 function readVersion(payload: string): number | null {
   const parsed = JSON.parse(payload) as { version?: unknown };
   return typeof parsed.version === 'number' ? parsed.version : null;
+}
+
+function parseJsonObjectForTest(
+  serialized: string,
+): Record<string, SelectorStoreJsonObject[string]> {
+  const parsed = JSON.parse(serialized) as unknown;
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('stored JSON must be an object.');
+  }
+
+  const record: Record<string, SelectorStoreJsonObject[string]> = {};
+  for (const [fieldName, value] of Object.entries(parsed)) {
+    if (
+      value === null ||
+      typeof value === 'string' ||
+      typeof value === 'boolean' ||
+      (typeof value === 'number' && Number.isFinite(value))
+    ) {
+      record[fieldName] = value;
+      continue;
+    }
+
+    throw new Error(`stored JSON field ${fieldName} must be a primitive.`);
+  }
+
+  return record;
 }
 
 function workflowFixture() {

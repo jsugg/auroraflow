@@ -7,6 +7,10 @@ import {
 import { buildSelfHealingSuggestionMetricAttributes } from '../observability/attributes';
 import { METRIC_NAMES } from '../observability/metricNames';
 import { getTelemetry } from '../observability/telemetry';
+import {
+  SELF_HEALING_HEURISTIC_STRATEGY_BASE_SIGNAL,
+  SELF_HEALING_SCORE_WEIGHTS,
+} from './scoringPolicy';
 
 export interface SuggestionEngineInput {
   actionType: SelfHealingActionType;
@@ -16,28 +20,6 @@ export interface SuggestionEngineInput {
 }
 
 const DEFAULT_MAX_CANDIDATES = 5;
-
-const SCORE_WEIGHTS = Object.freeze({
-  roleSignal: 0.28,
-  accessibleNameSignal: 0.22,
-  uniquenessSignal: 0.25,
-  historicalSignal: 0.15,
-  similaritySignal: 0.1,
-} satisfies Record<keyof SelfHealingSuggestionSignals, number>);
-
-const STRATEGY_BASE_SIGNAL: Readonly<Record<SelfHealingSuggestionStrategy, number>> = Object.freeze(
-  {
-    original: 0.36,
-    testId: 0.95,
-    roleName: 0.78,
-    ariaLabel: 0.72,
-    text: 0.58,
-    cssFallback: 0.42,
-    fallback: 0.2,
-    registry: 0.88,
-    domEvidence: 0.68,
-  },
-);
 
 const GENERIC_ACTION_FALLBACK: Readonly<Record<SelfHealingActionType, string>> = Object.freeze({
   navigate: "page.locator('main')",
@@ -128,7 +110,7 @@ function scoreSuggestion({
   const hasRole = strategy === 'roleName' ? 1 : 0;
   const hasAccessibleName =
     strategy === 'roleName' || strategy === 'ariaLabel' || strategy === 'text' ? 1 : 0;
-  const uniqueness = STRATEGY_BASE_SIGNAL[strategy];
+  const uniqueness = SELF_HEALING_HEURISTIC_STRATEGY_BASE_SIGNAL[strategy];
   const historicalSuccess = clamp(historicalSuccessByLocator[locator] ?? 0.5);
   const lexicalSimilarity = similaritySignal(locator, failedTarget);
 
@@ -141,11 +123,11 @@ function scoreSuggestion({
   };
 
   const rawScore =
-    signals.roleSignal * SCORE_WEIGHTS.roleSignal +
-    signals.accessibleNameSignal * SCORE_WEIGHTS.accessibleNameSignal +
-    signals.uniquenessSignal * SCORE_WEIGHTS.uniquenessSignal +
-    signals.historicalSignal * SCORE_WEIGHTS.historicalSignal +
-    signals.similaritySignal * SCORE_WEIGHTS.similaritySignal;
+    signals.roleSignal * SELF_HEALING_SCORE_WEIGHTS.roleSignal +
+    signals.accessibleNameSignal * SELF_HEALING_SCORE_WEIGHTS.accessibleNameSignal +
+    signals.uniquenessSignal * SELF_HEALING_SCORE_WEIGHTS.uniquenessSignal +
+    signals.historicalSignal * SELF_HEALING_SCORE_WEIGHTS.historicalSignal +
+    signals.similaritySignal * SELF_HEALING_SCORE_WEIGHTS.similaritySignal;
 
   return {
     score: Number(clamp(rawScore).toFixed(3)),

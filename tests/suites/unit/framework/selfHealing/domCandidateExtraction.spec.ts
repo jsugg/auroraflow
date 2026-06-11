@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import type { Page } from 'playwright';
+import { describe, expect, it, vi } from 'vitest';
 import { extractDomCandidateSeeds } from '../../../../../src/framework/selfHealing/domCandidateExtraction';
+import { resolveLocatorExpression } from '../../../../../src/framework/selfHealing/guardedValidation';
 import type { DomSnapshot } from '../../../../../src/framework/selfHealing/types';
 
 const snapshot: DomSnapshot = {
@@ -65,5 +67,60 @@ describe('extractDomCandidateSeeds', () => {
       candidates.find((candidate) => candidate.locator === "page.getByTestId('submit-order')")
         ?.evidence.uniqueInSnapshot,
     ).toBe(true);
+  });
+
+  it('emits quoted role, label, text, and CSS locators parseable until AUR-IMPL-020', () => {
+    const quotedSnapshot: DomSnapshot = {
+      ...snapshot,
+      elements: [
+        {
+          id: 'dom-quote',
+          tagName: 'button',
+          attributes: {
+            'aria-label': "It's saved",
+          },
+          role: 'button',
+          accessibleName: "It's saved",
+          text: "It's saved",
+          visible: true,
+          enabled: true,
+          editable: false,
+          depth: 4,
+          childCount: 0,
+          cssPath: 'button[aria-label="It\'s saved"]',
+        },
+      ],
+    };
+    const locatorMock = {};
+    const pageMock = {
+      getByLabel: vi.fn().mockReturnValue(locatorMock),
+      getByRole: vi.fn().mockReturnValue(locatorMock),
+      getByTestId: vi.fn().mockReturnValue(locatorMock),
+      getByText: vi.fn().mockReturnValue(locatorMock),
+      locator: vi.fn().mockReturnValue(locatorMock),
+    };
+
+    const candidates = extractDomCandidateSeeds({
+      snapshot: quotedSnapshot,
+      actionType: 'click',
+      maxTextLength: 120,
+    });
+    const locators = candidates.map((candidate) => candidate.locator);
+    for (const locator of locators) {
+      expect(resolveLocatorExpression(pageMock as unknown as Page, locator)).not.toBeNull();
+    }
+
+    expect(locators).toEqual(
+      expect.arrayContaining([
+        "page.getByRole('button', { name: \"It's saved\" })",
+        'page.getByLabel("It\'s saved")',
+        'page.getByText("It\'s saved")',
+        'page.locator(`button[aria-label="It\'s saved"]`)',
+      ]),
+    );
+    expect(pageMock.getByRole).toHaveBeenCalledWith('button', { name: "It's saved" });
+    expect(pageMock.getByLabel).toHaveBeenCalledWith("It's saved");
+    expect(pageMock.getByText).toHaveBeenCalledWith("It's saved");
+    expect(pageMock.locator).toHaveBeenCalledWith('button[aria-label="It\'s saved"]');
   });
 });

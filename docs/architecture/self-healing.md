@@ -13,6 +13,8 @@ AuroraFlow supports a mode-gated self-healing failure-capture foundation for fai
 - `SELF_HEAL_MIN_CONFIDENCE` controls the confidence floor used by downstream self-healing decisions.
 - Accepted range is `0` to `1`.
 - Invalid or missing values default to `0.92`.
+- The default `0.92` floor is a safety-first, registry-curated policy: fresh heuristic and DOM candidates are expected to remain below the floor, while curated registry entries and strongly validated candidate history can pass.
+- Lowering the default threshold or broadening DOM-pass behavior requires reachability fixtures and a decision-log update.
 
 ## SAT Enrichment
 
@@ -27,7 +29,8 @@ Selector Analysis Tooling (SAT) enriches `suggest` and `guarded` artifacts with 
 - `SELF_HEAL_REGISTRY_MODE` accepts `off`, `read`, or `write_pending`; `read` loads active selector records/history, while `write_pending` also stores history observations and reviewable pending promotion records after successful guarded auto-apply.
 - `SELF_HEAL_REGISTRY_REQUIRED=true` opts into required registry resolution; otherwise read mode is opportunistic when Redis configuration is present.
 - `SELF_HEAL_REGISTRY_NAMESPACE` overrides the active selector namespace; default is `selector-registry`.
-- `SELF_HEAL_PROMOTION_MODE` accepts `manual` or `ci_acknowledged`; reviewed workflows still require explicit acknowledgement or reviewer identity before active selector records change.
+- `SELF_HEAL_PROMOTION_MODE` accepts `manual` or `ci_acknowledged`; reviewed workflows still require explicit acknowledgement or reviewer identity before active selector records change. The mode is reserved for future enforcement (`AUR-IMPL-025`).
+- Invalid `SELF_HEAL_*` values produce diagnostics: `resolveSelfHealingConfig()` warns by default and throws `SelfHealingConfigError` when `AURORAFLOW_CONFIG_STRICT=true`; `resolveSelfHealingConfigWithDiagnostics()` exposes the diagnostics and effective config programmatically. Diagnostics never echo received values.
 
 DOM snapshots are captured inside the browser through `page.evaluate` and serialized as compact summaries:
 
@@ -87,6 +90,7 @@ JSON Schema contracts for self-healing artifacts live in [`../operations/artifac
 When mode is `guarded`, AuroraFlow evaluates ranked locator suggestions in dry-run mode before writing the failure artifact:
 
 - Candidates below `SELF_HEAL_MIN_CONFIDENCE` are marked as skipped.
+- With default scoring, fresh heuristic and DOM candidates remain diagnostic unless a maintainer explicitly lowers the threshold; registry-curated candidates can pass when their confidence meets the floor.
 - Supported locator expressions are resolved against the current page and checked for matches and visibility.
 - The first confidence-eligible visible candidate is marked as `accepted` for operator review.
 - No action is auto-applied in this stage; validation is diagnostic and auditable only.
@@ -113,7 +117,8 @@ When `SELF_HEAL_REGISTRY_MODE=write_pending` and a registry runtime is configure
 
 - candidate history observations for SAT-ranked candidates, with validation status and guarded auto-apply outcome.
 - pending promotion records only when guarded auto-apply succeeds, a stable `selectorId` and base selector version are known, and the accepted locator differs from the active selector.
-- Redis TTLs for historical SAT telemetry and pending promotion review records.
+- Atomic Redis/store counter merges for candidate history observations; Redis uses backend-side Lua rather than process-local locks.
+- Redis TTLs for historical SAT telemetry and pending promotion review records. Candidate-history default and maximum retention are both `2,592,000` seconds (30 days), per `AUR-DEC-005`.
 
 Pending promotion records share `eventId`, `candidateId`, and `selectorId` with the file artifact. They are review records only; AuroraFlow does not mutate active selector records or source files in this step.
 

@@ -7,9 +7,12 @@ AuroraFlow reads configuration from explicit function inputs, CLI flags, and env
 | Variable | Values | Default | Purpose |
 | --- | --- | --- | --- |
 | `SELF_HEAL_MODE` | `off`, `suggest`, `guarded` | `off` | Enables self-healing capture and guarded validation. |
-| `SELF_HEAL_MIN_CONFIDENCE` | `0..1` | `0.92` | Confidence floor for guarded candidate acceptance. |
+| `SELF_HEAL_MIN_CONFIDENCE` | `0..1` | `0.92` | Safety floor for guarded candidate acceptance. |
 | `SELF_HEAL_ALLOWED_ACTIONS` | comma-separated action types | `click,type,read,wait,screenshot` | Action types eligible for guarded validation. |
 | `SELF_HEAL_ALLOWED_DOMAINS` | comma-separated hosts | empty | Optional host allow-list for guarded validation. |
+| `AURORAFLOW_CONFIG_STRICT` | boolean-like | `false` | Opt-in strict mode: invalid `SELF_HEAL_*` values throw `SelfHealingConfigError` instead of warning. |
+
+Invalid `SELF_HEAL_*` values are observable instead of silently defaulting: `resolveSelfHealingConfig()` logs one warning per invalid value with the applied fallback, and throws when `AURORAFLOW_CONFIG_STRICT=true`. `resolveSelfHealingConfigWithDiagnostics()` returns `{ config, diagnostics, strict }` without logging or throwing for callers that report diagnostics themselves. Diagnostic messages name the variable, the expected format, and the applied value, but never echo the received value, so they cannot leak secrets accidentally placed in these variables. `describeEffectiveSelfHealingConfig(config)` returns a JSON-safe snapshot of the effective configuration for logging; it only contains values derived from `SELF_HEAL_*` variables, never credentials such as Redis settings.
 
 ## SAT and registry
 
@@ -24,9 +27,13 @@ AuroraFlow reads configuration from explicit function inputs, CLI flags, and env
 | `SELF_HEAL_REGISTRY_MODE` | `off`, `read`, `write_pending` | `read` | Reads active selectors/history or writes reviewable pending records. |
 | `SELF_HEAL_REGISTRY_REQUIRED` | boolean-like | `false` | Fails registry resolution when Redis is required but unavailable. |
 | `SELF_HEAL_REGISTRY_NAMESPACE` | string | `selector-registry` | Active selector namespace. |
-| `SELF_HEAL_PROMOTION_MODE` | `manual`, `ci_acknowledged` | `manual` | Promotion workflow posture. |
+| `SELF_HEAL_PROMOTION_MODE` | `manual`, `ci_acknowledged` | `manual` | Promotion workflow posture. Reserved for future enforcement (`AUR-IMPL-025`): the value is parsed, validated, and exposed as `sat.promotionMode`, but reviewed promotion workflows currently require explicit acknowledgement or reviewer identity regardless of this setting. |
 
 Read mode is opportunistic unless Redis configuration is present or `SELF_HEAL_REGISTRY_REQUIRED=true`. Write-pending mode records SAT history and pending promotions when a registry runtime is configured.
+
+Default guarded healing is registry-curated by policy: fresh heuristic and DOM candidates are diagnostic below the `0.92` floor, while curated registry entries at or above the floor and strongly validated candidate history can pass guarded dry-run validation. Lower thresholds require reachability tests and an updated decision record.
+
+Candidate-history retention follows `AUR-DEC-005`: the exported default and hard cap are both `2,592,000` seconds (30 days). Positive custom TTLs below the cap are honored; higher values are clamped to 30 days. Redis history data is consumer-owned.
 
 ## Redis
 
@@ -45,7 +52,7 @@ Read mode is opportunistic unless Redis configuration is present or `SELF_HEAL_R
 | `AURORAFLOW_REDIS_MAX_BACKOFF_MS` | `2000` | Retry cap; must be at least base delay. |
 | `AURORAFLOW_REDIS_KEY_PREFIX` | `auroraflow` | Key namespace prefix. |
 
-Redis keys are namespaced and selector updates use versioned compare-and-set for reviewed promotion workflows.
+Redis keys are namespaced and selector updates use versioned compare-and-set for reviewed promotion workflows. Selector-candidate history writes use backend-side atomic JSON merges for counters and 30-day capped TTL refreshes; they do not rely on process-local locks.
 
 ## Self-healing governance
 

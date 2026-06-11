@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   SelectorRegistryRepository,
   type SelectorStore,
+  type SelectorStoreJsonMergePatch,
+  type SelectorStoreJsonObject,
+  type SelectorStoreSetOptions,
 } from '../../../../../src/data/selectors/selectorRegistry';
 import { StoreSelectorCandidateHistoryRepository } from '../../../../../src/framework/selfHealing/historyRepository';
 import { StorePendingSelectorPromotionRepository } from '../../../../../src/framework/selfHealing/promotionRepository';
@@ -27,9 +30,35 @@ class InMemorySelectorStore implements SelectorStore {
     return keys.map((key) => this.records.get(key) ?? null);
   }
 
-  public async set(key: string, value: string, options?: { ttlSeconds?: number }): Promise<void> {
+  public async set(key: string, value: string, options?: SelectorStoreSetOptions): Promise<void> {
     this.records.set(key, value);
     this.ttlSecondsByKey.set(key, options?.ttlSeconds);
+  }
+
+  public async atomicJsonMerge(
+    key: string,
+    patch: SelectorStoreJsonMergePatch,
+    options?: SelectorStoreSetOptions,
+  ): Promise<string> {
+    const current = this.records.get(key);
+    const record =
+      current === undefined ? { ...patch.defaultValue } : parseJsonObjectForTest(current);
+
+    for (const [fieldName, value] of Object.entries(patch.defaultValue)) {
+      record[fieldName] ??= value;
+    }
+    for (const [fieldName, increment] of Object.entries(patch.increments ?? {})) {
+      const currentValue = record[fieldName];
+      record[fieldName] = (typeof currentValue === 'number' ? currentValue : 0) + increment;
+    }
+    for (const [fieldName, value] of Object.entries(patch.set ?? {})) {
+      record[fieldName] = value;
+    }
+
+    const serialized = JSON.stringify(record);
+    this.records.set(key, serialized);
+    this.ttlSecondsByKey.set(key, options?.ttlSeconds);
+    return serialized;
   }
 
   public async del(key: string): Promise<number> {
@@ -46,6 +75,32 @@ class InMemorySelectorStore implements SelectorStore {
   public rawSet(key: string, value: string): void {
     this.records.set(key, value);
   }
+}
+
+function parseJsonObjectForTest(
+  serialized: string,
+): Record<string, SelectorStoreJsonObject[string]> {
+  const parsed = JSON.parse(serialized) as unknown;
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new Error('stored JSON must be an object.');
+  }
+
+  const record: Record<string, SelectorStoreJsonObject[string]> = {};
+  for (const [fieldName, value] of Object.entries(parsed)) {
+    if (
+      value === null ||
+      typeof value === 'string' ||
+      typeof value === 'boolean' ||
+      (typeof value === 'number' && Number.isFinite(value))
+    ) {
+      record[fieldName] = value;
+      continue;
+    }
+
+    throw new Error(`stored JSON field ${fieldName} must be a primitive.`);
+  }
+
+  return record;
 }
 
 const rankedCandidate: RankedSelfHealingCandidate = {

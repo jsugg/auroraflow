@@ -58,6 +58,14 @@ function recordRepresentativeSmokeMetrics(telemetry: AuroraFlowTelemetry): void 
     ...testAttributes,
     'auroraflow.test.status': 'failed',
   });
+  telemetry.recordCounter(METRIC_NAMES.testAttemptsTotal, 1, {
+    ...testAttributes,
+    'auroraflow.test_attempt.status': 'succeeded',
+  });
+  telemetry.recordCounter(METRIC_NAMES.testAttemptsTotal, 1, {
+    ...testAttributes,
+    'auroraflow.test_attempt.status': 'failed',
+  });
   telemetry.recordHistogram(METRIC_NAMES.testCaseDurationMs, 25, {
     ...testAttributes,
     'auroraflow.test.status': 'passed',

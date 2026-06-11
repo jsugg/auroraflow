@@ -4,7 +4,7 @@ groups:
       - alert: AuroraFlowPassRateLow
         expr: |
           sum(rate(auroraflow_test_cases_total{auroraflow_test_status="passed"}[10m]))
-            / clamp_min(sum(rate(auroraflow_test_cases_total[10m])), 1) < 0.95
+            / clamp_min(sum(rate(auroraflow_test_cases_total[10m])), 1) < 0.98
         for: 10m
         labels:
           severity: warning
@@ -14,7 +14,7 @@ groups:
       - alert: AuroraFlowFailureRateHigh
         expr: |
           sum(rate(auroraflow_test_cases_total{auroraflow_test_status="failed"}[10m]))
-            / clamp_min(sum(rate(auroraflow_test_cases_total[10m])), 1) > 0.05
+            / clamp_min(sum(rate(auroraflow_test_cases_total[10m])), 1) > 0.02
         for: 10m
         labels:
           severity: warning
@@ -22,7 +22,9 @@ groups:
           summary: AuroraFlow failure rate is above the local SLO.
 
       - alert: AuroraFlowFlakeRateHigh
-        expr: sum(increase(auroraflow_flaky_tests_total[30m])) > 0
+        expr: |
+          sum(increase(auroraflow_flaky_tests_total[30m]))
+            / clamp_min(sum(increase(auroraflow_test_cases_total[30m])), 1) > 0.02
         for: 5m
         labels:
           severity: warning
@@ -30,7 +32,9 @@ groups:
           summary: AuroraFlow flaky test count increased.
 
       - alert: AuroraFlowRetryPressureHigh
-        expr: sum(increase(auroraflow_retry_failures_total[30m])) > 0
+        expr: |
+          sum(rate(auroraflow_retry_failures_total[10m]))
+            / clamp_min(sum(rate(auroraflow_test_attempts_total[10m])), 1) > 0.1
         for: 5m
         labels:
           severity: warning
@@ -40,7 +44,7 @@ groups:
       - alert: AuroraFlowGuardedAutoHealFailureRateHigh
         expr: |
           sum(rate(auroraflow_guarded_auto_heal_total{auroraflow_self_heal_status="failed"}[30m]))
-            / clamp_min(sum(rate(auroraflow_guarded_auto_heal_total[30m])), 1) > 0.1
+            / clamp_min(sum(rate(auroraflow_guarded_auto_heal_total[30m])), 1) > 0.05
         for: 10m
         labels:
           severity: warning

@@ -47,6 +47,49 @@ end
 
 return {"1", current or ""}
 `;
+const REDIS_ATOMIC_JSON_MERGE_SCRIPT = `
+local current = redis.call("GET", KEYS[1])
+local defaults = cjson.decode(ARGV[1])
+local increments = cjson.decode(ARGV[2])
+local sets = cjson.decode(ARGV[3])
+local ttlSeconds = ARGV[4]
+local record = defaults
+
+if current then
+  local ok, decoded = pcall(cjson.decode, current)
+  if not ok or type(decoded) ~= "table" then
+    return redis.error_reply("AuroraFlow atomic JSON merge target must contain a JSON object")
+  end
+  record = decoded
+  for fieldName, value in pairs(defaults) do
+    if record[fieldName] == nil then
+      record[fieldName] = value
+    end
+  end
+end
+
+for fieldName, increment in pairs(increments) do
+  local rawCurrentValue = record[fieldName]
+  if rawCurrentValue ~= nil and tonumber(rawCurrentValue) == nil then
+    return redis.error_reply("AuroraFlow atomic JSON merge counter field must be numeric")
+  end
+  local currentValue = tonumber(rawCurrentValue) or 0
+  record[fieldName] = currentValue + tonumber(increment)
+end
+
+for fieldName, value in pairs(sets) do
+  record[fieldName] = value
+end
+
+local nextValue = cjson.encode(record)
+if ttlSeconds == "" then
+  redis.call("SET", KEYS[1], nextValue)
+else
+  redis.call("SET", KEYS[1], nextValue, "EX", tonumber(ttlSeconds))
+end
+
+return nextValue
+`;
 
 export class RedisConfigError extends Error {
   constructor(message: string) {
@@ -94,6 +137,19 @@ export interface RedisRuntimeConfig {
 
 export interface RedisSetOptions {
   ttlSeconds?: number;
+}
+
+export type RedisJsonPrimitive = string | number | boolean | null;
+export type RedisJsonObject = Readonly<Record<string, RedisJsonPrimitive>>;
+
+export interface RedisAtomicJsonMergePatch {
+  defaultValue: RedisJsonObject;
+  increments?: Readonly<Record<string, number>>;
+  set?: RedisJsonObject;
+}
+
+export interface RedisAtomicJsonMergeOptions extends RedisSetOptions {
+  patch: RedisAtomicJsonMergePatch;
 }
 
 export interface RedisCompareAndSetOptions extends RedisSetOptions {
@@ -454,6 +510,29 @@ export class RedisClient {
     return this.parseCompareAndSetReply(reply);
   }
 
+  public async atomicJsonMerge(key: string, options: RedisAtomicJsonMergeOptions): Promise<string> {
+    const qualifiedKey = this.qualifyKey(key);
+    const ttlSeconds =
+      options.ttlSeconds === undefined ? '' : String(this.normalizeTtlSeconds(options.ttlSeconds));
+    const defaultValue = this.serializeJsonObject(options.patch.defaultValue, 'defaultValue');
+    const increments = this.serializeJsonIncrements(options.patch.increments ?? {});
+    const set = this.serializeJsonObject(options.patch.set ?? {}, 'set');
+
+    const reply = await this.executeCommand('atomicJsonMerge', async (client) => {
+      if (!client.eval) {
+        throw new RedisConfigError(
+          'Redis client driver must support EVAL for atomic JSON merge operations.',
+        );
+      }
+      return client.eval(REDIS_ATOMIC_JSON_MERGE_SCRIPT, {
+        keys: [qualifiedKey],
+        arguments: [defaultValue, increments, set, ttlSeconds],
+      });
+    });
+
+    return this.parseAtomicJsonMergeReply(reply);
+  }
+
   public async del(key: string): Promise<number> {
     const qualifiedKey = this.qualifyKey(key);
     return this.executeCommand('del', (client) => client.del(qualifiedKey));
@@ -659,6 +738,58 @@ export class RedisClient {
     }
 
     throw new RedisConfigError('Unexpected Redis compare-and-set existing-value reply.');
+  }
+
+  private parseAtomicJsonMergeReply(reply: unknown): string {
+    if (typeof reply === 'string') {
+      return reply;
+    }
+
+    if (Buffer.isBuffer(reply)) {
+      return reply.toString('utf8');
+    }
+
+    throw new RedisConfigError('Unexpected Redis atomic JSON merge reply shape.');
+  }
+
+  private serializeJsonObject(value: RedisJsonObject, label: string): string {
+    if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+      throw new RedisConfigError(`atomicJsonMerge ${label} must be a JSON object.`);
+    }
+
+    for (const [fieldName, fieldValue] of Object.entries(value)) {
+      this.validateJsonFieldName(fieldName, label);
+      if (
+        fieldValue === null ||
+        typeof fieldValue === 'string' ||
+        typeof fieldValue === 'boolean'
+      ) {
+        continue;
+      }
+      if (typeof fieldValue === 'number' && Number.isFinite(fieldValue)) {
+        continue;
+      }
+      throw new RedisConfigError(`atomicJsonMerge ${label}.${fieldName} must be a JSON primitive.`);
+    }
+
+    return JSON.stringify(value);
+  }
+
+  private serializeJsonIncrements(increments: Readonly<Record<string, number>>): string {
+    for (const [fieldName, increment] of Object.entries(increments)) {
+      this.validateJsonFieldName(fieldName, 'increments');
+      if (!Number.isInteger(increment)) {
+        throw new RedisConfigError(`atomicJsonMerge increments.${fieldName} must be an integer.`);
+      }
+    }
+
+    return JSON.stringify(increments);
+  }
+
+  private validateJsonFieldName(fieldName: string, label: string): void {
+    if (!/^[A-Za-z0-9_.:-]+$/.test(fieldName)) {
+      throw new RedisConfigError(`atomicJsonMerge ${label} contains unsupported field name.`);
+    }
   }
 
   private normalizeTtlSeconds(ttlSeconds: number): number {

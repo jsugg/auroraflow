@@ -190,7 +190,15 @@ export {
   DEFAULT_SELF_HEAL_MAX_DOM_NODES,
   DEFAULT_SELF_HEAL_MAX_TEXT_LENGTH,
   DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
+  describeEffectiveSelfHealingConfig,
   resolveSelfHealingConfig,
+  resolveSelfHealingConfigWithDiagnostics,
+  SELF_HEAL_CONFIG_STRICT_ENV,
+  SelfHealingConfigError,
+  type ResolveSelfHealingConfigOptions,
+  type SelfHealingConfigDiagnostic,
+  type SelfHealingConfigDiagnosticCode,
+  type SelfHealingConfigResolution,
 } from './framework/selfHealing/config';
 
 export {
@@ -210,6 +218,7 @@ export {
 
 export {
   DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS,
+  MAX_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS,
   StoreSelectorCandidateHistoryRepository,
   type StoreSelectorCandidateHistoryRepositoryOptions,
 } from './framework/selfHealing/historyRepository';

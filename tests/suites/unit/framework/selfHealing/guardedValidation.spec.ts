@@ -5,7 +5,11 @@ import {
   resetTelemetryForTests,
   setTelemetryForTests,
 } from '../../../../../src/framework/observability/telemetry';
-import { evaluateGuardedSuggestionsDryRun } from '../../../../../src/framework/selfHealing/guardedValidation';
+import { DEFAULT_SELF_HEAL_MIN_CONFIDENCE } from '../../../../../src/framework/selfHealing/config';
+import {
+  evaluateGuardedSuggestionsDryRun,
+  resolveLocatorExpression,
+} from '../../../../../src/framework/selfHealing/guardedValidation';
 import type { SelfHealingSuggestion } from '../../../../../src/framework/selfHealing/types';
 import { CapturingTelemetry } from '../observability/capturingTelemetry';
 
@@ -152,6 +156,48 @@ describe('evaluateGuardedSuggestionsDryRun', () => {
     });
   });
 
+  it('keeps default guarded validation registry-curated by confidence', async () => {
+    const pageMock = createGuardedPageMock();
+    const freshDomScore = DEFAULT_SELF_HEAL_MIN_CONFIDENCE - 0.001;
+    const curatedRegistryScore = DEFAULT_SELF_HEAL_MIN_CONFIDENCE + 0.001;
+    const suggestions: SelfHealingSuggestion[] = [
+      createSuggestion("page.getByRole('button', { name: /submit/i })", freshDomScore, 'roleName'),
+      createSuggestion("page.getByTestId('submit')", curatedRegistryScore, 'registry'),
+    ];
+
+    const result = await evaluateGuardedSuggestionsDryRun({
+      page: pageMock as unknown as Page,
+      actionType: 'click',
+      minConfidence: DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
+      suggestions,
+      currentUrl: 'https://example.test/page',
+      safetyPolicy: {
+        allowedActions: ['click', 'type', 'read', 'wait', 'screenshot'],
+        allowedDomains: ['example.test'],
+      },
+    });
+
+    expect(result.acceptedLocator).toBe("page.getByTestId('submit')");
+    expect(result.acceptedScore).toBe(curatedRegistryScore);
+    expect(result.candidates).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          locator: "page.getByTestId('submit')",
+          strategy: 'registry',
+          status: 'accepted',
+          confidenceEligible: true,
+        }),
+        expect.objectContaining({
+          locator: "page.getByRole('button', { name: /submit/i })",
+          strategy: 'roleName',
+          status: 'below_confidence_threshold',
+          confidenceEligible: false,
+          matchedElements: 0,
+        }),
+      ]),
+    );
+  });
+
   it('marks unsupported locator expressions without throwing', async () => {
     const pageMock = createGuardedPageMock();
     const suggestions: SelfHealingSuggestion[] = [
@@ -249,5 +295,63 @@ describe('evaluateGuardedSuggestionsDryRun', () => {
       evaluatedDomain: 'blocked.test',
       blockedReason: 'domain_not_allowed',
     });
+  });
+});
+
+describe('resolveLocatorExpression AUR-IMPL-020 regression safety net', () => {
+  it.each([
+    {
+      expression: 'page.getByText("It\'s saved")',
+      expectedMethod: 'getByText',
+      expectedArgument: "It's saved",
+    },
+    {
+      expression: "page.getByText('It\\'s saved')",
+      expectedMethod: 'getByText',
+      expectedArgument: "It's saved",
+    },
+    {
+      expression: "page.getByText('It's saved')",
+      expectedMethod: 'getByText',
+      expectedArgument: "It's saved",
+    },
+    {
+      expression: 'page.getByLabel("Customer email")',
+      expectedMethod: 'getByLabel',
+      expectedArgument: 'Customer email',
+    },
+    {
+      expression: 'page.locator("button[aria-label=\\"Save changes\\"]")',
+      expectedMethod: 'locator',
+      expectedArgument: 'button[aria-label="Save changes"]',
+    },
+  ] as const)(
+    'parses quoted $expectedMethod expression $expression before structured candidates',
+    ({ expression, expectedMethod, expectedArgument }) => {
+      const pageMock = createGuardedPageMock();
+
+      const locator = resolveLocatorExpression(pageMock as unknown as Page, expression);
+
+      expect(locator).not.toBeNull();
+      expect(pageMock[expectedMethod]).toHaveBeenCalledWith(expectedArgument);
+    },
+  );
+
+  it('parses role/name candidates with quoted strings and regular expressions', () => {
+    const pageMock = createGuardedPageMock();
+
+    const stringNameLocator = resolveLocatorExpression(
+      pageMock as unknown as Page,
+      'page.getByRole("button", { name: "Save changes" })',
+    );
+    const regexNameLocator = resolveLocatorExpression(
+      pageMock as unknown as Page,
+      "page.getByRole('button', { name: /save changes/i })",
+    );
+
+    expect(stringNameLocator).not.toBeNull();
+    expect(regexNameLocator).not.toBeNull();
+    expect(pageMock.getByRole).toHaveBeenNthCalledWith(1, 'button', { name: 'Save changes' });
+    expect(pageMock.getByRole).toHaveBeenNthCalledWith(2, 'button', { name: /save changes/i });
   });
 });
