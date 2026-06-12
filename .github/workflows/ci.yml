@@ -140,6 +140,10 @@ jobs:
             --output-md aggregated-e2e-artifacts/flakiness-summary.md \
             --trend-output .auroraflow-trends/flakiness-trends.jsonl \
             --trend-limit 250
+          # Keep every uploaded file under one parent directory so the artifact
+          # root stays aggregated-e2e-artifacts and downstream jobs can read
+          # flakiness-summary.json at the artifact root.
+          cp .auroraflow-trends/flakiness-trends.jsonl aggregated-e2e-artifacts/flakiness-trends.jsonl
 
       - name: Upload flakiness report artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
@@ -150,7 +154,7 @@ jobs:
           path: |
             aggregated-e2e-artifacts/flakiness-summary.json
             aggregated-e2e-artifacts/flakiness-summary.md
-            .auroraflow-trends/flakiness-trends.jsonl
+            aggregated-e2e-artifacts/flakiness-trends.jsonl
 
   slo-dashboard:
     name: SLO Dashboard and Alerts
