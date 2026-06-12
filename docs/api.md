@@ -8,6 +8,8 @@ import { PageObjectBase, PageFactory } from 'auroraflow';
 
 Repository-internal source paths are not the package contract.
 
+Every root export carries a stability tier (stable, advanced, experimental, deprecated, or internal) with documented compatibility guarantees and a deprecation policy. The full classification is machine-readable and contract-tested; see [API stability](./api-stability.md).
+
 ## Page objects
 
 ### `PageObjectBase`
