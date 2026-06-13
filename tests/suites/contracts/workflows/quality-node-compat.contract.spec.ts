@@ -21,4 +21,15 @@ describe('quality workflow Node compatibility contract', () => {
 
     expect(packageJson.engines?.node).toBe('>=20 <25');
   });
+
+  it('enforces critical-module coverage once on Node 22', () => {
+    const qualityWorkflow = readFileSync(
+      path.join(process.cwd(), '.github/workflows/quality.yml'),
+      'utf8',
+    );
+
+    expect(qualityWorkflow).toContain('name: Critical Module Coverage');
+    expect(qualityWorkflow).toContain("node-version: '22'");
+    expect(qualityWorkflow).toContain('run: npm run test:coverage');
+  });
 });

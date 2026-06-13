@@ -229,21 +229,58 @@ describe('observability trends', () => {
     await expect(readObservabilityTrendPoints(trendPath)).resolves.toEqual([third, second]);
   });
 
-  it('rejects malformed existing trend files with actionable diagnostics', async () => {
+  it('skips malformed trend lines, preserves valid points, and reports warnings', async () => {
+    const directory = await makeTemporaryDirectory();
+    const trendPath = path.join(directory, 'observability-trends.jsonl');
+    const first = buildObservabilityTrendPointFromFlakinessSummary({
+      summary: createSummary('2026-06-05T12:00:00.000Z'),
+      metadata: { env: trendEnv, runId: 'run-1' },
+    });
+    const second = buildObservabilityTrendPointFromFlakinessSummary({
+      summary: createSummary('2026-06-05T12:02:00.000Z'),
+      metadata: { env: trendEnv, runId: 'run-2' },
+    });
+    const warnings: Array<{ filePath: string; line: number; message: string }> = [];
+    await writeFile(
+      trendPath,
+      `${JSON.stringify(first)}\nnot-json\n${JSON.stringify(second)}\n`,
+      'utf8',
+    );
+
+    await expect(
+      readObservabilityTrendPoints(trendPath, {
+        onWarning: (warning) => warnings.push(warning),
+      }),
+    ).resolves.toEqual([first, second]);
+    expect(warnings).toEqual([
+      expect.objectContaining({
+        filePath: trendPath,
+        line: 2,
+        message: expect.stringMatching(/Invalid observability trend file .* line 2/u),
+      }),
+    ]);
+
+    const result = await appendObservabilityTrendPoint({
+      filePath: trendPath,
+      point: buildObservabilityTrendPointFromFlakinessSummary({
+        summary: createSummary('2026-06-05T12:03:00.000Z'),
+        metadata: { env: trendEnv, runId: 'run-3' },
+      }),
+    });
+
+    expect(result.skippedLines).toBe(1);
+    await expect(readObservabilityTrendPoints(trendPath)).resolves.toHaveLength(3);
+  });
+
+  it('retains opt-in strict parsing for corruption diagnostics', async () => {
     const directory = await makeTemporaryDirectory();
     const trendPath = path.join(directory, 'observability-trends.jsonl');
     await writeFile(trendPath, 'not-json\n', 'utf8');
 
-    await expect(
-      appendObservabilityTrendPoint({
-        filePath: trendPath,
-        point: buildObservabilityTrendPointFromFlakinessSummary({
-          summary: createSummary(),
-          metadata: { env: trendEnv },
-        }),
-      }),
-    ).rejects.toThrow(ObservabilityTrendPersistenceError);
-    await expect(readObservabilityTrendPoints(trendPath)).rejects.toThrow(
+    await expect(readObservabilityTrendPoints(trendPath, { strict: true })).rejects.toThrow(
+      ObservabilityTrendPersistenceError,
+    );
+    await expect(readObservabilityTrendPoints(trendPath, { strict: true })).rejects.toThrow(
       /Invalid observability trend file .* line 1/u,
     );
   });

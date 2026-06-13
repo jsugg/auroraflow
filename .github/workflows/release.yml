@@ -24,8 +24,13 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
+  playwright-peer-matrix:
+    name: Playwright Peer Compatibility
+    uses: ./.github/workflows/playwright-peer-matrix.yml
+
   release-dry-run:
     name: Release Dry-Run Evidence
+    needs: playwright-peer-matrix
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:

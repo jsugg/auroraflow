@@ -31,7 +31,9 @@ describe('release dry-run workflow contract', () => {
   });
 
   it('pins every action to an immutable SHA and disables credential persistence', () => {
-    const usesEntries = releaseWorkflow.match(/uses:\s+\S+/g) ?? [];
+    const usesEntries = (releaseWorkflow.match(/uses:\s+\S+/g) ?? []).filter(
+      (usesEntry) => !usesEntry.startsWith('uses: ./'),
+    );
     expect(usesEntries.length).toBeGreaterThan(0);
     for (const usesEntry of usesEntries) {
       expect(usesEntry).toMatch(/@[a-f0-9]{40}$/);

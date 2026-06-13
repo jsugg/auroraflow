@@ -42,6 +42,8 @@ In `.github/workflows/ci.yml`:
   - `flakiness-summary.md`
   - `flakiness-trends.jsonl`
 - `.auroraflow-trends/flakiness-trends.jsonl` is restored through a branch-scoped cache and uploaded for triage.
+- Trend reads skip malformed non-empty JSONL lines by default, preserve valid points, and report `skippedMalformedLines`; callers can opt into strict parsing through the library API.
+- CI caches are evictable, branch-scoped history—not a durable analytics store.
 
 Use this artifact to identify:
 

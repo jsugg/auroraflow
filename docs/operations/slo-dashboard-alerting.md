@@ -61,6 +61,8 @@ In `.github/workflows/ci.yml`:
   - `slo-alerts.md`
   - `slo-trends.jsonl`
 - `.auroraflow-trends/slo-trends.jsonl` is restored through a branch-scoped cache and uploaded as part of `slo-dashboard-alerts`.
+- Trend reads skip malformed non-empty JSONL lines by default, preserve valid points, and report `skippedMalformedLines`; callers can opt into strict parsing through the library API.
+- CI caches are evictable, branch-scoped history—not a durable analytics store.
 
 Optional strict gate:
 

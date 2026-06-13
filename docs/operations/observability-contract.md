@@ -89,3 +89,10 @@ Histogram metric names use the Collector's Prometheus unit suffix. For example, 
 ## Privacy Rules
 
 Raw selectors, URLs, request bodies, passwords, tokens, and cookies must not be emitted by default. Action spans use `auroraflow.action.target_hash` plus `auroraflow.action.target_kind`; the raw target is present only when `AURORAFLOW_OBSERVABILITY_EXPORT_RAW_SELECTORS=true`.
+
+## Export validation tiers
+
+- Routine verification uses a process-local OTLP/HTTP protobuf receiver. It exercises the real trace and metric exporters and asserts representative span names, metric names, attributes, and resource metadata without starting the reference stack.
+- The collector-only smoke remains path-filtered for observability changes and `main` runs.
+- Full-stack and secret-gated remote-export smokes are scheduled or manually dispatched. They are intentionally excluded from pull-request execution because their service startup cost is disproportionate to the focused export contract.
+- Artifact-only/no-op behavior remains the supported default; these tests do not create a production observability support claim.

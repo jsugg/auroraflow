@@ -132,7 +132,7 @@ describe('observability contract documentation', () => {
     expect(workflow).toContain('Observability Full Stack Smoke');
     expect(workflow).toContain('AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED');
     expect(workflow).toContain(
-      "SHOULD_RUN_OBSERVABILITY_FULL_STACK: ${{ github.ref == 'refs/heads/main' || needs.preflight.outputs.run_observability_stack == 'true' }}",
+      "SHOULD_RUN_OBSERVABILITY_FULL_STACK: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}",
     );
     expect(workflow).not.toContain('vars.AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED');
     expect(workflow).toContain('prometheus-targets.json');
@@ -148,7 +148,7 @@ describe('observability contract documentation', () => {
     expect(workflow).toContain('Observability Remote Export Smoke');
     expect(workflow).toContain('AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED');
     expect(workflow).toContain(
-      "SHOULD_RUN_REMOTE_EXPORT: ${{ github.ref == 'refs/heads/main' || needs.preflight.outputs.run_observability_stack == 'true' }}",
+      "SHOULD_RUN_REMOTE_EXPORT: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}",
     );
     expect(workflow).not.toContain('vars.AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED');
     expect(workflow).toContain('secrets.OTEL_EXPORTER_OTLP_ENDPOINT');

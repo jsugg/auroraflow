@@ -32,6 +32,16 @@ Each run uploads a `release-dry-run-evidence` artifact (30-day retention) contai
 
 The run also executes the full `npm run verify` gate and a clean `npm run build` so release evidence always reflects a healthy tree.
 
+## Playwright peer compatibility
+
+The release dry run calls `.github/workflows/playwright-peer-matrix.yml` before packaging. That reusable workflow validates three lanes inside the declared `playwright >=1.59 <2` range:
+
+- **floor:** exact `1.59.1`;
+- **current:** lockfile versions installed by `npm ci`;
+- **latest:** newest compatible `1.x` resolved from `^1.59.0`.
+
+Each lane runs type checking, focused page-object/factory unit tests, and the Chrome smoke suite. Browser installation makes this matrix too expensive for routine pull-request CI, so it runs weekly, on manual dispatch, and as a release prerequisite.
+
 ## Versioning and changelog policy
 
 - Versions follow [SemVer](https://semver.org/). Breaking changes to `stable` exports (see `docs/api-stability.md`) require a major release; the deprecation policy there governs removal timelines.
@@ -79,6 +89,7 @@ If a published release is broken or compromised:
 ## Pre-release checklist
 
 - [ ] `npm run verify` green on the release commit.
+- [ ] Playwright floor/current/latest peer matrix green.
 - [ ] Release dry-run workflow green; evidence artifact reviewed (pack contents, SBOMs, provenance readiness, changelog draft).
 - [ ] Release notes curated from the changelog draft.
 - [ ] Version bump follows SemVer against `docs/api-stability.md` tiers.
