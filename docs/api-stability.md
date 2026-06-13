@@ -156,32 +156,39 @@ The self-healing engine rows are experimental because candidate scoring calibrat
 
 ### Self-healing engine
 
-| Export                             | Kind    | Tier         |
-| ---------------------------------- | ------- | ------------ |
-| `analyzeSelfHealingFailure`        | runtime | experimental |
-| `SelfHealingAnalysisResult`        | type    | experimental |
-| `SelfHealingFailureContext`        | type    | experimental |
-| `buildSelfHealingCandidateId`      | runtime | experimental |
-| `rankSelfHealingCandidates`        | runtime | experimental |
-| `CandidateScoringInput`            | type    | experimental |
-| `SelfHealingCandidateSeed`         | type    | experimental |
-| `extractDomCandidateSeeds`         | runtime | experimental |
-| `DomCandidateExtractionInput`      | type    | experimental |
-| `captureDomSnapshot`               | runtime | experimental |
-| `normalizeAllowedAttributes`       | runtime | experimental |
-| `normalizeDomText`                 | runtime | experimental |
-| `redactDomAttributeValue`          | runtime | experimental |
-| `summarizeDomSnapshot`             | runtime | experimental |
-| `DomSnapshotOptions`               | type    | experimental |
-| `captureFailureEvent`              | runtime | experimental |
-| `createFileFailureArtifactWriter`  | runtime | experimental |
-| `CaptureFailureEventInput`         | type    | experimental |
-| `FailureArtifactWriter`            | type    | experimental |
-| `generateRankedLocatorSuggestions` | runtime | experimental |
-| `SuggestionEngineInput`            | type    | experimental |
-| `evaluateGuardedSuggestionsDryRun` | runtime | experimental |
-| `resolveLocatorExpression`         | runtime | experimental |
-| `GuardedValidationInput`           | type    | experimental |
+| Export                              | Kind    | Tier         |
+| ----------------------------------- | ------- | ------------ |
+| `analyzeSelfHealingFailure`         | runtime | experimental |
+| `SelfHealingAnalysisResult`         | type    | experimental |
+| `SelfHealingFailureContext`         | type    | experimental |
+| `buildSelfHealingCandidateId`       | runtime | experimental |
+| `rankSelfHealingCandidates`         | runtime | experimental |
+| `CandidateScoringInput`             | type    | experimental |
+| `SelfHealingCandidateSeed`          | type    | experimental |
+| `extractDomCandidateSeeds`          | runtime | experimental |
+| `DomCandidateExtractionInput`       | type    | experimental |
+| `captureDomSnapshot`                | runtime | experimental |
+| `normalizeAllowedAttributes`        | runtime | experimental |
+| `normalizeDomText`                  | runtime | experimental |
+| `redactDomAttributeValue`           | runtime | experimental |
+| `summarizeDomSnapshot`              | runtime | experimental |
+| `DomSnapshotOptions`                | type    | experimental |
+| `DEFAULT_ARTIFACT_PRIVACY_POLICY`   | runtime | experimental |
+| `SENSITIVE_ARTIFACT_PRIVACY_POLICY` | runtime | experimental |
+| `applyDomSnapshotPrivacy`           | runtime | experimental |
+| `captureFailureScreenshot`          | runtime | experimental |
+| `resolveArtifactPrivacyPolicy`      | runtime | experimental |
+| `ArtifactPrivacyPolicy`             | type    | experimental |
+| `ArtifactPrivacyPreset`             | type    | experimental |
+| `captureFailureEvent`               | runtime | experimental |
+| `createFileFailureArtifactWriter`   | runtime | experimental |
+| `CaptureFailureEventInput`          | type    | experimental |
+| `FailureArtifactWriter`             | type    | experimental |
+| `generateRankedLocatorSuggestions`  | runtime | experimental |
+| `SuggestionEngineInput`             | type    | experimental |
+| `evaluateGuardedSuggestionsDryRun`  | runtime | experimental |
+| `resolveLocatorExpression`          | runtime | experimental |
+| `GuardedValidationInput`            | type    | experimental |
 
 ### Self-healing artifact contracts
 

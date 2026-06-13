@@ -245,6 +245,15 @@ Report APIs:
 - `buildAlertEvaluationMarkdown()`
 - trend helpers such as `appendObservabilityTrendPoint()` and `readObservabilityTrendPoints()`
 
+Artifact privacy APIs:
+
+- `resolveArtifactPrivacyPolicy()`
+- `captureFailureScreenshot()`
+- `applyDomSnapshotPrivacy()`
+- `DEFAULT_ARTIFACT_PRIVACY_POLICY` and `SENSITIVE_ARTIFACT_PRIVACY_POLICY`
+
+The compatible preset preserves current capture behavior. The sensitive preset disables failure screenshots and omits visible DOM text before self-healing candidate extraction. See [Artifact privacy and retention](./operations/privacy-retention.md).
+
 Live OpenTelemetry export requires `AURORAFLOW_OBSERVABILITY_ENABLED=true` and an OTLP endpoint. JSON/Markdown artifacts remain deterministic evidence even when live telemetry is disabled.
 
 ## Artifact schemas

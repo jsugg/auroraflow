@@ -14,6 +14,7 @@ describe('documentation surface contract', () => {
       'docs/configuration.md',
       'docs/api.md',
       'docs/architecture/self-healing.md',
+      'docs/operations/privacy-retention.md',
       'docs/operations/observability-contract.md',
       'docs/operations/flakiness-analytics.md',
       'docs/operations/slo-dashboard-alerting.md',
@@ -22,6 +23,26 @@ describe('documentation surface contract', () => {
     for (const docPath of requiredDocs) {
       expect(readRepoFile(docPath).trim().length).toBeGreaterThan(200);
     }
+  });
+
+  it('documents privacy scope, capture controls, and consumer-owned retention', () => {
+    const privacy = readRepoFile('docs/operations/privacy-retention.md');
+
+    for (const dataClass of [
+      'Screenshots',
+      'DOM text',
+      'Failure events',
+      'Logs',
+      'Redis records',
+      'Telemetry',
+      'Trends',
+      'Audit records',
+    ]) {
+      expect(privacy).toContain(dataClass);
+    }
+    expect(privacy).toContain('AURORAFLOW_ARTIFACT_PRIVACY_PRESET');
+    expect(privacy).toContain('consumer-owned');
+    expect(privacy).toContain('does not claim support for regulated PII');
   });
 
   it('keeps current maturity claims aligned with implemented promotion workflows', () => {

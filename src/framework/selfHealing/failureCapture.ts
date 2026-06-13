@@ -20,6 +20,7 @@ import {
 } from '../observability/attributes';
 import { METRIC_NAMES } from '../observability/metricNames';
 import { getTelemetry } from '../observability/telemetry';
+import { DEFAULT_ARTIFACT_PRIVACY_POLICY, type ArtifactPrivacyPolicy } from './artifactPrivacy';
 
 export type FailureArtifactWriter = (event: CapturedFailureEvent) => Promise<void>;
 
@@ -30,6 +31,7 @@ export interface CaptureFailureEventInput {
   error: unknown;
   currentUrl?: string;
   screenshotPath?: string;
+  privacyPolicy?: ArtifactPrivacyPolicy;
   suggestions?: ReadonlyArray<SelfHealingSuggestion>;
   writer?: FailureArtifactWriter;
   decorateEvent?: (event: CapturedFailureEvent) => Promise<void> | void;
@@ -82,6 +84,7 @@ export async function captureFailureEvent({
   error,
   currentUrl,
   screenshotPath,
+  privacyPolicy = DEFAULT_ARTIFACT_PRIVACY_POLICY,
   suggestions: inputSuggestions,
   writer = createFileFailureArtifactWriter(),
   decorateEvent,
@@ -138,7 +141,7 @@ export async function captureFailureEvent({
         safetyPolicy: config.safetyPolicy,
         pageObjectName,
         currentUrl,
-        screenshotPath,
+        screenshotPath: privacyPolicy.screenshot.mode === 'capture' ? screenshotPath : undefined,
         action,
         error: normalizeError(error),
         suggestions,

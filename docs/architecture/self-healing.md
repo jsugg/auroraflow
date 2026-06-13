@@ -72,12 +72,16 @@ Each artifact includes:
 - page object context and current URL (when available).
 - action metadata (type, target, description).
 - normalized error details.
-- screenshot path captured for the failure.
+- optional screenshot path captured for the failure when the privacy policy permits it.
 - ranked locator suggestions with weighted scoring signals (`roleSignal`, `accessibleNameSignal`, `uniquenessSignal`, `historicalSignal`, `similaritySignal`).
 - optional `sat` payload with snapshot summary, ranked DOM/heuristic candidates, selected candidate ID, history summary, and analysis warnings.
 - optional `registryPersistence` payload with history write counts, pending promotion write status, and persistence warnings when `SELF_HEAL_REGISTRY_MODE=write_pending`.
 
 JSON Schema contracts for self-healing artifacts live in [`../operations/artifact-schemas.md`](../operations/artifact-schemas.md).
+
+### Artifact Privacy
+
+`AURORAFLOW_ARTIFACT_PRIVACY_PRESET=compatible` preserves failure screenshot and bounded DOM text capture. The opt-in `sensitive` preset disables failure screenshots and removes visible text, accessible names, and text-bearing attributes before DOM candidate extraction. Custom experimental policies can add screenshot masks or use redact/keyed-hash/disable DOM text modes. See [Artifact privacy and retention](../operations/privacy-retention.md) for residual risks and consumer-owned retention.
 
 ### Correlation Identifier Resolution
 

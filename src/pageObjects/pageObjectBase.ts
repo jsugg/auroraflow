@@ -4,6 +4,11 @@ import { Logger, createChildLogger } from '../utils/logger';
 import { analyzeSelfHealingFailure } from '../framework/selfHealing/analyzer';
 import { resolveSelfHealingConfig } from '../framework/selfHealing/config';
 import { captureFailureEvent } from '../framework/selfHealing/failureCapture';
+import {
+  captureFailureScreenshot,
+  resolveArtifactPrivacyPolicy as resolveArtifactPrivacyPolicyFromEnvironment,
+  type ArtifactPrivacyPolicy,
+} from '../framework/selfHealing/artifactPrivacy';
 import { persistSelfHealingRegistryTelemetry } from '../framework/selfHealing/registryPersistence';
 import { resolveSelfHealingRegistryRuntime } from '../framework/selfHealing/registryRuntime';
 import { generateRankedLocatorSuggestions } from '../framework/selfHealing/suggestionEngine';
@@ -236,17 +241,19 @@ export abstract class PageObjectBase {
       errorCode = `page_action_${actionContext.type}_failed`;
       span.recordException(actionError);
       this.logger.error(errorMessage, { error });
-      const screenshotPath = this.buildFailureScreenshotPath(errorMessage);
+      const artifactPrivacyPolicy = this.resolveArtifactPrivacyPolicy();
+      const screenshotPath =
+        artifactPrivacyPolicy.screenshot.mode === 'capture'
+          ? this.buildFailureScreenshotPath(errorMessage)
+          : undefined;
       const currentUrl = this.resolveCurrentUrl();
 
-      // Take a screenshot on error
-      await this.page
-        .screenshot({
-          path: screenshotPath,
-        })
-        .catch((screenshotError) =>
-          this.logger.error('Failed to take a screenshot.', { screenshotError }),
+      if (screenshotPath !== undefined) {
+        await captureFailureScreenshot(this.page, screenshotPath, artifactPrivacyPolicy).catch(
+          (screenshotError) =>
+            this.logger.error('Failed to take a screenshot.', { screenshotError }),
         );
+      }
 
       const selfHealingConfig = resolveSelfHealingConfig(process.env);
       span.setAttribute('auroraflow.self_heal.mode', selfHealingConfig.mode);
@@ -274,6 +281,7 @@ export abstract class PageObjectBase {
           currentUrl,
           existingSuggestions: rankedSuggestions,
           registryRuntime,
+          privacyPolicy: artifactPrivacyPolicy,
         });
         if (selfHealingAnalysis.sat) {
           span.setAttribute(
@@ -362,6 +370,7 @@ export abstract class PageObjectBase {
         pageObjectName: this.pageObjectName,
         currentUrl,
         screenshotPath,
+        privacyPolicy: artifactPrivacyPolicy,
         action: failureActionContext,
         error,
         suggestions: selfHealingAnalysis?.suggestions ?? rankedSuggestions,
@@ -468,6 +477,12 @@ export abstract class PageObjectBase {
     const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
     const sanitizedMessage = errorMessage.replace(/[^a-z0-9]/gi, '_');
     return `test-results/screenshots/${timestamp}_${sanitizedMessage}.png`;
+  }
+
+  protected resolveArtifactPrivacyPolicy(): ArtifactPrivacyPolicy {
+    return resolveArtifactPrivacyPolicyFromEnvironment(process.env, (diagnostic) =>
+      this.logger.warn(diagnostic),
+    );
   }
 
   private async ensureInitialized(): Promise<void> {
