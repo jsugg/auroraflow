@@ -180,6 +180,10 @@ npm run security:check
 
 Security workflows cover dependency review on pull requests, high-severity npm audit on non-PR events, CodeQL on non-PR events, gitleaks, workflow security scanning, and a final security gate.
 
+## Release process
+
+Releases are governed by a manual, dry-run-only workflow (`.github/workflows/release.yml`) that produces auditable evidence — pack report, SPDX/CycloneDX SBOMs, provenance-readiness check, and a changelog draft — without publishing. Publishing is intentionally disabled behind a protected-environment placeholder. See [release-process.md](operations/release-process.md) for the changelog, rollback, provenance, and SBOM policy (`AUR-DEC-012`).
+
 ## Documentation rules
 
 Documentation should remain precise and source-backed:
