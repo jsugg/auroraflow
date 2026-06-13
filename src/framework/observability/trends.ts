@@ -87,7 +87,19 @@ export interface ObservabilityTrendWriteResult {
   filePath: string;
   limit: number;
   points: number;
+  skippedLines?: number;
   appended: ObservabilityTrendPoint;
+}
+
+interface ObservabilityTrendReadWarning {
+  filePath: string;
+  line: number;
+  message: string;
+}
+
+interface ObservabilityTrendReadOptions {
+  strict?: boolean;
+  onWarning?: (warning: ObservabilityTrendReadWarning) => void;
 }
 
 export class ObservabilityTrendPersistenceError extends Error {
@@ -558,6 +570,7 @@ function toNodeError(error: unknown): NodeJS.ErrnoException | undefined {
 
 export async function readObservabilityTrendPoints(
   filePath: string,
+  options: ObservabilityTrendReadOptions = {},
 ): Promise<ObservabilityTrendPoint[]> {
   let content: string;
   try {
@@ -585,9 +598,17 @@ export async function readObservabilityTrendPoints(
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      throw new ObservabilityTrendPersistenceError(
+      const persistenceError = new ObservabilityTrendPersistenceError(
         `Invalid observability trend file ${filePath} line ${index + 1}: ${message}`,
       );
+      if (options.strict) {
+        throw persistenceError;
+      }
+      options.onWarning?.({
+        filePath,
+        line: index + 1,
+        message: persistenceError.message,
+      });
     }
   }
 
@@ -625,13 +646,24 @@ export async function appendObservabilityTrendPoint({
   filePath,
   point,
   limit = DEFAULT_OBSERVABILITY_TREND_LIMIT,
+  strict = false,
+  onWarning,
 }: {
   filePath: string;
   point: ObservabilityTrendPoint;
   limit?: number;
+  strict?: boolean;
+  onWarning?: ObservabilityTrendReadOptions['onWarning'];
 }): Promise<ObservabilityTrendWriteResult> {
   const boundedLimit = resolveTrendLimit({ value: limit });
-  const existing = await readObservabilityTrendPoints(filePath);
+  let skippedLines = 0;
+  const existing = await readObservabilityTrendPoints(filePath, {
+    strict,
+    onWarning: (warning) => {
+      skippedLines += 1;
+      onWarning?.(warning);
+    },
+  });
   const points = [...existing, parseObservabilityTrendPoint(point)]
     .sort(compareTrendPoints)
     .slice(-boundedLimit);
@@ -641,6 +673,7 @@ export async function appendObservabilityTrendPoint({
     filePath,
     limit: boundedLimit,
     points: points.length,
+    skippedLines,
     appended: point,
   };
 }

@@ -124,3 +124,5 @@ npm run slo:alerts -- --dashboard-json test-results/slo-dashboard.json \
 ```
 
 Add `--trend-output` when you want bounded JSONL history across runs.
+
+Run `npm run test:coverage` to enforce focused thresholds for critical self-healing, privacy, history, and trend modules. Thresholds live in `vitest.config.mts`; raise them only with corresponding tests, and do not weaken them to hide regressions.

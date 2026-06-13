@@ -722,12 +722,12 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 | `AUR-IMPL-011` | Add privacy and retention documentation | 1 | P1 | privacy | Complete | `007`, `030`, `037`, `041` | security/privacy | M | `001` | none; synthetic/non-prod PII and shortest-useful retention resolved | Data classes and retention guidance documented. |
 | `AUR-IMPL-012` | Add screenshot/DOM text privacy-control design | 1 | P1 | privacy | Complete | `007`, `041` | runtime/privacy | L | `011` | none; synthetic/non-prod PII scope resolved | Sensitive preset/control design prevents synthetic leaks. |
 | `AUR-IMPL-013` | Add lifecycle helper and Playwright fixture plan | 1 | P1 | devex | Ready | `012`, `024` | runtime/devex | M | none | none | Public contract/design for `closeAuroraFlow()` and fixture accepted. |
-| `AUR-IMPL-014` | Add Playwright peer-version matrix task | 1 | P2 | ci | Ready | `020`, `022` | QA/CI | M | `010` | CI budget | Min/current/latest peer lanes defined. |
-| `AUR-IMPL-015` | Add coverage thresholds and property/concurrency tests | 1 | P2 | test | Ready | `022`, `001`, `002`, `004`, `007` | QA | M | `003`, `005` | dependency approval if using property-test library | Critical module coverage baseline enforced. |
+| `AUR-IMPL-014` | Add Playwright peer-version matrix task | 1 | P2 | ci | Complete | `020`, `022` | QA/CI | M | `010` | none; browser cost moved to scheduled/release lane | Min/current/latest peer lanes defined. |
+| `AUR-IMPL-015` | Add coverage thresholds and property/concurrency tests | 1 | P2 | test | Complete | `022`, `001`, `002`, `004`, `007` | QA | M | `003`, `005` | none; table-driven generators used without new property dependency | Critical module coverage baseline enforced. |
 | `AUR-IMPL-016` | Add contributor onboarding, CODEOWNERS, and ADRs | 1 | P3 | governance | Ready | `034`, `035`, `009`, `040`, `041` | maintainers | S | `001`, `009`, `010`, `011` | maintainer owner names | Critical paths owned; initial ADRs created. |
 | `AUR-IMPL-017` | Productize memory selector store and conformance baseline | 1 | P2 | data | Ready | `026`, `016`, `017` | data/devex | M | `005` | store API decision | Memory and Redis stores pass same conformance suite. |
-| `AUR-IMPL-018` | Add trend malformed-line resilience | 1 | P2 | reliability | Ready | `018`, `041` | observability/reporting | S | none | none | One corrupt JSONL line does not block valid trend points. |
-| `AUR-IMPL-019` | Add focused OTLP integration coverage | 1 | P2 | observability | Ready | `021`, `019`, `041` | observability/QA | M | `010` | CI cost/support level | Mock/collector integration verifies export path. |
+| `AUR-IMPL-018` | Add trend malformed-line resilience | 1 | P2 | reliability | Complete | `018`, `041` | observability/reporting | S | none | none | One corrupt JSONL line does not block valid trend points. |
+| `AUR-IMPL-019` | Add focused OTLP integration coverage | 1 | P2 | observability | Complete | `021`, `019`, `041` | observability/QA | M | `010` | none; full/remote stacks remain scheduled/manual | Mock/collector integration verifies export path. |
 | `AUR-IMPL-020` | Implement structured candidate model end-to-end | 2 | P1 | refactor | Not started | `002`, `008`, `022`, `040` | self-healing/runtime | L | `003`, `009` | schema compatibility | New runtime path uses discriminated locator model and legacy read. |
 | `AUR-IMPL-021` | Add `AuroraFlowContext` runtime injection | 2 | P1 | architecture | Not started | `011`, `006`, `010` | runtime architecture | L | `013`, `009` | none | Two contexts run isolated in one process. |
 | `AUR-IMPL-022` | Add internal page-action pipeline | 2 | P1 | refactor | Not started | `010`, `011`, `027`, `025`, `040` | runtime architecture | L | `021`, `020` | none | First actions delegate without public behavior regression. |
@@ -1321,6 +1321,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
   - Peer floor is tested before release.
   - Matrix failure blocks or warns according to documented lane type.
   - CI cost is recorded.
+- **Implementation result:** Added reusable floor/current/latest workflow with exact `1.59.1`, lockfile-current, and latest compatible `1.x` lanes. Each lane aligns `playwright`, `playwright-core`, and `@playwright/test`, then runs typecheck, focused unit tests, and Chrome smoke. Browser-heavy execution is weekly, manual, and required by release dry-run rather than routine PR CI.
 - **Rollback strategy:** Move matrix to scheduled-only if PR cost is too high.
 - **Risks:** Runtime increases; old Playwright may conflict with lockfile tooling.
 - **Non-goals:** Supporting Playwright `<1.59` or `2.x`.
@@ -1362,6 +1363,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
   - Coverage gate exists for critical modules.
   - Property/concurrency tests cover at least candidate/config/history/trend risk areas.
   - If coverage command is missing, add script or document command and create follow-up.
+- **Implementation result:** Added V8 thresholds for trend parsing, artifact privacy, self-healing config, guarded locator parsing, and candidate history. Dedicated Node 22 CI runs existing table-driven candidate/config coverage, history concurrency tests, and malformed-trend cases. No property-test dependency was added.
 - **Rollback strategy:** Set thresholds warning-only or lower to baseline; do not remove critical tests.
 - **Risks:** CI time increases; coverage tooling may require config changes.
 - **Non-goals:** Adding property-test dependency without approval.
@@ -1483,6 +1485,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
   - Malformed line does not block valid trend points.
   - Warning count is observable.
   - Artifact-first behavior preserved.
+- **Implementation result:** Trend reads now skip malformed non-empty lines by default, preserve valid points, expose warning callbacks and skipped-line counts, and retain opt-in strict parsing. Report scripts print skipped counts before atomically rewriting bounded valid history.
 - **Rollback strategy:** Re-enable strict mode by default; keep docs warning.
 - **Risks:** Skipping malformed data can hide corruption if warning ignored.
 - **Non-goals:** Long-horizon durable trend storage.
@@ -1524,6 +1527,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
   - Telemetry export path is tested without requiring full stack by default.
   - No-op default still passes.
   - Metric/label compatibility is asserted.
+- **Implementation result:** Added a process-local OTLP/HTTP protobuf receiver integration test using the real trace and metric exporters. It asserts representative span/metric names, attributes, and resource metadata. Full-stack and remote-export lanes moved to scheduled/manual execution; collector-only and no-op paths remain intact.
 - **Rollback strategy:** Move heavy integration to scheduled workflow; keep unit mocks.
 - **Risks:** Test flakiness or service dependency creep.
 - **Non-goals:** Production observability support claim.
@@ -2270,13 +2274,13 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | Field | Value |
 | --- | --- |
 | Current phase | Phase 1 |
-| Current task | `AUR-IMPL-011`/`012` privacy documentation and controls complete; PR-01C ready to publish |
-| Branch | `feature/artifact-privacy-controls` |
-| Latest commit | PR-01C privacy work pending commit |
-| Working tree status | PR-01C changes validated and pending commit |
+| Current task | `AUR-IMPL-014`, `015`, `018`, and `019` complete; PR-01F ready to publish |
+| Branch | `feature/phase-1-quality-foundation` |
+| Latest commit | PR-01F quality foundation pending commit |
+| Working tree status | PR-01F changes validated and pending commit |
 | Blocked decision gates | None; `AUR-DEC-001`-`AUR-DEC-013` resolved by operator on 2026-06-10 |
-| Last validation run | 2026-06-13 `AUR-IMPL-011`/`012`: full `npm run verify` passed (40 unit files / 228 tests; 17 integration/contract files / 74 tests); 10 schemas compiled; security workflow scan had no findings and npm audit found 0 vulnerabilities |
-| Next recommended action | Commit and open PR-01C, follow CI to green, merge, then start `AUR-IMPL-013` |
+| Last validation run | 2026-06-13 PR-01F: full `npm run verify` passed (40 unit files / 229 tests; 19 integration/contract files / 79 tests); critical coverage passed at 87.87% statements / 76.55% branches / 95.91% functions / 88.12% lines; 10 schemas compiled; workflow security had no findings |
+| Next recommended action | Commit and open PR-01F, run the peer matrix on the branch, follow required CI to green, and merge |
 
 ### 15.3 Task Progress Log
 
@@ -2297,6 +2301,8 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | 2026-06-12 | Claude | `AUR-IMPL-009` | Classified all 256 root exports (111 runtime, 145 type) into stability tiers: 41 stable (page objects/factory/helpers/logging/self-healing config/metric names), 188 advanced (Redis/selector registry, registry runtime and promotion governance, artifact contracts, telemetry, reports/trends), 26 experimental (self-healing engine pending `AUR-IMPL-020`/`028`), 1 internal (`resetRedisClientForTests`), 0 deprecated. Added machine-readable `docs/api-stability.md` with tier guarantees, deprecation policy (stable: >=1 minor release and 90 days; removal only in majors), and schema/CLI/metrics/env compatibility surfaces. Added `tests/helpers/apiStabilitySurface.ts` (TypeScript-AST export inventory rejecting `export *`, manifest table parser failing loudly on unknown tier/kind) plus four contract tests (no duplicates, zero unclassified, zero stale/mislabeled, runtime-surface parity via root import) and six unit tests for the helpers. Linked tiers from `docs/api.md`. No export removed or renamed | `docs/api-stability.md`, `docs/api.md`, `tests/helpers/apiStabilitySurface.ts`, `tests/suites/contracts/package/packageSurface.contract.spec.ts`, `tests/suites/unit/framework/packageSurface/packageSurface.spec.ts`, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk npm run test:unit -- --run tests/suites/unit/framework/packageSurface/packageSurface.spec.ts tests/suites/unit/framework/publicApi/publicApi.spec.ts`; `rtk npm run test:integration -- --run tests/suites/contracts/package/packageSurface.contract.spec.ts`; `rtk npm run typecheck`; `rtk npm run lint`; stale-row drift injection then contract rerun; `rtk npm run verify` | Unit script ran 39 files / 219 tests passed; integration script ran 16 files / 65 tests passed; typecheck/lint clean; injected stale manifest row failed the contract as designed, then passed after restore; full verify passed | Next task: `AUR-IMPL-010` release dry-run workflow (PR-01B) |
 | 2026-06-12 | Claude | `AUR-IMPL-010` | Added manual-only release dry-run workflow per `AUR-DEC-012`: `workflow_dispatch`-only trigger, `contents: read` at workflow and job level, SHA-pinned actions, `persist-credentials: false`. Dry-run job runs `npm ci`, full `npm run verify`, `npm run build`, `npm run pack:dry-run` plus `npm pack --dry-run --json` evidence capture, runtime-dependency SBOMs via `npm sbom --omit dev` (SPDX + CycloneDX; requires npm >= 9.5, satisfied by the Node 22 toolchain), a provenance-readiness check (repository URL match, non-private, explicit `files` allowlist; real provenance statement deferred to a future publish task), and a Conventional Commits changelog draft; all evidence uploaded under the single `release-evidence/` artifact root. `publish-gate` job is a hard-refusal placeholder gated on a non-empty `publish_confirmation` input and the protected `release` environment; no `npm publish` invocation exists anywhere in the workflow. Added `docs/operations/release-process.md` (versioning/changelog policy, provenance/SBOM policy with signing deferred, publish gating, rollback policy preferring `npm deprecate` over unpublish, pre-release checklist), linked it from `docs/development.md`, and added a release contract test covering trigger surface, least-privilege permissions, no-publish invariant, SHA pinning, evidence steps, gating, and doc policy terms | `.github/workflows/release.yml`, `docs/operations/release-process.md`, `docs/development.md`, `tests/suites/contracts/workflows/release-dry-run.contract.spec.ts`, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk npm run workflows:lint`; `rtk npm run workflows:security`; `rtk npm run test:integration -- --run tests/suites/contracts/workflows/release-dry-run.contract.spec.ts`; `rtk npm run build`; `rtk npm run pack:dry-run`; local smoke of SBOM (via `npx npm@11 sbom`), provenance-readiness, and changelog-draft step logic; `rtk npm run verify` | actionlint and zizmor clean (no findings); contract gate 17 files / 73 tests passed after tightening the no-publish wording the contract itself caught; build/dry-pack clean; SBOMs generated 64 SPDX packages / 63 CycloneDX components; provenance prerequisites satisfied; full verify passed | Next task: `AUR-IMPL-011`/`012` privacy docs and controls (PR-01C) |
 | 2026-06-13 | Implementation agent | `AUR-IMPL-011`, `AUR-IMPL-012` | Documented screenshot, DOM text, failure-event, log, Redis, telemetry, trend, and audit data classes plus shortest-useful retention guidance and consumer ownership. Added an additive `ArtifactPrivacyPolicy` with compatible and sensitive presets, screenshot disable/mask hooks, DOM text capture/redact/keyed-hash/disable modes, in-browser omission for sensitive capture, and protected `PageObjectBase` override seam. Classified seven new root exports. Added synthetic-secret fixtures proving sensitive failure artifacts, logger output, and telemetry contain no fixture secret while the compatible default remains unchanged. Explicitly excluded regulated PII support | `docs/operations/privacy-retention.md`, privacy/config/schema/API/self-healing docs, `src/framework/selfHealing/{artifactPrivacy,domSnapshot,domCandidateExtraction,analyzer,failureCapture}.ts`, `src/pageObjects/pageObjectBase.ts`, `src/index.ts`, privacy/logger/page-object/analyzer/docs/package-surface tests, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | Test-first unit/docs runs; `rtk npm run typecheck`; `rtk npm run lint`; `rtk npm run test:unit`; `rtk npm run test:integration`; `rtk npm run schemas:check`; `rtk npm run verify`; `rtk npm run security:check` | Initial tests failed on missing policy/doc as expected; final verify passed with 40 unit files / 228 tests and 17 integration/contract files / 74 tests; 10 schemas compiled; zizmor had no findings; npm audit found 0 vulnerabilities | Commit, open PR-01C, follow CI to green, merge, then `AUR-IMPL-013` |
+| 2026-06-13 | Implementation agent | `AUR-IMPL-018` | Made trend JSONL reads tolerant by default with valid-point preservation, observable skipped-line warnings/counts, strict opt-in, script reporting, and cache durability documentation | `src/framework/observability/trends.ts`, report scripts, trend tests/docs | Targeted trend test; schemas; typecheck; full verification | Valid/malformed/valid history passed; strict diagnostics preserved; scripts report skipped count | Include in PR-01F |
+| 2026-06-13 | Implementation agent | `AUR-IMPL-014`, `015`, `019` | Added scheduled/release Playwright floor/current/latest matrix, critical-module V8 coverage gate without a property-test dependency, focused real-exporter OTLP receiver coverage, and scheduled full/remote observability lanes | workflows, Vitest/package config, OTLP/workflow contracts, release/observability/testing docs | Local floor `1.59.1` and latest `1.60.0` type/unit checks; `npm run verify`; `npm run test:coverage`; workflow lint/security; schemas | Verify passed 40 unit files / 229 tests and 19 integration/contract files / 79 tests; coverage 87.87/76.55/95.91/88.12; no workflow security findings; 10 schemas compiled | Publish PR-01F and run branch peer matrix |
 
 ### 15.4 Command Log
 
@@ -2354,6 +2360,8 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | 2026-06-13 | `rtk npm run test:unit`, `rtk npm run test:integration`, `rtk npm run schemas:check` | Privacy policy, synthetic-secret, docs, package-surface, and artifact-schema gates | Passed | Unit 40 files / 228 tests; integration/contracts 17 files / 74 tests; 10 schemas compiled |
 | 2026-06-13 | `rtk npm run verify` | Full PR-01C gate | Passed | Format, lint, typecheck, unit, integration, shellcheck, and workflow lint clean |
 | 2026-06-13 | `rtk npm run security:check` | Privacy/security posture gate | Passed | zizmor 1.25.2 reported no findings; npm audit found 0 vulnerabilities |
+| 2026-06-13 | Local Playwright floor/latest installs, typecheck, focused page-object/factory tests | Validate matrix dependency alignment before CI | Passed | Floor `1.59.1`; latest resolved `1.60.0`; `playwright`, `playwright-core`, and `@playwright/test` aligned |
+| 2026-06-13 | `rtk npm run verify`; `rtk npm run test:coverage`; `rtk npm run workflows:security`; `rtk npm run schemas:check` | Final PR-01F quality gate | Passed | 40 unit files / 229 tests; 19 integration/contract files / 79 tests; coverage thresholds passed; no workflow security findings; 10 schemas compiled |
 
 ### 15.5 Decision Log
 

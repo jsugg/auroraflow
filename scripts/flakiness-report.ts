@@ -178,7 +178,13 @@ async function main(): Promise<number> {
           limit: options.trendLimit,
           point: buildObservabilityTrendPointFromFlakinessSummary({ summary }),
         });
-        console.log(`Trend history: ${trend.filePath} points=${trend.points}`);
+        const skippedLines = trend.skippedLines ?? 0;
+        console.log(
+          `Trend history: ${trend.filePath} points=${trend.points} skippedMalformedLines=${skippedLines}`,
+        );
+        if (skippedLines > 0) {
+          console.warn(`Skipped ${skippedLines} malformed trend history line(s).`);
+        }
       }
 
       console.log(
