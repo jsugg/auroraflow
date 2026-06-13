@@ -1,5 +1,6 @@
 import type { Page } from 'playwright';
 import { describe, expect, it, vi } from 'vitest';
+import { SENSITIVE_ARTIFACT_PRIVACY_POLICY } from '../../../../../src/framework/selfHealing/artifactPrivacy';
 import {
   captureDomSnapshot,
   normalizeAllowedAttributes,
@@ -65,7 +66,33 @@ describe('domSnapshot utilities', () => {
       maxDomNodes: 2,
       maxTextLength: 80,
       allowedAttributes: ['data-testid'],
+      domTextMode: 'capture',
     });
+  });
+
+  it('requests in-browser text omission for the sensitive preset', async () => {
+    const expectedSnapshot = {
+      schemaVersion: '1.0.0',
+      capturedAt: '2026-06-05T12:00:00.000Z',
+      nodeCount: 0,
+      truncated: false,
+      elements: [],
+    } satisfies DomSnapshot;
+    const evaluate = vi
+      .fn<(_: unknown, input: unknown) => Promise<DomSnapshot>>()
+      .mockResolvedValue(expectedSnapshot);
+    const page = { evaluate } as unknown as Page;
+    await captureDomSnapshot(page, {
+      maxDomNodes: 10,
+      maxTextLength: 80,
+      allowedAttributes: ['aria-label'],
+      privacyPolicy: SENSITIVE_ARTIFACT_PRIVACY_POLICY,
+    });
+
+    expect(evaluate).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({ domTextMode: 'disable' }),
+    );
   });
 
   it('summarizes snapshots without embedding element payloads', () => {

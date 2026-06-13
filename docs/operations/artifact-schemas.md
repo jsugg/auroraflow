@@ -34,3 +34,5 @@ The command compiles all schema files and validates generated artifacts found un
 These schemas define contracts for current artifacts, selector-history records, pending promotion review records, and observability trend points. Pending promotion records are runtime-written in `SELF_HEAL_REGISTRY_MODE=write_pending`; reviewed approval/rejection/rollback workflows operate on registry records only and do not rewrite source code.
 
 Selector-candidate-history records use the `AUR-DEC-005` shortest-useful retention contract: default TTL and hard cap are both `2,592,000` seconds (30 days), and `expiresAt` mirrors the clamped TTL. Redis persistence is consumer-owned; applications may choose shorter custom TTLs.
+
+Screenshot paths and DOM text fields are optional under the existing `1.0.0` schemas. The sensitive privacy preset can omit them without a schema-version change; legacy readers remain valid. See [Artifact privacy and retention](./privacy-retention.md).

@@ -42,7 +42,12 @@ function normalizeText(value: string | undefined, maxLength: number): string | n
     return null;
   }
   const normalized = value.replace(/\s+/g, ' ').trim();
-  if (normalized.length === 0 || normalized.length > maxLength) {
+  if (
+    normalized.length === 0 ||
+    normalized.length > maxLength ||
+    normalized === '[redacted]' ||
+    normalized.startsWith('hmac-sha256:')
+  ) {
     return null;
   }
   return normalized;

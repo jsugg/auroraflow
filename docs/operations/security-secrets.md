@@ -36,6 +36,8 @@ This document defines the minimum secret-handling requirements for AuroraFlow de
 2. Redact secret values from logs and screenshots before sharing artifacts.
 3. Use dedicated non-production credentials for all automated tests.
 
+Use the `sensitive` artifact privacy preset when pages may display non-production PII or secrets. See [Artifact privacy and retention](./privacy-retention.md) for capture controls, residual risks, and consumer-owned deletion requirements.
+
 ## Log Redaction and Destinations
 
 AuroraFlow redacts common secret-shaped log fields by default before records are written.

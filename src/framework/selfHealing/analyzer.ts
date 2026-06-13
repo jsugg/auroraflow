@@ -2,6 +2,7 @@ import type { Page } from 'playwright';
 import { buildSelfHealingCandidateId, rankSelfHealingCandidates } from './candidateScoring';
 import { extractDomCandidateSeeds } from './domCandidateExtraction';
 import { captureDomSnapshot, summarizeDomSnapshot } from './domSnapshot';
+import { DEFAULT_ARTIFACT_PRIVACY_POLICY, type ArtifactPrivacyPolicy } from './artifactPrivacy';
 import { generateRankedLocatorSuggestions } from './suggestionEngine';
 import type { SelfHealingCandidateSeed } from './candidateTypes';
 import type { SelectorRegistryEntry, SelfHealingRegistryRuntime } from './registryContracts';
@@ -22,6 +23,7 @@ export interface SelfHealingFailureContext {
   currentUrl?: string;
   existingSuggestions?: readonly SelfHealingSuggestion[];
   registryRuntime?: SelfHealingRegistryRuntime;
+  privacyPolicy?: ArtifactPrivacyPolicy;
 }
 
 export interface SelfHealingAnalysisResult {
@@ -210,6 +212,7 @@ export async function analyzeSelfHealingFailure({
   currentUrl,
   existingSuggestions,
   registryRuntime,
+  privacyPolicy = DEFAULT_ARTIFACT_PRIVACY_POLICY,
 }: SelfHealingFailureContext): Promise<SelfHealingAnalysisResult> {
   const suggestions =
     existingSuggestions ??
@@ -246,6 +249,7 @@ export async function analyzeSelfHealingFailure({
         maxTextLength: config.sat.maxTextLength,
         allowedAttributes: config.sat.allowedAttributes,
         currentUrl,
+        privacyPolicy,
       });
       snapshotSummary = summarizeDomSnapshot(snapshot);
       domCandidates.push(

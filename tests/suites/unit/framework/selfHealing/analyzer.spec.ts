@@ -2,12 +2,17 @@ import type { Page } from 'playwright';
 import { describe, expect, it, vi } from 'vitest';
 import { analyzeSelfHealingFailure } from '../../../../../src/framework/selfHealing/analyzer';
 import { buildSelfHealingCandidateId } from '../../../../../src/framework/selfHealing/candidateScoring';
+import { SENSITIVE_ARTIFACT_PRIVACY_POLICY } from '../../../../../src/framework/selfHealing/artifactPrivacy';
 import type { SelfHealingRegistryRuntime } from '../../../../../src/framework/selfHealing/registryContracts';
 import type {
   DomSnapshot,
   SelectorCandidateHistory,
   SelfHealingConfig,
 } from '../../../../../src/framework/selfHealing/types';
+import {
+  SYNTHETIC_SECRET,
+  createSyntheticSecretDomSnapshot,
+} from '../../../../fixtures/privacy/syntheticSecrets';
 
 function selfHealingConfig(overrides: Partial<SelfHealingConfig['sat']> = {}): SelfHealingConfig {
   return {
@@ -119,6 +124,39 @@ describe('analyzeSelfHealingFailure', () => {
       analysisWarnings: [],
     });
     expect(evaluate).not.toHaveBeenCalled();
+  });
+
+  it('does not build text-derived candidates from sensitive DOM content', async () => {
+    const secretSnapshot = createSyntheticSecretDomSnapshot();
+    const page = {
+      evaluate: vi
+        .fn<(_: unknown, input: unknown) => Promise<DomSnapshot>>()
+        .mockResolvedValue(secretSnapshot),
+    } as unknown as Page;
+
+    const result = await analyzeSelfHealingFailure({
+      page,
+      config: selfHealingConfig(),
+      pageObjectName: 'PrivacyPage',
+      currentUrl: secretSnapshot.url,
+      privacyPolicy: SENSITIVE_ARTIFACT_PRIVACY_POLICY,
+      action: {
+        type: 'click',
+        target: '#submit',
+        description: 'Synthetic privacy fixture failure',
+      },
+    });
+
+    expect(JSON.stringify(result)).not.toContain(SYNTHETIC_SECRET);
+    const domCandidates = result.sat?.candidates.filter(
+      (candidate) => candidate.evidence.source === 'dom',
+    );
+    expect(domCandidates).not.toHaveLength(0);
+    expect(
+      domCandidates?.every(
+        (candidate) => !['ariaLabel', 'roleName', 'text'].includes(candidate.strategy),
+      ),
+    ).toBe(true);
   });
 
   it('loads active registry selectors and applies candidate history to ranking', async () => {

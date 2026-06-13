@@ -1,4 +1,9 @@
 import type { Page } from 'playwright';
+import {
+  DEFAULT_ARTIFACT_PRIVACY_POLICY,
+  applyDomSnapshotPrivacy,
+  type ArtifactPrivacyPolicy,
+} from './artifactPrivacy';
 import type { DomElementSummary, DomSnapshot, DomSnapshotSummary } from './types';
 
 export interface DomSnapshotOptions {
@@ -7,6 +12,7 @@ export interface DomSnapshotOptions {
   allowedAttributes: readonly string[];
   currentUrl?: string;
   capturedAt?: string;
+  privacyPolicy?: ArtifactPrivacyPolicy;
 }
 
 interface BrowserDomSnapshotInput {
@@ -15,6 +21,7 @@ interface BrowserDomSnapshotInput {
   maxDomNodes: number;
   maxTextLength: number;
   allowedAttributes: readonly string[];
+  domTextMode: 'capture' | 'disable';
 }
 
 interface BrowserStyle {
@@ -123,15 +130,23 @@ export async function captureDomSnapshot(
     maxDomNodes: Math.max(1, Math.floor(options.maxDomNodes)),
     maxTextLength: Math.max(1, Math.floor(options.maxTextLength)),
     allowedAttributes: normalizeAllowedAttributes(options.allowedAttributes),
+    domTextMode: options.privacyPolicy?.domText.mode === 'disable' ? 'disable' : 'capture',
   };
 
-  return page.evaluate<DomSnapshot, BrowserDomSnapshotInput>((input) => {
+  const snapshot = await page.evaluate<DomSnapshot, BrowserDomSnapshotInput>((input) => {
     const runtime = globalThis as unknown as BrowserRuntime;
     const documentRef = runtime.document;
     const skippedTags = new Set(['script', 'style', 'noscript', 'template']);
     const cssEscape =
       runtime.CSS?.escape ?? ((value: string): string => value.replace(/[^a-zA-Z0-9_-]/g, '\\$&'));
     const allowedAttributes = new Set(input.allowedAttributes);
+    const textBearingAttributes = new Set([
+      'alt',
+      'aria-description',
+      'aria-label',
+      'placeholder',
+      'title',
+    ]);
     const elements: DomElementSummary[] = [];
     let scannedNodes = 0;
     let truncated = false;
@@ -146,6 +161,10 @@ export async function captureDomSnapshot(
       }
       truncated = true;
       return collapsed.slice(0, input.maxTextLength).trimEnd();
+    }
+
+    function normalizeVisibleText(value: string | null): string {
+      return input.domTextMode === 'disable' ? '' : normalizeText(value);
     }
 
     function redactAttributeValue({
@@ -171,6 +190,9 @@ export async function captureDomSnapshot(
       for (const attribute of element.attributes) {
         const name = attribute.name.toLowerCase();
         if (!allowedAttributes.has(name)) {
+          continue;
+        }
+        if (input.domTextMode === 'disable' && textBearingAttributes.has(name)) {
           continue;
         }
         attributes[name] = redactAttributeValue({
@@ -241,7 +263,7 @@ export async function captureDomSnapshot(
         .split(/\s+/)
         .map((id) => documentRef.getElementById(id))
         .filter((element): element is BrowserElement => element !== null)
-        .map((element) => normalizeText(element.textContent))
+        .map((element) => normalizeVisibleText(element.textContent))
         .filter(Boolean)
         .join(' ');
     }
@@ -250,35 +272,35 @@ export async function captureDomSnapshot(
       const id = element.getAttribute('id');
       if (id) {
         const label = documentRef.querySelector(`label[for="${cssEscape(id)}"]`);
-        const labelText = normalizeText(label?.textContent ?? null);
+        const labelText = normalizeVisibleText(label?.textContent ?? null);
         if (labelText) {
           return labelText;
         }
       }
       const parentLabel = element.closest('label');
-      return normalizeText(parentLabel?.textContent ?? null);
+      return normalizeVisibleText(parentLabel?.textContent ?? null);
     }
 
     function accessibleNameFor(element: BrowserElement): string | undefined {
-      const directName = normalizeText(element.getAttribute('aria-label'));
+      const directName = normalizeVisibleText(element.getAttribute('aria-label'));
       if (directName) {
         return directName;
       }
       const labelledBy = textFromReferencedIds(element.getAttribute('aria-labelledby'));
       if (labelledBy) {
-        return normalizeText(labelledBy);
+        return normalizeVisibleText(labelledBy);
       }
       const labelText = labelTextFor(element);
       if (labelText) {
         return labelText;
       }
       for (const attributeName of ['placeholder', 'title', 'alt']) {
-        const attributeValue = normalizeText(element.getAttribute(attributeName));
+        const attributeValue = normalizeVisibleText(element.getAttribute(attributeName));
         if (attributeValue) {
           return attributeValue;
         }
       }
-      const text = normalizeText(element.textContent);
+      const text = normalizeVisibleText(element.textContent);
       return text || undefined;
     }
 
@@ -376,7 +398,7 @@ export async function captureDomSnapshot(
       const attributes = collectAttributes(element, tagName);
       const role = inferRole(element, tagName);
       const accessibleName = accessibleNameFor(element);
-      const text = normalizeText(element.textContent);
+      const text = normalizeVisibleText(element.textContent);
       const enabled =
         !element.hasAttribute('disabled') && element.getAttribute('aria-disabled') !== 'true';
       const parentTagName = element.parentElement?.tagName.toLowerCase();
@@ -408,4 +430,8 @@ export async function captureDomSnapshot(
       elements,
     };
   }, browserInput);
+  return applyDomSnapshotPrivacy(
+    snapshot,
+    options.privacyPolicy ?? DEFAULT_ARTIFACT_PRIVACY_POLICY,
+  );
 }

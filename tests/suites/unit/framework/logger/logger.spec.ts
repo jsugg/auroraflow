@@ -6,6 +6,7 @@ import {
   createConfiguredLogger,
   resolveLoggerRuntimeConfig,
 } from '../../../../../src/utils/logger';
+import { SYNTHETIC_SECRET } from '../../../../fixtures/privacy/syntheticSecrets';
 
 function createMemoryDestination(): {
   destination: pino.DestinationStream;
@@ -96,8 +97,8 @@ describe('createConfiguredLogger', () => {
 
     logger.info(
       {
-        password: 'plain-password',
-        headers: { authorization: 'Bearer secret-token' },
+        password: SYNTHETIC_SECRET,
+        headers: { authorization: `Bearer ${SYNTHETIC_SECRET}` },
         safeValue: 'visible',
       },
       'user login attempted',
@@ -114,6 +115,7 @@ describe('createConfiguredLogger', () => {
     expect(payload.headers.authorization).toBe('[Redacted]');
     expect(payload.safeValue).toBe('visible');
     expect(payload.msg).toBe('user login attempted');
+    expect(chunks[0]).not.toContain(SYNTHETIC_SECRET);
   });
 });
 

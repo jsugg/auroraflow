@@ -287,6 +287,16 @@ export {
 } from './framework/selfHealing/domSnapshot';
 
 export {
+  DEFAULT_ARTIFACT_PRIVACY_POLICY,
+  SENSITIVE_ARTIFACT_PRIVACY_POLICY,
+  applyDomSnapshotPrivacy,
+  captureFailureScreenshot,
+  resolveArtifactPrivacyPolicy,
+  type ArtifactPrivacyPolicy,
+  type ArtifactPrivacyPreset,
+} from './framework/selfHealing/artifactPrivacy';
+
+export {
   captureFailureEvent,
   createFileFailureArtifactWriter,
   type CaptureFailureEventInput,

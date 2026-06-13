@@ -35,6 +35,14 @@ Default guarded healing is registry-curated by policy: fresh heuristic and DOM c
 
 Candidate-history retention follows `AUR-DEC-005`: the exported default and hard cap are both `2,592,000` seconds (30 days). Positive custom TTLs below the cap are honored; higher values are clamped to 30 days. Redis history data is consumer-owned.
 
+## Artifact privacy
+
+| Variable | Values | Default | Purpose |
+| --- | --- | --- | --- |
+| `AURORAFLOW_ARTIFACT_PRIVACY_PRESET` | `compatible`, `sensitive` | `compatible` | Keeps current failure screenshot/DOM text capture, or disables screenshots and omits visible DOM text before candidate extraction. |
+
+Invalid values use `compatible` and emit a diagnostic without echoing the received value. Custom screenshot masks and DOM text redact/hash/disable policies are available through the experimental `ArtifactPrivacyPolicy` API and the protected `PageObjectBase` resolver seam. See [Artifact privacy and retention](./operations/privacy-retention.md). These controls target synthetic and non-production PII; they are not regulated-PII support.
+
 ## Redis
 
 | Variable | Default | Notes |

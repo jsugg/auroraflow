@@ -6,6 +6,7 @@ import {
 } from '../../../../../src/framework/observability/telemetry';
 import { captureFailureEvent } from '../../../../../src/framework/selfHealing/failureCapture';
 import { CapturingTelemetry } from '../observability/capturingTelemetry';
+import { SENSITIVE_ARTIFACT_PRIVACY_POLICY } from '../../../../../src/framework/selfHealing/artifactPrivacy';
 import type {
   SelfHealingConfig,
   SelfHealingMode,
@@ -181,6 +182,29 @@ describe('captureFailureEvent', () => {
       component: 'CheckoutPage',
       errorCode: 'page_action_click_failed',
     });
+  });
+
+  it('omits screenshot paths when the sensitive policy disables capture', async () => {
+    const writer = vi.fn<(_: unknown) => Promise<void>>().mockResolvedValue();
+
+    const result = await captureFailureEvent({
+      config: selfHealingConfig('suggest'),
+      pageObjectName: 'ExamplePage',
+      screenshotPath: 'test-results/screenshots/private.png',
+      privacyPolicy: SENSITIVE_ARTIFACT_PRIVACY_POLICY,
+      action: {
+        type: 'click',
+        target: '#submit',
+        description: 'Synthetic privacy fixture failure',
+      },
+      error: new Error('click failed'),
+      writer,
+    });
+
+    expect(result?.screenshotPath).toBeUndefined();
+    expect(writer).toHaveBeenCalledWith(
+      expect.not.objectContaining({ screenshotPath: expect.any(String) as string }),
+    );
   });
 
   it('falls back to GitHub and Playwright identifiers when AuroraFlow identifiers are absent', async () => {

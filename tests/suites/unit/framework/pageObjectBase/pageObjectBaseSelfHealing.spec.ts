@@ -11,6 +11,10 @@ import {
 import type { SelfHealingRegistryRuntime } from '../../../../../src/framework/selfHealing/registryContracts';
 import { PageObjectBase } from '../../../../../src/pageObjects/pageObjectBase';
 import { CapturingTelemetry } from '../observability/capturingTelemetry';
+import {
+  SYNTHETIC_SECRET,
+  createSyntheticSecretDomSnapshot,
+} from '../../../../fixtures/privacy/syntheticSecrets';
 
 class TestPageObject extends PageObjectBase {
   constructor(
@@ -33,6 +37,7 @@ type PageMock = {
   click: ReturnType<typeof vi.fn>;
   close: ReturnType<typeof vi.fn>;
   fill: ReturnType<typeof vi.fn>;
+  evaluate: ReturnType<typeof vi.fn>;
   getByLabel: ReturnType<typeof vi.fn>;
   getByRole: ReturnType<typeof vi.fn>;
   getByTestId: ReturnType<typeof vi.fn>;
@@ -73,6 +78,13 @@ function createPageMock(): PageMock {
     click: vi.fn().mockResolvedValue(undefined),
     close: vi.fn().mockResolvedValue(undefined),
     fill: vi.fn().mockResolvedValue(undefined),
+    evaluate: vi.fn().mockResolvedValue({
+      schemaVersion: '1.0.0',
+      capturedAt: '2026-06-12T12:00:00.000Z',
+      nodeCount: 0,
+      truncated: false,
+      elements: [],
+    }),
     getByLabel: vi.fn().mockReturnValue(locatorMock),
     getByRole: vi.fn().mockReturnValue(locatorMock),
     getByTestId: vi.fn().mockReturnValue(locatorMock),
@@ -102,6 +114,7 @@ describe('PageObjectBase self-healing integration', () => {
     delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
     delete process.env.SELF_HEAL_ALLOWED_DOMAINS;
     delete process.env.SELF_HEAL_REGISTRY_MODE;
+    delete process.env.AURORAFLOW_ARTIFACT_PRIVACY_PRESET;
     await rm(artifactsDir, { recursive: true, force: true });
     pageMock = createPageMock();
     pageObject = new TestPageObject(pageMock as unknown as Page);
@@ -115,6 +128,7 @@ describe('PageObjectBase self-healing integration', () => {
     delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
     delete process.env.SELF_HEAL_ALLOWED_DOMAINS;
     delete process.env.SELF_HEAL_REGISTRY_MODE;
+    delete process.env.AURORAFLOW_ARTIFACT_PRIVACY_PRESET;
     resetTelemetryForTests();
     await rm(artifactsDir, { recursive: true, force: true });
   });
@@ -163,6 +177,27 @@ describe('PageObjectBase self-healing integration', () => {
     expect(content.suggestions.length).toBeGreaterThan(0);
     expect(content.suggestions[0]?.score).toBeGreaterThanOrEqual(
       content.suggestions[1]?.score ?? 0,
+    );
+  });
+
+  it('uses the sensitive preset without leaking synthetic DOM secrets', async () => {
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
+    process.env.AURORAFLOW_ARTIFACT_PRIVACY_PRESET = 'sensitive';
+    pageMock.evaluate.mockResolvedValueOnce(createSyntheticSecretDomSnapshot());
+    pageMock.fill.mockRejectedValueOnce(new Error('fill failed'));
+
+    await expect(pageObject.type('#username', 'alice')).rejects.toThrow(
+      'Error typing in selector #username: fill failed',
+    );
+
+    expect(pageMock.screenshot).not.toHaveBeenCalled();
+    const artifacts = await readdir(artifactsDir);
+    const artifact = readFileSync(path.join(artifactsDir, artifacts[0]), 'utf8');
+    expect(artifact).not.toContain(SYNTHETIC_SECRET);
+    expect(JSON.parse(artifact)).not.toHaveProperty('screenshotPath');
+    expect(JSON.stringify({ spans: telemetry.spans, counters: telemetry.counters })).not.toContain(
+      SYNTHETIC_SECRET,
     );
   });
 
