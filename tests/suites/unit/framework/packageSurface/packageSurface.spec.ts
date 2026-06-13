@@ -1,5 +1,11 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
+  STABILITY_TIERS,
+  extractRootExports,
+  findDuplicateNames,
+  parseStabilityManifest,
+} from '../../../../helpers/apiStabilitySurface';
+import {
   AlertPolicyValidationError,
   DEFAULT_OBSERVABILITY_TREND_LIMIT,
   DEFAULT_SELF_HEAL_MAX_CANDIDATES,
@@ -215,5 +221,71 @@ describe('public package surface', () => {
       isEnabled(): boolean;
       shutdown(): Promise<void>;
     }>();
+  });
+});
+
+describe('package surface classification helpers', () => {
+  it('extracts runtime and type exports with aliases and inline type modifiers', () => {
+    const source = [
+      "export { Alpha, type AlphaOptions, Beta as Gamma } from './alpha';",
+      "export type { Delta } from './delta';",
+    ].join('\n');
+
+    expect(extractRootExports(source)).toEqual([
+      { name: 'Alpha', kind: 'runtime', source: './alpha' },
+      { name: 'AlphaOptions', kind: 'type', source: './alpha' },
+      { name: 'Gamma', kind: 'runtime', source: './alpha' },
+      { name: 'Delta', kind: 'type', source: './delta' },
+    ]);
+  });
+
+  it('rejects wildcard re-exports that would make the inventory open-ended', () => {
+    expect(() => extractRootExports("export * from './alpha';")).toThrow(/export \*/);
+  });
+
+  it('rejects statements that are not named export declarations', () => {
+    expect(() => extractRootExports('export const alpha = 1;')).toThrow(
+      /only named export declarations/,
+    );
+  });
+
+  it('parses manifest rows and ignores prose, headers, and non-manifest tables', () => {
+    const markdown = [
+      'Some prose about `inlineCode` that is not a table row.',
+      '| Export | Kind | Tier |',
+      '| --- | --- | --- |',
+      '| `Alpha` | runtime | stable |',
+      '| `AlphaOptions` | type | experimental |',
+      '| Tier | Compatibility guarantee |',
+      '| stable | Core supported API. |',
+    ].join('\n');
+
+    expect(parseStabilityManifest(markdown)).toEqual([
+      { name: 'Alpha', kind: 'runtime', tier: 'stable' },
+      { name: 'AlphaOptions', kind: 'type', tier: 'experimental' },
+    ]);
+  });
+
+  it('fails loudly on unknown tiers and kinds instead of skipping rows', () => {
+    expect(() => parseStabilityManifest('| `Alpha` | runtime | solid |')).toThrow(
+      /Invalid stability tier 'solid'/,
+    );
+    expect(() => parseStabilityManifest('| `Alpha` | value | stable |')).toThrow(
+      /Invalid export kind 'value'/,
+    );
+    expect(STABILITY_TIERS).toEqual([
+      'stable',
+      'advanced',
+      'experimental',
+      'deprecated',
+      'internal',
+    ]);
+  });
+
+  it('reports duplicate export names', () => {
+    expect(findDuplicateNames([{ name: 'Alpha' }, { name: 'Beta' }, { name: 'Alpha' }])).toEqual([
+      'Alpha',
+    ]);
+    expect(findDuplicateNames([{ name: 'Alpha' }, { name: 'Beta' }])).toEqual([]);
   });
 });
