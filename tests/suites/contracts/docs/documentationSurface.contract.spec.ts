@@ -9,10 +9,18 @@ function readRepoFile(relativePath: string): string {
 describe('documentation surface contract', () => {
   it('ships API-grade onboarding and reference docs', () => {
     const requiredDocs = [
+      'CONTRIBUTING.md',
       'docs/getting-started.md',
       'docs/writing-tests.md',
       'docs/configuration.md',
       'docs/api.md',
+      'docs/adr/README.md',
+      'docs/adr/0001-safety-first-self-healing.md',
+      'docs/adr/0002-api-stability-tiers.md',
+      'docs/adr/0003-scoring-and-slo-policy.md',
+      'docs/adr/0004-redis-strategy.md',
+      'docs/adr/0005-observability-boundary.md',
+      'docs/adr/0006-release-policy.md',
       'docs/architecture/self-healing.md',
       'docs/operations/privacy-retention.md',
       'docs/operations/observability-contract.md',
@@ -63,5 +71,49 @@ describe('documentation surface contract', () => {
     expect(docs).not.toContain(
       'reviewed approval/rejection/rollback flows and source-code rewrites remain out of scope',
     );
+  });
+
+  it('documents lightweight contribution governance and advisory ownership', () => {
+    const contributing = readRepoFile('CONTRIBUTING.md');
+    const codeowners = readRepoFile('.github/CODEOWNERS');
+    const adrIndex = readRepoFile('docs/adr/README.md');
+    const adrDocs = [
+      'docs/adr/0001-safety-first-self-healing.md',
+      'docs/adr/0002-api-stability-tiers.md',
+      'docs/adr/0003-scoring-and-slo-policy.md',
+      'docs/adr/0004-redis-strategy.md',
+      'docs/adr/0005-observability-boundary.md',
+      'docs/adr/0006-release-policy.md',
+    ]
+      .map(readRepoFile)
+      .join('\n');
+
+    expect(contributing).toContain('lightweight');
+    expect(contributing).toContain('advisory CODEOWNERS');
+    expect(contributing).toContain('Confirm or replace owner handles');
+    expect(codeowners).toContain('Advisory owner map');
+    expect(codeowners).toContain('@jsugg');
+    expect(adrIndex).toContain('ADR 0001');
+
+    for (const topic of [
+      'Safety-first self-healing',
+      'API stability tiers',
+      'Scoring and SLO policy',
+      'Redis strategy',
+      'Observability boundary',
+      'Release policy',
+    ]) {
+      expect(adrDocs).toContain(topic);
+    }
+
+    for (const issueId of [
+      'AUR-ARCH-034',
+      'AUR-ARCH-035',
+      'AUR-ARCH-009',
+      'AUR-ARCH-040',
+      'AUR-ARCH-041',
+    ]) {
+      expect(adrDocs).toContain(issueId);
+    }
   });
 });

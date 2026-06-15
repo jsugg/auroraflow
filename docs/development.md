@@ -184,6 +184,14 @@ Security workflows cover dependency review on pull requests, high-severity npm a
 
 Releases are governed by a manual, dry-run-only workflow (`.github/workflows/release.yml`) that produces auditable evidence — pack report, SPDX/CycloneDX SBOMs, provenance-readiness check, and a changelog draft — without publishing. Publishing is intentionally disabled behind a protected-environment placeholder. See [release-process.md](operations/release-process.md) for the changelog, rollback, provenance, and SBOM policy (`AUR-DEC-012`).
 
+## Contribution governance
+
+Use [`../CONTRIBUTING.md`](../CONTRIBUTING.md) as the lightweight contributor entry point. It links the validation matrix, safety guardrails, advisory CODEOWNERS policy, and initial ADR set.
+
+Ownership is advisory by default: [`.github/CODEOWNERS`](../.github/CODEOWNERS) routes review to the current maintainer handle, but it becomes enforceable only if branch protection requires code-owner review. Confirm or replace owner handles with the maintainer before enabling that enforcement.
+
+Architecture decision records live in [`adr/`](adr/). Add or supersede an ADR when a change affects safety-first self-healing, API compatibility tiers, scoring/SLO policy, Redis ownership, observability support boundaries, release policy, or another durable architecture decision.
+
 ## Documentation rules
 
 Documentation should remain precise and source-backed:

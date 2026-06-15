@@ -2274,13 +2274,13 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | Field | Value |
 | --- | --- |
 | Current phase | Phase 1 |
-| Current task | `AUR-IMPL-014`, `015`, `018`, and `019` complete; PR-01F ready to publish |
-| Branch | `feature/phase-1-quality-foundation` |
-| Latest commit | PR-01F quality foundation pending commit |
-| Working tree status | PR-01F changes validated and pending commit |
+| Current task | `AUR-IMPL-016` contributor governance complete; PR-01G ready to publish |
+| Branch | `feature/contributor-governance` |
+| Latest commit | `AUR-IMPL-016` changes pending |
+| Working tree status | Governance docs and docs contract validated; pending commit |
 | Blocked decision gates | None; `AUR-DEC-001`-`AUR-DEC-013` resolved by operator on 2026-06-10 |
-| Last validation run | 2026-06-13 PR-01F: full `npm run verify` passed (40 unit files / 229 tests; 19 integration/contract files / 79 tests); critical coverage passed at 87.87% statements / 76.55% branches / 95.91% functions / 88.12% lines; 10 schemas compiled; workflow security had no findings |
-| Next recommended action | Commit and open PR-01F, run the peer matrix on the branch, follow required CI to green, and merge |
+| Last validation run | 2026-06-15 PR-01G: full `npm run verify` passed (format, lint, typecheck, unit 40 files / 229 tests, integration/contracts 19 files / 80 tests, shellcheck, workflow lint); targeted docs contract passed after ADR index fix |
+| Next recommended action | Commit and open PR-01G, follow CI to green, merge, and sync `main` |
 
 ### 15.3 Task Progress Log
 
@@ -2303,6 +2303,8 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | 2026-06-13 | Implementation agent | `AUR-IMPL-011`, `AUR-IMPL-012` | Documented screenshot, DOM text, failure-event, log, Redis, telemetry, trend, and audit data classes plus shortest-useful retention guidance and consumer ownership. Added an additive `ArtifactPrivacyPolicy` with compatible and sensitive presets, screenshot disable/mask hooks, DOM text capture/redact/keyed-hash/disable modes, in-browser omission for sensitive capture, and protected `PageObjectBase` override seam. Classified seven new root exports. Added synthetic-secret fixtures proving sensitive failure artifacts, logger output, and telemetry contain no fixture secret while the compatible default remains unchanged. Explicitly excluded regulated PII support | `docs/operations/privacy-retention.md`, privacy/config/schema/API/self-healing docs, `src/framework/selfHealing/{artifactPrivacy,domSnapshot,domCandidateExtraction,analyzer,failureCapture}.ts`, `src/pageObjects/pageObjectBase.ts`, `src/index.ts`, privacy/logger/page-object/analyzer/docs/package-surface tests, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | Test-first unit/docs runs; `rtk npm run typecheck`; `rtk npm run lint`; `rtk npm run test:unit`; `rtk npm run test:integration`; `rtk npm run schemas:check`; `rtk npm run verify`; `rtk npm run security:check` | Initial tests failed on missing policy/doc as expected; final verify passed with 40 unit files / 228 tests and 17 integration/contract files / 74 tests; 10 schemas compiled; zizmor had no findings; npm audit found 0 vulnerabilities | Commit, open PR-01C, follow CI to green, merge, then `AUR-IMPL-013` |
 | 2026-06-13 | Implementation agent | `AUR-IMPL-018` | Made trend JSONL reads tolerant by default with valid-point preservation, observable skipped-line warnings/counts, strict opt-in, script reporting, and cache durability documentation | `src/framework/observability/trends.ts`, report scripts, trend tests/docs | Targeted trend test; schemas; typecheck; full verification | Valid/malformed/valid history passed; strict diagnostics preserved; scripts report skipped count | Include in PR-01F |
 | 2026-06-13 | Implementation agent | `AUR-IMPL-014`, `015`, `019` | Added scheduled/release Playwright floor/current/latest matrix, critical-module V8 coverage gate without a property-test dependency, focused real-exporter OTLP receiver coverage, and scheduled full/remote observability lanes | workflows, Vitest/package config, OTLP/workflow contracts, release/observability/testing docs | Local floor `1.59.1` and latest `1.60.0` type/unit checks; `npm run verify`; `npm run test:coverage`; workflow lint/security; schemas | Verify passed 40 unit files / 229 tests and 19 integration/contract files / 79 tests; coverage 87.87/76.55/95.91/88.12; no workflow security findings; 10 schemas compiled | Publish PR-01F and run branch peer matrix |
+| 2026-06-15 | Implementation agent | `AUR-IMPL-016` | Started PR-01G contributor governance; verified clean `main`, created `feature/contributor-governance`, inspected docs contract, development docs, decision log, API tiers, release, Redis, self-healing, observability, and SLO policy docs; inferred provisional advisory owner from repository owner/collaborator list | `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk git fetch origin main --prune`; `rtk git pull --ff-only origin main`; `rtk git switch -c feature/contributor-governance`; `rtk gh repo view --json nameWithOwner,defaultBranchRef,owner`; `rtk gh api repos/jsugg/auroraflow/collaborators --paginate --jq '.[].login'`; docs/task inspection commands; Serena `get_symbols_overview` on docs contract | Branch created from up-to-date `main`; owner handle available as `@jsugg`; no existing `CONTRIBUTING.md`, `CODEOWNERS`, or ADR directory | Add governance files, update docs contract and links, then run docs validation |
+| 2026-06-15 | Implementation agent | `AUR-IMPL-016`, `AUR-VAL-026` | Added lightweight contributor guidance, advisory CODEOWNERS, ADR index, six initial ADRs, README/development links, docs-surface contract coverage, and journal completion evidence | `CONTRIBUTING.md`, `.github/CODEOWNERS`, `docs/adr/**`, `README.md`, `docs/development.md`, `tests/suites/contracts/docs/documentationSurface.contract.spec.ts`, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk npm run format:check`; `rtk npx prettier --write ...`; `rtk npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts`; `rtk npm run verify` | Initial formatting warned on two files and first docs contract caught the ADR index missing the literal ADR label; fixes applied. Final docs contract passed 19 files / 80 tests; full verify passed format/lint/typecheck/unit/integration/shellcheck/workflow lint | Commit, open PR-01G, follow CI to green, merge, and sync `main` |
 
 ### 15.4 Command Log
 
@@ -2362,6 +2364,10 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | 2026-06-13 | `rtk npm run security:check` | Privacy/security posture gate | Passed | zizmor 1.25.2 reported no findings; npm audit found 0 vulnerabilities |
 | 2026-06-13 | Local Playwright floor/latest installs, typecheck, focused page-object/factory tests | Validate matrix dependency alignment before CI | Passed | Floor `1.59.1`; latest resolved `1.60.0`; `playwright`, `playwright-core`, and `@playwright/test` aligned |
 | 2026-06-13 | `rtk npm run verify`; `rtk npm run test:coverage`; `rtk npm run workflows:security`; `rtk npm run schemas:check` | Final PR-01F quality gate | Passed | 40 unit files / 229 tests; 19 integration/contract files / 79 tests; coverage thresholds passed; no workflow security findings; 10 schemas compiled |
+| 2026-06-15 | `rtk npm run format:check` | First PR-01G formatting gate | Failed, then fixed | Prettier warned on `docs/adr/README.md` and docs contract test; targeted Prettier write made files clean |
+| 2026-06-15 | `rtk npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts` | `AUR-VAL-026` docs contract for contributor governance | Failed, then passed | First run caught ADR index missing literal `ADR 0001`; after index fix, 19 integration/contract files and 80 tests passed |
+| 2026-06-15 | `rtk npm run verify` | Full PR-01G gate | Passed | Format, lint, typecheck, 40 unit files / 229 tests, 19 integration/contract files / 80 tests, shellcheck, and workflow lint clean |
+| 2026-06-15 | `rtk npx prettier --write docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md`; `rtk npm run format:check`; `rtk npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts` | Post-journal docs gate | Passed | Formatter clean; docs contract rerun passed 19 files / 80 tests |
 
 ### 15.5 Decision Log
 
@@ -2416,6 +2422,19 @@ Current handoff, 2026-06-10 Codex:
 - **Rollback notes:** Revert the two new docs, README links, and this journal update; no runtime rollback needed.
 - **Decision gates updated:** Repository decision log now records `AUR-DEC-001` through `AUR-DEC-013`.
 - **Journal entries added:** Current status snapshot, task progress, command log, and handoff notes updated for PR-00A.
+
+Current handoff, 2026-06-15 Implementation agent:
+
+- **What was completed:** `AUR-IMPL-016` contributor governance: root `CONTRIBUTING.md`, advisory `.github/CODEOWNERS`, ADR index, six initial ADRs for self-healing safety, API tiers, scoring/SLO policy, Redis strategy, observability boundary, and release policy, plus README/development discoverability and docs-surface contract coverage.
+- **What remains:** Publish PR-01G, follow CI to green, merge, follow any `main` jobs, and sync local `main`.
+- **Current blockers:** None. Owner handle is `@jsugg`, verified from repository owner/collaborator metadata; CODEOWNERS stays advisory until maintainer confirms/replaces handles and branch protection enables enforcement.
+- **Validation status:** Targeted docs contract passed with 19 files / 80 tests. Full `npm run verify` passed format, lint, typecheck, unit 40 files / 229 tests, integration/contracts 19 files / 80 tests, shellcheck, and workflow lint.
+- **Files changed:** `CONTRIBUTING.md`, `.github/CODEOWNERS`, `docs/adr/**`, `README.md`, `docs/development.md`, `tests/suites/contracts/docs/documentationSurface.contract.spec.ts`, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md`.
+- **Important context:** Process remains lightweight; no runtime behavior, public API, workflow, schema, dependency, or lockfile changes.
+- **Recommended next task:** After PR-01G merges, continue Phase 2 with `AUR-IMPL-020` when ready.
+- **Rollback notes:** Revert the governance docs, CODEOWNERS, ADR links, docs contract additions, and this journal update; no runtime rollback needed.
+- **Decision gates updated:** None; ADRs record the already-resolved `AUR-DEC-*` policies.
+- **Journal entries added:** Current status snapshot, task progress, command log, and handoff notes updated for PR-01G.
 
 ## 16. Backlog Grooming Rules
 
