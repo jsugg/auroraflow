@@ -107,6 +107,76 @@ describe('rankSelfHealingCandidates', () => {
     expect(curatedRegistry?.score).toBeGreaterThanOrEqual(DEFAULT_SELF_HEAL_MIN_CONFIDENCE);
   });
 
+  it('property: registry confidence is the only fresh signal that reaches the default gate', () => {
+    for (let confidenceBasisPoints = 0; confidenceBasisPoints <= 100; confidenceBasisPoints += 5) {
+      const confidence = confidenceBasisPoints / 100;
+      const [candidate] = rankSelfHealingCandidates({
+        pageObjectName: 'CheckoutPage',
+        actionType: 'click',
+        failedTarget: '#legacy-submit',
+        selectorId: `checkout.submit.${confidenceBasisPoints}`,
+        heuristicSuggestions: [],
+        domCandidates: [],
+        registryCandidates: [
+          {
+            id: `checkout.submit.${confidenceBasisPoints}`,
+            pageObjectName: 'CheckoutPage',
+            actionType: 'click',
+            locator: `page.getByTestId('submit-${confidenceBasisPoints}')`,
+            confidence,
+            updatedAt: '2026-06-16T00:00:00.000Z',
+            version: 1,
+          },
+        ],
+        maxCandidates: 1,
+      });
+
+      expect(candidate?.score).toBeGreaterThanOrEqual(confidence);
+      expect((candidate?.score ?? 0) >= DEFAULT_SELF_HEAL_MIN_CONFIDENCE).toBe(
+        confidence >= DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
+      );
+    }
+  });
+
+  it('property: fresh DOM candidates remain below the default guarded gate', () => {
+    const strategies = ['testId', 'roleName', 'ariaLabel', 'cssFallback'] as const;
+
+    for (const strategy of strategies) {
+      for (const visible of [true, false]) {
+        for (const uniqueInSnapshot of [true, false]) {
+          const [candidate] = rankSelfHealingCandidates({
+            pageObjectName: 'CheckoutPage',
+            actionType: 'click',
+            failedTarget: '#legacy-submit',
+            heuristicSuggestions: [],
+            domCandidates: [
+              {
+                locator:
+                  strategy === 'roleName'
+                    ? "page.getByRole('button', { name: /submit/i })"
+                    : "page.getByTestId('submit-order')",
+                strategy,
+                rationale: `${strategy} generated evidence.`,
+                evidence: {
+                  elementId: `${strategy}-${visible}-${uniqueInSnapshot}`,
+                  source: 'dom',
+                  uniqueInSnapshot,
+                  visible,
+                  accessibleName: 'Submit order',
+                  role: 'button',
+                  matchedAttributes: ['data-testid', 'role', 'accessibleName'],
+                },
+              },
+            ],
+            maxCandidates: 1,
+          });
+
+          expect(candidate?.score).toBeLessThan(DEFAULT_SELF_HEAL_MIN_CONFIDENCE);
+        }
+      }
+    }
+  });
+
   it('allows prior validated history to bootstrap a candidate without lowering defaults', () => {
     const locator = "page.getByRole('button', { name: /submit order/i })";
     const candidateId = buildSelfHealingCandidateId({

@@ -24,6 +24,7 @@ type LocatorMock = {
 };
 
 type GuardedPageMock = {
+  frameLocator: ReturnType<typeof vi.fn>;
   getByLabel: ReturnType<typeof vi.fn>;
   getByRole: ReturnType<typeof vi.fn>;
   getByTestId: ReturnType<typeof vi.fn>;
@@ -47,6 +48,9 @@ function createGuardedPageMock(overrides: Partial<LocatorState> = {}): GuardedPa
   };
 
   return {
+    frameLocator: vi.fn().mockReturnValue({
+      getByTestId: vi.fn().mockReturnValue(createLocatorMock(acceptedState)),
+    }),
     getByLabel: vi.fn().mockReturnValue(createLocatorMock({ count: 0, visible: false })),
     getByRole: vi.fn().mockReturnValue(createLocatorMock(acceptedState)),
     getByTestId: vi.fn().mockReturnValue(createLocatorMock(acceptedState)),
@@ -353,5 +357,20 @@ describe('resolveLocatorExpression AUR-IMPL-020 regression safety net', () => {
     expect(regexNameLocator).not.toBeNull();
     expect(pageMock.getByRole).toHaveBeenNthCalledWith(1, 'button', { name: 'Save changes' });
     expect(pageMock.getByRole).toHaveBeenNthCalledWith(2, 'button', { name: /save changes/i });
+  });
+
+  it.fails('documents AUR-QE-112 gap for same-origin frame test-id candidates', () => {
+    const pageMock = createGuardedPageMock();
+
+    const locator = resolveLocatorExpression(
+      pageMock as unknown as Page,
+      "page.frameLocator('iframe[title=\"Checkout iframe\"]').getByTestId('iframe-submit')",
+    );
+
+    expect(locator).not.toBeNull();
+    expect(pageMock.frameLocator).toHaveBeenCalledWith('iframe[title="Checkout iframe"]');
+    expect(pageMock.frameLocator.mock.results[0]?.value.getByTestId).toHaveBeenCalledWith(
+      'iframe-submit',
+    );
   });
 });
