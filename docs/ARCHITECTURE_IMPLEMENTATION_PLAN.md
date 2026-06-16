@@ -721,11 +721,11 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 | `AUR-IMPL-010` | Add release/provenance/changelog/SBOM workflow | 1 | P1 | release | Complete | `009`, `035` | release/security | M | `009` | none; provenance + SBOM resolved, signing deferred | Dry-run release creates auditable artifacts without publishing. |
 | `AUR-IMPL-011` | Add privacy and retention documentation | 1 | P1 | privacy | Complete | `007`, `030`, `037`, `041` | security/privacy | M | `001` | none; synthetic/non-prod PII and shortest-useful retention resolved | Data classes and retention guidance documented. |
 | `AUR-IMPL-012` | Add screenshot/DOM text privacy-control design | 1 | P1 | privacy | Complete | `007`, `041` | runtime/privacy | L | `011` | none; synthetic/non-prod PII scope resolved | Sensitive preset/control design prevents synthetic leaks. |
-| `AUR-IMPL-013` | Add lifecycle helper and Playwright fixture plan | 1 | P1 | devex | Ready | `012`, `024` | runtime/devex | M | none | none | Public contract/design for `closeAuroraFlow()` and fixture accepted. |
+| `AUR-IMPL-013` | Add lifecycle helper and Playwright fixture plan | 1 | P1 | devex | Complete | `012`, `024` | runtime/devex | M | none | none | Public contract/design for `closeAuroraFlow()` and fixture accepted. |
 | `AUR-IMPL-014` | Add Playwright peer-version matrix task | 1 | P2 | ci | Complete | `020`, `022` | QA/CI | M | `010` | none; browser cost moved to scheduled/release lane | Min/current/latest peer lanes defined. |
 | `AUR-IMPL-015` | Add coverage thresholds and property/concurrency tests | 1 | P2 | test | Complete | `022`, `001`, `002`, `004`, `007` | QA | M | `003`, `005` | none; table-driven generators used without new property dependency | Critical module coverage baseline enforced. |
-| `AUR-IMPL-016` | Add contributor onboarding, CODEOWNERS, and ADRs | 1 | P3 | governance | Ready | `034`, `035`, `009`, `040`, `041` | maintainers | S | `001`, `009`, `010`, `011` | maintainer owner names | Critical paths owned; initial ADRs created. |
-| `AUR-IMPL-017` | Productize memory selector store and conformance baseline | 1 | P2 | data | Ready | `026`, `016`, `017` | data/devex | M | `005` | store API decision | Memory and Redis stores pass same conformance suite. |
+| `AUR-IMPL-016` | Add contributor onboarding, CODEOWNERS, and ADRs | 1 | P3 | governance | Complete | `034`, `035`, `009`, `040`, `041` | maintainers | S | `001`, `009`, `010`, `011` | maintainer owner names | Critical paths owned; initial ADRs created. |
+| `AUR-IMPL-017` | Productize memory selector store and conformance baseline | 1 | P2 | data | Complete | `026`, `016`, `017` | data/devex | M | `005` | store API decision | Memory and Redis stores pass same conformance suite. |
 | `AUR-IMPL-018` | Add trend malformed-line resilience | 1 | P2 | reliability | Complete | `018`, `041` | observability/reporting | S | none | none | One corrupt JSONL line does not block valid trend points. |
 | `AUR-IMPL-019` | Add focused OTLP integration coverage | 1 | P2 | observability | Complete | `021`, `019`, `041` | observability/QA | M | `010` | none; full/remote stacks remain scheduled/manual | Mock/collector integration verifies export path. |
 | `AUR-IMPL-020` | Implement structured candidate model end-to-end | 2 | P1 | refactor | Not started | `002`, `008`, `022`, `040` | self-healing/runtime | L | `003`, `009` | schema compatibility | New runtime path uses discriminated locator model and legacy read. |
@@ -1280,6 +1280,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
   - Helper/fixture contract is documented.
   - Helper is additive and idempotent if implemented.
   - Future context integration is clear.
+- **Implementation result:** Added `docs/operations/lifecycle.md` and API/development links defining `closeAuroraFlow(context?)` and planned `auroraflow/playwright` fixture semantics as a Phase 1 contract only. The contract states one-shot/idempotent cleanup, concurrent-call coalescing, reverse disposer order, aggregate failure surfacing, disabled-subsystem no-ops, no Playwright object ownership, no process-exit hooks, and stable `PageFactory(page)` behavior. Docs-surface contract coverage prevents the planned helper/fixture language from disappearing or being mislabeled as implemented before `AUR-IMPL-023`.
 - **Rollback strategy:** Revert helper export/docs; existing shutdown APIs remain.
 - **Risks:** Helper may hide resource ownership ambiguity.
 - **Non-goals:** Automatic global cleanup on process exit.
@@ -1444,6 +1445,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
   - Memory and Redis stores pass same conformance suite where capabilities overlap.
   - Memory store tier is documented.
   - Redis remains optional.
+- **Implementation result:** Added productized `MemorySelectorStore` / `createMemorySelectorStore()` with explicit `durability: 'non-durable'`, deterministic clock injection, TTL expiry, `getMany`, `scanKeys`, compare-and-set, atomic JSON merge, `clear()`, and idempotent `close()`. Added a shared selector-store conformance suite and ran it against memory in unit tests and Redis in integration tests. Replaced duplicated private self-healing store fakes with the productized memory store where practical while keeping legacy-store negative tests. Classified the new root exports as advanced and documented non-durable/local limits.
 - **Rollback strategy:** Keep conformance tests and mark memory store experimental, or revert memory export.
 - **Risks:** Memory store may be mistaken for durable production store.
 - **Non-goals:** Additional backend adapters.
@@ -2274,13 +2276,13 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | Field | Value |
 | --- | --- |
 | Current phase | Phase 1 |
-| Current task | `AUR-IMPL-016` contributor governance complete; PR-01G ready to publish |
-| Branch | `feature/contributor-governance` |
-| Latest commit | `AUR-IMPL-016` changes pending |
-| Working tree status | Governance docs and docs contract validated; pending commit |
+| Current task | Phase 1 gap closeout complete: `AUR-IMPL-013` lifecycle contract and `AUR-IMPL-017` memory selector store/conformance |
+| Branch | `main` |
+| Latest commit | `f9f17b5` (`docs: add contributor governance`); current Phase 1 closeout changes pending commit |
+| Working tree status | Phase 1 closeout source/docs/tests validated; pending commit |
 | Blocked decision gates | None; `AUR-DEC-001`-`AUR-DEC-013` resolved by operator on 2026-06-10 |
-| Last validation run | 2026-06-15 PR-01G: full `npm run verify` passed (format, lint, typecheck, unit 40 files / 229 tests, integration/contracts 19 files / 80 tests, shellcheck, workflow lint); targeted docs contract passed after ADR index fix |
-| Next recommended action | Commit and open PR-01G, follow CI to green, merge, and sync `main` |
+| Last validation run | 2026-06-16 Phase 1 closeout: full `npm run verify` passed (format, lint, typecheck, unit 41 files / 237 tests, integration/contracts 19 files / 87 tests, shellcheck, workflow lint); `npm run test:coverage` also passed 7 files / 63 tests |
+| Next recommended action | Commit Phase 1 closeout, merge/sync, then start Phase 2 with `AUR-IMPL-020` |
 
 ### 15.3 Task Progress Log
 
@@ -2305,6 +2307,8 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | 2026-06-13 | Implementation agent | `AUR-IMPL-014`, `015`, `019` | Added scheduled/release Playwright floor/current/latest matrix, critical-module V8 coverage gate without a property-test dependency, focused real-exporter OTLP receiver coverage, and scheduled full/remote observability lanes | workflows, Vitest/package config, OTLP/workflow contracts, release/observability/testing docs | Local floor `1.59.1` and latest `1.60.0` type/unit checks; `npm run verify`; `npm run test:coverage`; workflow lint/security; schemas | Verify passed 40 unit files / 229 tests and 19 integration/contract files / 79 tests; coverage 87.87/76.55/95.91/88.12; no workflow security findings; 10 schemas compiled | Publish PR-01F and run branch peer matrix |
 | 2026-06-15 | Implementation agent | `AUR-IMPL-016` | Started PR-01G contributor governance; verified clean `main`, created `feature/contributor-governance`, inspected docs contract, development docs, decision log, API tiers, release, Redis, self-healing, observability, and SLO policy docs; inferred provisional advisory owner from repository owner/collaborator list | `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk git fetch origin main --prune`; `rtk git pull --ff-only origin main`; `rtk git switch -c feature/contributor-governance`; `rtk gh repo view --json nameWithOwner,defaultBranchRef,owner`; `rtk gh api repos/jsugg/auroraflow/collaborators --paginate --jq '.[].login'`; docs/task inspection commands; Serena `get_symbols_overview` on docs contract | Branch created from up-to-date `main`; owner handle available as `@jsugg`; no existing `CONTRIBUTING.md`, `CODEOWNERS`, or ADR directory | Add governance files, update docs contract and links, then run docs validation |
 | 2026-06-15 | Implementation agent | `AUR-IMPL-016`, `AUR-VAL-026` | Added lightweight contributor guidance, advisory CODEOWNERS, ADR index, six initial ADRs, README/development links, docs-surface contract coverage, and journal completion evidence | `CONTRIBUTING.md`, `.github/CODEOWNERS`, `docs/adr/**`, `README.md`, `docs/development.md`, `tests/suites/contracts/docs/documentationSurface.contract.spec.ts`, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk npm run format:check`; `rtk npx prettier --write ...`; `rtk npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts`; `rtk npm run verify` | Initial formatting warned on two files and first docs contract caught the ADR index missing the literal ADR label; fixes applied. Final docs contract passed 19 files / 80 tests; full verify passed format/lint/typecheck/unit/integration/shellcheck/workflow lint | Commit, open PR-01G, follow CI to green, merge, and sync `main` |
+| 2026-06-16 | Codex | `AUR-IMPL-013`, `AUR-VAL-011` | Closed the missing Phase 1 lifecycle contract gap without implementing Phase 2 runtime: documented planned `closeAuroraFlow(context?)` and `auroraflow/playwright` fixture semantics, current consumer shutdown responsibilities, idempotent/concurrent cleanup rules, reverse disposer order, aggregate failures, disabled-subsystem no-ops, Playwright non-ownership, no process-exit hooks, and stable `PageFactory(page)` behavior. Added docs-surface coverage so the contract cannot disappear or be mislabeled as implemented early | `docs/operations/lifecycle.md`, `docs/api.md`, `docs/development.md`, `tests/suites/contracts/docs/documentationSurface.contract.spec.ts`, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts tests/suites/contracts/package/packageSurface.contract.spec.ts`; `rtk npm run format:check`; `rtk npm run lint`; `rtk npm run typecheck`; `rtk npm run verify` | Docs/package contracts passed with 19 files / 87 tests after lifecycle assertions; full verify passed format/lint/typecheck/unit/integration/shellcheck/workflow lint | Commit Phase 1 closeout with `AUR-IMPL-017` |
+| 2026-06-16 | Codex | `AUR-IMPL-017`, `AUR-VAL-020` | Added productized non-durable `MemorySelectorStore` with `createMemorySelectorStore()`, deterministic clock injection, TTL, `getMany`, `scanKeys`, compare-and-set, atomic JSON merge, `clear()`, and idempotent `close()`. Added shared store conformance and ran it against memory and Redis. Replaced duplicated private self-healing store fakes with the productized memory store where practical; legacy negative tests remain for missing atomic capabilities. Exported/classified the memory store and documented local/non-durable limits | `src/data/selectors/memorySelectorStore.ts`, `src/index.ts`, `tests/helpers/selectorStoreConformance.ts`, `tests/suites/unit/framework/data/memorySelectorStore.spec.ts`, `tests/suites/integration/framework/data/redisIntegration.spec.ts`, self-healing tests, API/data-layer/API-stability docs, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk npm run test:unit -- --run tests/suites/unit/framework/data/memorySelectorStore.spec.ts`; `rtk npm run test:integration -- --run tests/suites/integration/framework/data/redisIntegration.spec.ts`; `rtk npm run test:coverage`; `rtk npm run typecheck`; `rtk npm run lint`; `rtk npm run format:check`; `rtk npm run verify` | Unit suite passed 41 files / 237 tests; integration/contracts passed 19 files / 87 tests; coverage thresholds passed 7 files / 63 tests with 87.87% statements / 76.55% branches / 95.91% functions / 88.12% lines; full verify passed | Commit Phase 1 closeout |
 
 ### 15.4 Command Log
 
@@ -2368,6 +2372,13 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | 2026-06-15 | `rtk npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts` | `AUR-VAL-026` docs contract for contributor governance | Failed, then passed | First run caught ADR index missing literal `ADR 0001`; after index fix, 19 integration/contract files and 80 tests passed |
 | 2026-06-15 | `rtk npm run verify` | Full PR-01G gate | Passed | Format, lint, typecheck, 40 unit files / 229 tests, 19 integration/contract files / 80 tests, shellcheck, and workflow lint clean |
 | 2026-06-15 | `rtk npx prettier --write docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md`; `rtk npm run format:check`; `rtk npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts` | Post-journal docs gate | Passed | Formatter clean; docs contract rerun passed 19 files / 80 tests |
+| 2026-06-16 | `rtk npm run test:unit -- --run tests/suites/unit/framework/data/memorySelectorStore.spec.ts` | Memory selector store and unit conformance | Passed after one fix | First conformance pattern fixture matched the outside key because it shared the same prefix; fixture corrected. Unit suite passed 41 files / 237 tests |
+| 2026-06-16 | `rtk npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts tests/suites/contracts/package/packageSurface.contract.spec.ts` | Lifecycle docs contract and package-surface classification | Passed | Integration/contracts passed 19 files / 87 tests |
+| 2026-06-16 | `rtk npm run test:integration -- --run tests/suites/integration/framework/data/redisIntegration.spec.ts` | Redis selector-store conformance and registry integration | Passed | Integration/contracts passed 19 files / 87 tests with Redis conformance included |
+| 2026-06-16 | `rtk npm run test:coverage` | Critical-module coverage gate after memory-store fake replacement | Passed | 7 files / 63 tests; coverage thresholds passed at 87.87% statements / 76.55% branches / 95.91% functions / 88.12% lines |
+| 2026-06-16 | `rtk npm run format:check`; `rtk npm run lint`; `rtk npm run typecheck` | Phase 1 closeout static gates | Passed | Format required a targeted Prettier write for three files, then format/lint/typecheck were clean |
+| 2026-06-16 | `rtk npm run verify` | Full Phase 1 closeout gate before final conformance hardening | Failed, then fixed | Redis `scanKeys()` does not promise sorted order; conformance now sorts scanned keys before assertion while `keys()` remains deterministic |
+| 2026-06-16 | `rtk npm run verify` | Full Phase 1 closeout gate | Passed | Format/lint/typecheck clean; unit 41 files / 237 tests; integration/contracts 19 files / 87 tests; shellcheck and workflow lint clean |
 
 ### 15.5 Decision Log
 
@@ -2435,6 +2446,19 @@ Current handoff, 2026-06-15 Implementation agent:
 - **Rollback notes:** Revert the governance docs, CODEOWNERS, ADR links, docs contract additions, and this journal update; no runtime rollback needed.
 - **Decision gates updated:** None; ADRs record the already-resolved `AUR-DEC-*` policies.
 - **Journal entries added:** Current status snapshot, task progress, command log, and handoff notes updated for PR-01G.
+
+Current handoff, 2026-06-16 Codex:
+
+- **What was completed:** Phase 1 closeout for the two missing audit findings: `AUR-IMPL-013` lifecycle contract/docs/contract test and `AUR-IMPL-017` productized memory selector store plus shared memory/Redis conformance.
+- **What remains:** Commit/PR the Phase 1 closeout, merge/sync, then start Phase 2 with `AUR-IMPL-020` structured candidate model.
+- **Current blockers:** None.
+- **Validation status:** Full `npm run verify` passed: format, lint, typecheck, unit suite 41 files / 237 tests, integration/contracts 19 files / 87 tests, shellcheck, workflow lint. Coverage gate also passed 7 files / 63 tests.
+- **Files changed:** `src/data/selectors/memorySelectorStore.ts`, `src/index.ts`, selector-store conformance/unit/integration tests, self-healing tests using productized memory store, lifecycle/API/data-layer/API-stability docs, docs-surface contract, and this implementation plan.
+- **Important context:** `closeAuroraFlow(context?)` and `auroraflow/playwright` remain planned contracts only; no Phase 2 runtime context, lifecycle implementation, fixture entrypoint, process hooks, package split, new durable backend, or new dependency was added.
+- **Recommended next task:** After final verify and merge, execute `AUR-IMPL-020`; read `AUR-IMPL-003`, API tier docs, and structured-candidate prompt first.
+- **Rollback notes:** Revert memory store/export/docs/tests and lifecycle contract docs/tests. Existing Redis store, telemetry shutdown, and `PageFactory(page)` APIs remain unchanged.
+- **Decision gates updated:** None; this implements already-planned Phase 1 tasks under existing decisions.
+- **Journal entries added:** Current status snapshot, task progress, command log, and handoff notes updated for Phase 1 closeout.
 
 ## 16. Backlog Grooming Rules
 

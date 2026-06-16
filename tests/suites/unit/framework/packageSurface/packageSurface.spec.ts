@@ -16,6 +16,7 @@ import {
   DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
   LoggerConfigError,
   METRIC_NAMES,
+  MemorySelectorStore,
   OBSERVABILITY_TREND_SCHEMA_VERSION,
   ObservabilityTrendPersistenceError,
   PageFactory,
@@ -36,6 +37,7 @@ import {
   captureDomSnapshot,
   createChildLogger,
   createConfiguredLogger,
+  createMemorySelectorStore,
   createRedisSelfHealingRegistryRuntime,
   createRedisSelectorStore,
   createStoreSelfHealingRegistryRuntime,
@@ -67,6 +69,8 @@ import {
   type FlakinessSummary,
   type LogDestination,
   type LoggerRuntimeConfig,
+  type MemorySelectorStoreDurability,
+  type MemorySelectorStoreOptions,
   type ObservabilityTrendPoint,
   type RankedSelfHealingCandidate,
   type RedisRuntimeConfig,
@@ -94,6 +98,7 @@ describe('public package surface', () => {
     expect(SelectorRegistryRepository).toBeTypeOf('function');
     expect(AlertPolicyValidationError).toBeTypeOf('function');
     expect(LoggerConfigError).toBeTypeOf('function');
+    expect(MemorySelectorStore).toBeTypeOf('function');
     expect(ObservabilityTrendPersistenceError).toBeTypeOf('function');
     expect(SelfHealingArtifactSchemaError).toBeTypeOf('function');
     expect(StorePendingSelectorPromotionRepository).toBeTypeOf('function');
@@ -116,6 +121,7 @@ describe('public package surface', () => {
     expect(captureDomSnapshot).toBeTypeOf('function');
     expect(createChildLogger).toBeTypeOf('function');
     expect(createConfiguredLogger).toBeTypeOf('function');
+    expect(createMemorySelectorStore).toBeTypeOf('function');
     expect(createRedisSelfHealingRegistryRuntime).toBeTypeOf('function');
     expect(createRedisSelectorStore).toBeTypeOf('function');
     expect(createStoreSelfHealingRegistryRuntime).toBeTypeOf('function');
@@ -163,6 +169,8 @@ describe('public package surface', () => {
       redactPaths: string[];
       redactCensor: string;
     }>();
+    expectTypeOf<MemorySelectorStoreDurability>().toEqualTypeOf<'non-durable'>();
+    expectTypeOf<MemorySelectorStoreOptions>().toMatchTypeOf<{ now?: () => number }>();
     expectTypeOf<SelfHealingConfig['mode']>().toEqualTypeOf<'off' | 'suggest' | 'guarded'>();
     expectTypeOf<SelfHealingConfig['sat']['registryMode']>().toEqualTypeOf<
       'off' | 'read' | 'write_pending'

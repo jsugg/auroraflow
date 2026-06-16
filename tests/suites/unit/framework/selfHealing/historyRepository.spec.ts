@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { MemorySelectorStore } from '../../../../../src/data/selectors/memorySelectorStore';
 import type {
   SelectorStore,
+  SelectorStoreJsonMergePatch,
   SelectorStoreSetOptions,
 } from '../../../../../src/data/selectors/selectorRegistry';
 import {
@@ -9,66 +11,26 @@ import {
 } from '../../../../../src/framework/selfHealing/historyRepository';
 import type { RankedSelfHealingCandidate } from '../../../../../src/framework/selfHealing/types';
 
-type JsonPrimitive = string | number | boolean | null;
-type JsonObject = Record<string, JsonPrimitive>;
-
-interface AtomicJsonMergePatch {
-  defaultValue: Readonly<JsonObject>;
-  increments?: Readonly<Record<string, number>>;
-  set?: Readonly<JsonObject>;
-}
-
-class AtomicInMemorySelectorStore implements SelectorStore {
-  private readonly records = new Map<string, string>();
+class TrackingMemorySelectorStore extends MemorySelectorStore {
   public readonly ttlSecondsByKey = new Map<string, number | undefined>();
 
-  public async get(key: string): Promise<string | null> {
-    return this.records.get(key) ?? null;
-  }
-
-  public async getMany(keys: readonly string[]): Promise<Array<string | null>> {
-    return keys.map((key) => this.records.get(key) ?? null);
-  }
-
-  public async set(key: string, value: string, options?: SelectorStoreSetOptions): Promise<void> {
-    this.records.set(key, value);
+  public override async set(
+    key: string,
+    value: string,
+    options?: SelectorStoreSetOptions,
+  ): Promise<void> {
+    await super.set(key, value, options);
     this.ttlSecondsByKey.set(key, options?.ttlSeconds);
   }
 
-  public async atomicJsonMerge(
+  public override async atomicJsonMerge(
     key: string,
-    patch: AtomicJsonMergePatch,
+    patch: SelectorStoreJsonMergePatch,
     options?: SelectorStoreSetOptions,
   ): Promise<string> {
-    const current = this.records.get(key);
-    const record = current === undefined ? { ...patch.defaultValue } : parseJsonObject(current);
-
-    for (const [fieldName, value] of Object.entries(patch.defaultValue)) {
-      record[fieldName] ??= value;
-    }
-    for (const [fieldName, increment] of Object.entries(patch.increments ?? {})) {
-      const currentValue = record[fieldName];
-      record[fieldName] = (typeof currentValue === 'number' ? currentValue : 0) + increment;
-    }
-    for (const [fieldName, value] of Object.entries(patch.set ?? {})) {
-      record[fieldName] = value;
-    }
-
-    const serialized = JSON.stringify(record);
-    this.records.set(key, serialized);
+    const serialized = await super.atomicJsonMerge(key, patch, options);
     this.ttlSecondsByKey.set(key, options?.ttlSeconds);
     return serialized;
-  }
-
-  public async del(key: string): Promise<number> {
-    return this.records.delete(key) ? 1 : 0;
-  }
-
-  public async keys(pattern: string): Promise<string[]> {
-    const matcher = new RegExp(
-      `^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`,
-    );
-    return [...this.records.keys()].filter((key) => matcher.test(key));
   }
 }
 
@@ -93,33 +55,9 @@ const rankedCandidate: RankedSelfHealingCandidate = {
   },
 };
 
-function parseJsonObject(serialized: string): JsonObject {
-  const parsed = JSON.parse(serialized) as unknown;
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error('stored history must be a JSON object.');
-  }
-
-  const record: JsonObject = {};
-  for (const [fieldName, value] of Object.entries(parsed)) {
-    if (
-      value === null ||
-      typeof value === 'string' ||
-      typeof value === 'boolean' ||
-      (typeof value === 'number' && Number.isFinite(value))
-    ) {
-      record[fieldName] = value;
-      continue;
-    }
-
-    throw new Error(`stored history field ${fieldName} must be a JSON primitive.`);
-  }
-
-  return record;
-}
-
 describe('StoreSelectorCandidateHistoryRepository', () => {
   it('uses a 30-day default TTL for shortest useful retention', async () => {
-    const store = new AtomicInMemorySelectorStore();
+    const store = new TrackingMemorySelectorStore();
     const repository = new StoreSelectorCandidateHistoryRepository({ store });
 
     const history = await repository.recordObservation({
@@ -138,7 +76,7 @@ describe('StoreSelectorCandidateHistoryRepository', () => {
   });
 
   it('honors custom positive TTLs below the retention cap', async () => {
-    const store = new AtomicInMemorySelectorStore();
+    const store = new TrackingMemorySelectorStore();
     const repository = new StoreSelectorCandidateHistoryRepository({ store, ttlSeconds: 3_600 });
 
     const history = await repository.recordObservation({
@@ -155,7 +93,7 @@ describe('StoreSelectorCandidateHistoryRepository', () => {
   });
 
   it('clamps custom TTLs above 30 days to the retention cap', async () => {
-    const store = new AtomicInMemorySelectorStore();
+    const store = new TrackingMemorySelectorStore();
     const repository = new StoreSelectorCandidateHistoryRepository({
       store,
       ttlSeconds: DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS + 1,
@@ -175,7 +113,7 @@ describe('StoreSelectorCandidateHistoryRepository', () => {
   });
 
   it.each([0, -1, 1.5, Number.NaN])('rejects invalid TTL %s', (ttlSeconds) => {
-    const store = new AtomicInMemorySelectorStore();
+    const store = new TrackingMemorySelectorStore();
 
     expect(() => new StoreSelectorCandidateHistoryRepository({ store, ttlSeconds })).toThrow(
       'selector history ttlSeconds must be a positive integer.',
@@ -216,7 +154,7 @@ describe('StoreSelectorCandidateHistoryRepository', () => {
   });
 
   it('preserves exact observation counters under parallel writes', async () => {
-    const store = new AtomicInMemorySelectorStore();
+    const store = new TrackingMemorySelectorStore();
     const repository = new StoreSelectorCandidateHistoryRepository({ store });
     const observationCount = 128;
 

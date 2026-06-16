@@ -36,7 +36,7 @@ Machine-readable surfaces that consumers and dashboards depend on are versioned 
 
 Every root export appears in exactly one row below. `Kind` distinguishes runtime values from type-only exports. The package-surface contract test enforces that this inventory and `src/index.ts` stay identical.
 
-The self-healing engine rows are experimental because candidate scoring calibration (`AUR-IMPL-020`) and the page-action pipeline restructuring (`AUR-IMPL-028`) are expected to reshape those signatures; depend on the artifact contracts instead where possible.
+The self-healing engine rows are experimental because candidate scoring calibration (`AUR-IMPL-020`) and the page-action pipeline restructuring (`AUR-IMPL-022`) are expected to reshape those signatures; depend on the artifact contracts instead where possible.
 
 ### Page objects, factory, and helpers
 
@@ -117,6 +117,10 @@ The self-healing engine rows are experimental because candidate scoring calibrat
 | `SelectorUpsertInput`                  | type    | advanced |
 | `SelectorUpsertOptions`                | type    | advanced |
 | `createRedisSelectorStore`             | runtime | advanced |
+| `MemorySelectorStore`                  | runtime | advanced |
+| `createMemorySelectorStore`            | runtime | advanced |
+| `MemorySelectorStoreDurability`        | type    | advanced |
+| `MemorySelectorStoreOptions`           | type    | advanced |
 | `PendingSelectorPromotionQuery`        | type    | advanced |
 | `PendingSelectorPromotionRepository`   | type    | advanced |
 | `SelectorCandidateHistoryObservation`  | type    | advanced |

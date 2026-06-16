@@ -57,6 +57,13 @@ export {
 export { createRedisSelectorStore } from './data/selectors/redisSelectorStore';
 
 export {
+  MemorySelectorStore,
+  createMemorySelectorStore,
+  type MemorySelectorStoreDurability,
+  type MemorySelectorStoreOptions,
+} from './data/selectors/memorySelectorStore';
+
+export {
   normalizeOptionalIdentifier,
   resolveCorrelationIdentifiers,
   resolveRunId,
