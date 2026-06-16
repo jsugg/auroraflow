@@ -1,9 +1,8 @@
 import { describe, expect, it } from 'vitest';
+import { MemorySelectorStore } from '../../../../../src/data/selectors/memorySelectorStore';
 import {
   SelectorRegistryRepository,
-  type SelectorStore,
   type SelectorStoreJsonMergePatch,
-  type SelectorStoreJsonObject,
   type SelectorStoreSetOptions,
 } from '../../../../../src/data/selectors/selectorRegistry';
 import { StoreSelectorCandidateHistoryRepository } from '../../../../../src/framework/selfHealing/historyRepository';
@@ -18,89 +17,31 @@ import type {
 } from '../../../../../src/framework/selfHealing/types';
 import { cleanupExpiredSelfHealingRegistryRecords } from '../../../../../scripts/self-healing-registry-cleanup';
 
-class InMemorySelectorStore implements SelectorStore {
-  private readonly records = new Map<string, string>();
+class TrackingMemorySelectorStore extends MemorySelectorStore {
   public readonly ttlSecondsByKey = new Map<string, number | undefined>();
 
-  public async get(key: string): Promise<string | null> {
-    return this.records.get(key) ?? null;
-  }
-
-  public async getMany(keys: readonly string[]): Promise<Array<string | null>> {
-    return keys.map((key) => this.records.get(key) ?? null);
-  }
-
-  public async set(key: string, value: string, options?: SelectorStoreSetOptions): Promise<void> {
-    this.records.set(key, value);
+  public override async set(
+    key: string,
+    value: string,
+    options?: SelectorStoreSetOptions,
+  ): Promise<void> {
+    await super.set(key, value, options);
     this.ttlSecondsByKey.set(key, options?.ttlSeconds);
   }
 
-  public async atomicJsonMerge(
+  public override async atomicJsonMerge(
     key: string,
     patch: SelectorStoreJsonMergePatch,
     options?: SelectorStoreSetOptions,
   ): Promise<string> {
-    const current = this.records.get(key);
-    const record =
-      current === undefined ? { ...patch.defaultValue } : parseJsonObjectForTest(current);
-
-    for (const [fieldName, value] of Object.entries(patch.defaultValue)) {
-      record[fieldName] ??= value;
-    }
-    for (const [fieldName, increment] of Object.entries(patch.increments ?? {})) {
-      const currentValue = record[fieldName];
-      record[fieldName] = (typeof currentValue === 'number' ? currentValue : 0) + increment;
-    }
-    for (const [fieldName, value] of Object.entries(patch.set ?? {})) {
-      record[fieldName] = value;
-    }
-
-    const serialized = JSON.stringify(record);
-    this.records.set(key, serialized);
+    const serialized = await super.atomicJsonMerge(key, patch, options);
     this.ttlSecondsByKey.set(key, options?.ttlSeconds);
     return serialized;
   }
 
-  public async del(key: string): Promise<number> {
-    return this.records.delete(key) ? 1 : 0;
+  public async rawSet(key: string, value: string): Promise<void> {
+    await super.set(key, value);
   }
-
-  public async keys(pattern: string): Promise<string[]> {
-    const matcher = new RegExp(
-      `^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`,
-    );
-    return [...this.records.keys()].filter((key) => matcher.test(key));
-  }
-
-  public rawSet(key: string, value: string): void {
-    this.records.set(key, value);
-  }
-}
-
-function parseJsonObjectForTest(
-  serialized: string,
-): Record<string, SelectorStoreJsonObject[string]> {
-  const parsed = JSON.parse(serialized) as unknown;
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error('stored JSON must be an object.');
-  }
-
-  const record: Record<string, SelectorStoreJsonObject[string]> = {};
-  for (const [fieldName, value] of Object.entries(parsed)) {
-    if (
-      value === null ||
-      typeof value === 'string' ||
-      typeof value === 'boolean' ||
-      (typeof value === 'number' && Number.isFinite(value))
-    ) {
-      record[fieldName] = value;
-      continue;
-    }
-
-    throw new Error(`stored JSON field ${fieldName} must be a primitive.`);
-  }
-
-  return record;
 }
 
 const rankedCandidate: RankedSelfHealingCandidate = {
@@ -149,7 +90,7 @@ function selfHealingConfig(
 
 describe('self-healing registry runtime', () => {
   it('adapts selector registry and candidate history stores for SAT reads', async () => {
-    const store = new InMemorySelectorStore();
+    const store = new TrackingMemorySelectorStore();
     const activeRegistry = new SelectorRegistryRepository({
       store,
       namespace: 'selector-registry',
@@ -162,7 +103,7 @@ describe('self-healing registry runtime', () => {
       locator: "page.getByTestId('submit-order')",
       confidence: 0.94,
     });
-    store.rawSet(
+    await store.rawSet(
       'selector-history:v2::CheckoutPage::click::candidate',
       JSON.stringify({
         candidateId: 'v2::CheckoutPage::click::candidate',
@@ -226,7 +167,7 @@ describe('self-healing registry runtime', () => {
   });
 
   it('records candidate history observations with TTL metadata', async () => {
-    const store = new InMemorySelectorStore();
+    const store = new TrackingMemorySelectorStore();
     const repository = new StoreSelectorCandidateHistoryRepository({ store });
 
     const history = await repository.recordObservation({
@@ -270,7 +211,7 @@ describe('self-healing registry runtime', () => {
   });
 
   it('writes pending promotion records idempotently with expiry-aware TTL', async () => {
-    const store = new InMemorySelectorStore();
+    const store = new TrackingMemorySelectorStore();
     const repository = new StorePendingSelectorPromotionRepository({ store });
     const expiresAt = new Date(Date.now() + 60_000).toISOString();
     const promotion = {
@@ -311,8 +252,8 @@ describe('self-healing registry runtime', () => {
   });
 
   it('cleanup removes only expired history and promotion records', async () => {
-    const store = new InMemorySelectorStore();
-    store.rawSet(
+    const store = new TrackingMemorySelectorStore();
+    await store.rawSet(
       'selector-history:expired',
       JSON.stringify({
         candidateId: 'expired',
@@ -326,7 +267,7 @@ describe('self-healing registry runtime', () => {
         expiresAt: '2026-06-08T11:59:00.000Z',
       }),
     );
-    store.rawSet(
+    await store.rawSet(
       'selector-promotions:expired',
       JSON.stringify({
         promotionId: 'promotion:expired',
@@ -342,7 +283,7 @@ describe('self-healing registry runtime', () => {
         acknowledged: false,
       }),
     );
-    store.rawSet('selector-registry:checkout.submit', '{"id":"checkout.submit"}');
+    await store.rawSet('selector-registry:checkout.submit', '{"id":"checkout.submit"}');
 
     const summary = await cleanupExpiredSelfHealingRegistryRecords({
       store,

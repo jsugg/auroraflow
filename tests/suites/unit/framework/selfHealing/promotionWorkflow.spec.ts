@@ -1,128 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type {
-  SelectorStore,
-  SelectorStoreCompareAndSetOptions,
-  SelectorStoreCompareAndSetResult,
-  SelectorStoreJsonMergePatch,
-  SelectorStoreJsonObject,
-  SelectorStoreSetOptions,
-} from '../../../../../src/data/selectors/selectorRegistry';
+import {
+  MemorySelectorStore,
+  createMemorySelectorStore,
+} from '../../../../../src/data/selectors/memorySelectorStore';
 import { SelfHealingPromotionWorkflow } from '../../../../../src/framework/selfHealing/promotionWorkflow';
 import { parsePendingSelectorPromotion } from '../../../../../src/framework/selfHealing/artifactSchema';
 import { parseArgs } from '../../../../../scripts/self-healing-promotions';
 
-class InMemorySelectorStore implements SelectorStore {
-  protected readonly records = new Map<string, string>();
-
-  public async compareAndSet(
-    key: string,
-    value: string,
-    options: SelectorStoreCompareAndSetOptions,
-  ): Promise<SelectorStoreCompareAndSetResult> {
-    const existingValue = this.records.get(key) ?? null;
-    const existingVersion = existingValue ? readVersion(existingValue) : null;
-    const matches =
-      options.expectedVersion === null
-        ? existingValue === null
-        : existingVersion === options.expectedVersion;
-    if (!matches) {
-      return { written: false, existingValue };
-    }
-    await this.set(key, value, options);
-    return { written: true, existingValue };
-  }
-
-  public async del(key: string): Promise<number> {
-    const existed = this.records.delete(key);
-    return existed ? 1 : 0;
-  }
-
-  public async get(key: string): Promise<string | null> {
-    return this.records.get(key) ?? null;
-  }
-
-  public async getMany(keys: readonly string[]): Promise<Array<string | null>> {
-    return keys.map((key) => this.records.get(key) ?? null);
-  }
-
-  public async atomicJsonMerge(
-    key: string,
-    patch: SelectorStoreJsonMergePatch,
-    options?: SelectorStoreSetOptions,
-  ): Promise<string> {
-    void options;
-    const current = this.records.get(key);
-    const record =
-      current === undefined ? { ...patch.defaultValue } : parseJsonObjectForTest(current);
-
-    for (const [fieldName, value] of Object.entries(patch.defaultValue)) {
-      record[fieldName] ??= value;
-    }
-    for (const [fieldName, increment] of Object.entries(patch.increments ?? {})) {
-      const currentValue = record[fieldName];
-      record[fieldName] = (typeof currentValue === 'number' ? currentValue : 0) + increment;
-    }
-    for (const [fieldName, value] of Object.entries(patch.set ?? {})) {
-      record[fieldName] = value;
-    }
-
-    const serialized = JSON.stringify(record);
-    this.records.set(key, serialized);
-    return serialized;
-  }
-
-  public async keys(pattern: string): Promise<string[]> {
-    const matcher = new RegExp(
-      `^${pattern.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*/g, '.*')}$`,
-    );
-    return [...this.records.keys()].filter((key) => matcher.test(key)).sort();
-  }
-
-  public async *scanKeys(pattern: string): AsyncGenerator<string, void, void> {
-    for (const key of await this.keys(pattern)) {
-      yield key;
-    }
-  }
-
-  public async set(key: string, value: string, options?: SelectorStoreSetOptions): Promise<void> {
-    void options;
-    this.records.set(key, value);
-  }
-}
-
-function readVersion(payload: string): number | null {
-  const parsed = JSON.parse(payload) as { version?: unknown };
-  return typeof parsed.version === 'number' ? parsed.version : null;
-}
-
-function parseJsonObjectForTest(
-  serialized: string,
-): Record<string, SelectorStoreJsonObject[string]> {
-  const parsed = JSON.parse(serialized) as unknown;
-  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
-    throw new Error('stored JSON must be an object.');
-  }
-
-  const record: Record<string, SelectorStoreJsonObject[string]> = {};
-  for (const [fieldName, value] of Object.entries(parsed)) {
-    if (
-      value === null ||
-      typeof value === 'string' ||
-      typeof value === 'boolean' ||
-      (typeof value === 'number' && Number.isFinite(value))
-    ) {
-      record[fieldName] = value;
-      continue;
-    }
-
-    throw new Error(`stored JSON field ${fieldName} must be a primitive.`);
-  }
-
-  return record;
-}
-
 function workflowFixture() {
-  const store = new InMemorySelectorStore();
+  const store = createMemorySelectorStore();
   const workflow = new SelfHealingPromotionWorkflow({
     store,
     activeNamespace: 'selector-registry-promotions-unit',
@@ -131,7 +17,7 @@ function workflowFixture() {
   return { store, workflow };
 }
 
-async function seedActiveSelector(store: InMemorySelectorStore): Promise<void> {
+async function seedActiveSelector(store: MemorySelectorStore): Promise<void> {
   await store.set(
     'selector-registry-promotions-unit:checkout.submit',
     JSON.stringify({
@@ -148,7 +34,7 @@ async function seedActiveSelector(store: InMemorySelectorStore): Promise<void> {
   );
 }
 
-async function seedPromotion(store: InMemorySelectorStore): Promise<void> {
+async function seedPromotion(store: MemorySelectorStore): Promise<void> {
   await store.set(
     'selector-registry-promotions-unit-promotions:evt-1',
     JSON.stringify({

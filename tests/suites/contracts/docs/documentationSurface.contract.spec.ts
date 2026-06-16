@@ -22,6 +22,7 @@ describe('documentation surface contract', () => {
       'docs/adr/0005-observability-boundary.md',
       'docs/adr/0006-release-policy.md',
       'docs/architecture/self-healing.md',
+      'docs/operations/lifecycle.md',
       'docs/operations/privacy-retention.md',
       'docs/operations/observability-contract.md',
       'docs/operations/flakiness-analytics.md',
@@ -51,6 +52,33 @@ describe('documentation surface contract', () => {
     expect(privacy).toContain('AURORAFLOW_ARTIFACT_PRIVACY_PRESET');
     expect(privacy).toContain('consumer-owned');
     expect(privacy).toContain('does not claim support for regulated PII');
+  });
+
+  it('documents lifecycle and fixture contract without claiming Phase 2 implementation', () => {
+    const lifecycle = readRepoFile('docs/operations/lifecycle.md');
+    const api = readRepoFile('docs/api.md');
+    const development = readRepoFile('docs/development.md');
+    const docs = `${lifecycle}\n${api}\n${development}`;
+
+    for (const requiredTerm of [
+      'closeAuroraFlow(context?)',
+      'auroraflow/playwright',
+      'AUR-IMPL-023',
+      'one-shot per runtime context',
+      'concurrent calls for the same context coalesce',
+      'reverse registration order',
+      'aggregate error',
+      'disabled subsystems are no-ops',
+      'PageFactory(page)',
+      'Playwright `Page`, `BrowserContext`, and `Browser` objects are never closed',
+      'no process-exit hooks',
+    ]) {
+      expect(docs).toContain(requiredTerm);
+    }
+
+    expect(lifecycle).toContain('design contract for `AUR-IMPL-013`');
+    expect(lifecycle).toContain('implementation remains a Phase 2 task');
+    expect(development).toContain('labeled as planned until `AUR-IMPL-023`');
   });
 
   it('keeps current maturity claims aligned with implemented promotion workflows', () => {

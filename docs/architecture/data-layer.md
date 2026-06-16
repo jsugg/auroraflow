@@ -1,6 +1,6 @@
 # Data Layer Foundation
 
-This document defines the current Redis-backed data layer primitives available in AuroraFlow.
+This document defines the current selector-store data layer primitives available in AuroraFlow.
 
 ## Implemented Modules
 
@@ -23,6 +23,10 @@ This document defines the current Redis-backed data layer primitives available i
   - large-registry listing via cursor key scans plus bounded batched payload reads.
 - `src/data/selectors/redisSelectorStore.ts`
   - Redis-backed `SelectorStore` adapter with TTL, compare-and-set, and atomic JSON merge support.
+- `src/data/selectors/memorySelectorStore.ts`
+  - process-local, non-durable `SelectorStore` adapter for tests and local experiments.
+  - supports TTL, deterministic clock injection, `getMany`, `scanKeys`, compare-and-set, atomic JSON merge, `clear()`, and idempotent `close()`.
+  - not shared across workers or processes and not a durable registry backend.
 - `src/framework/selfHealing/registryRuntime.ts`
   - runtime adapter that exposes active selectors, candidate history, and pending promotion repositories to SAT without coupling analyzer code to Redis.
   - read-mode resolver stays opportunistic unless Redis environment variables are present or `SELF_HEAL_REGISTRY_REQUIRED=true`.
@@ -47,9 +51,7 @@ This document defines the current Redis-backed data layer primitives available i
 ## Usage Example
 
 ```ts
-import { getRedisClient } from '../../src/utils/redisClient';
-import { SelectorRegistryRepository } from '../../src/data/selectors/selectorRegistry';
-import { createRedisSelectorStore } from '../../src/data/selectors/redisSelectorStore';
+import { SelectorRegistryRepository, createRedisSelectorStore, getRedisClient } from 'auroraflow';
 
 const redisClient = getRedisClient();
 await redisClient.connect();
@@ -79,6 +81,28 @@ await registry.upsert(
 );
 ```
 
+For local non-durable use:
+
+```ts
+import { SelectorRegistryRepository, createMemorySelectorStore } from 'auroraflow';
+
+const memoryStore = createMemorySelectorStore();
+const localRegistry = new SelectorRegistryRepository({
+  namespace: 'selector-registry-local',
+  store: memoryStore,
+});
+
+await localRegistry.upsert({
+  id: 'checkout.submit',
+  pageObjectName: 'CheckoutPage',
+  actionType: 'click',
+  locator: '#submit',
+});
+
+memoryStore.clear();
+await memoryStore.close();
+```
+
 ## Failure Semantics
 
 - Invalid runtime configuration throws `RedisConfigError` at construction time.
@@ -86,8 +110,9 @@ await registry.upsert(
 - Exhausted operation retries throw `RedisOperationError` with operation name and attempts.
 - Invalid selector payload/schema throws `SelectorRegistryValidationError` or `SelectorRegistryDataError`.
 - Stale expected-version writes throw `SelectorRegistryConflictError` and do not overwrite active records.
-- Candidate-history writes require `SelectorStore.atomicJsonMerge`; Redis implements this as one Lua `EVAL`, not a process-local lock. Missing atomic merge support fails write paths explicitly.
+- Candidate-history writes require `SelectorStore.atomicJsonMerge`; Redis implements this as one Lua `EVAL`, and the memory store implements it within one process. Missing atomic merge support fails write paths explicitly.
 - Candidate-history TTL follows shortest-useful retention: default and hard cap are both `2,592,000` seconds (30 days), and higher custom TTLs are clamped.
+- The memory store advertises `durability: 'non-durable'`; closing or process exit loses all records.
 
 ## Integration Testing
 
@@ -101,8 +126,9 @@ npm run test:integration
 
 Behavior notes:
 
-- When Docker is available, tests validate real Redis connectivity, namespaced key behavior, TTL handling, selector registry versioning, Redis-backed CAS, atomic candidate-history counters, and indexed selector lookup.
+- When Docker is available, tests validate real Redis connectivity, namespaced key behavior, TTL handling, selector registry versioning, Redis-backed CAS, atomic candidate-history counters, store conformance, and indexed selector lookup.
 - When Docker/Testcontainers is unavailable, tests skip with an explicit reason rather than hanging.
+- Unit tests run the same store conformance suite against `MemorySelectorStore`.
 
 ## Local Redis Orchestration (Docker Compose)
 

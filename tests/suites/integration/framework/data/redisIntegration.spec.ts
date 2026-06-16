@@ -10,6 +10,7 @@ import { StorePendingSelectorPromotionRepository } from '../../../../../src/fram
 import { SelfHealingPromotionWorkflow } from '../../../../../src/framework/selfHealing/promotionWorkflow';
 import type { RankedSelfHealingCandidate } from '../../../../../src/framework/selfHealing/types';
 import { RedisClient } from '../../../../../src/utils/redisClient';
+import { defineSelectorStoreConformanceSuite } from '../../../../helpers/selectorStoreConformance';
 
 interface IntegrationRuntime {
   container: StartedTestContainer | null;
@@ -111,6 +112,23 @@ afterAll(async () => {
     await runtime.container.stop();
     runtime.container = null;
   }
+});
+
+defineSelectorStoreConformanceSuite('RedisSelectorStore', {
+  create: (context) => {
+    const client = requireClient(context);
+    const store = createRedisSelectorStore(client);
+    return {
+      store,
+      cleanup: async () => {
+        for (const pattern of ['conformance:*', 'outside:conformance:*']) {
+          for (const key of await store.keys(pattern)) {
+            await store.del(key);
+          }
+        }
+      },
+    };
+  },
 });
 
 describe('RedisClient integration', () => {

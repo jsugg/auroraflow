@@ -174,7 +174,32 @@ Useful methods:
 
 Expected-version writes protect reviewed promotion workflows from silent overwrites. Stale writes throw `SelectorRegistryConflictError`.
 
-Use `createRedisSelectorStore(getRedisClient())` to back the repository with Redis.
+Use `createRedisSelectorStore(getRedisClient())` to back the repository with Redis. Use `createMemorySelectorStore()` for a non-durable, process-local store suitable for unit tests, local experiments, and fixture-scoped selector state.
+
+### `MemorySelectorStore`
+
+```ts
+const store = createMemorySelectorStore();
+
+await store.set('selector-registry:login.submit', '{"version":1}');
+await store.get('selector-registry:login.submit');
+store.clear();
+await store.close();
+```
+
+`MemorySelectorStore` implements the same `SelectorStore` capabilities as the Redis adapter for common registry paths: `get`, `getMany`, `set`, `del`, `keys`, `scanKeys`, `compareAndSet`, and `atomicJsonMerge`. It exposes `durability: 'non-durable'`, `clear()`, and idempotent `close()`. It is not shared across processes and must not be used as durable CI or team storage.
+
+## Package lifecycle
+
+Phase 1 defines the lifecycle contract; implementation is planned for `AUR-IMPL-023`. See [Lifecycle contract](./operations/lifecycle.md).
+
+Current APIs remain explicit:
+
+- call `shutdownTelemetry()` when telemetry export/flush matters;
+- call `RedisClient.disconnect()` for consumer-created Redis clients;
+- create a fresh `PageFactory(page)` for each Playwright `Page`.
+
+The planned `closeAuroraFlow(context?)` helper will be additive, idempotent, safe when optional subsystems are disabled, and will never close Playwright `Page`, `BrowserContext`, or `Browser` objects. The planned `auroraflow/playwright` fixture will keep the stable `new PageFactory(page)` constructor intact.
 
 ## Self-healing
 
@@ -229,7 +254,7 @@ Key public functions:
 
 - `initializeTelemetry(options?)`
 - `getTelemetry()`
-- `shutdownTelemetry(options?)`
+- `shutdownTelemetry()`
 - `resolveTelemetryConfig(env?)`
 - metric and span attribute builders from `framework/observability/attributes`
 - `METRIC_NAMES` and `REQUIRED_METRIC_NAMES`
