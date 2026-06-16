@@ -117,6 +117,42 @@ describe('resolveSelfHealingConfig', () => {
     });
   });
 
+  it('property: rejects undocumented modes and confidence ranges without echoing secret values', () => {
+    const invalidModes = ['apply', 'auto', 'GUARDED!', 'suggest-now', 'off;rm -rf /'];
+    const invalidConfidences = ['-0.01', '1.01', 'NaN', 'Infinity', 'token-secret-123'];
+
+    for (const mode of invalidModes) {
+      for (const minConfidence of invalidConfidences) {
+        const resolution = resolveSelfHealingConfigWithDiagnostics({
+          SELF_HEAL_MODE: mode,
+          SELF_HEAL_MIN_CONFIDENCE: minConfidence,
+        });
+
+        expect(resolution.config.mode).toBe('off');
+        expect(resolution.config.minConfidence).toBe(DEFAULT_SELF_HEAL_MIN_CONFIDENCE);
+        expect(resolution.diagnostics).toHaveLength(2);
+        for (const diagnostic of resolution.diagnostics) {
+          expect(diagnostic.message).not.toContain(mode);
+          expect(diagnostic.message).not.toContain(minConfidence);
+          expect(diagnostic.message).not.toContain('token-secret-123');
+        }
+      }
+    }
+  });
+
+  it('property: accepts only documented confidence values inside the inclusive range', () => {
+    for (let basisPoints = 0; basisPoints <= 100; basisPoints += 1) {
+      const minConfidence = (basisPoints / 100).toFixed(2);
+      const config = resolveSelfHealingConfig({
+        SELF_HEAL_MODE: 'guarded',
+        SELF_HEAL_MIN_CONFIDENCE: minConfidence,
+      });
+
+      expect(config.mode).toBe('guarded');
+      expect(config.minConfidence).toBe(Number(minConfidence));
+    }
+  });
+
   it('parses allow-lists and filters unsupported actions', () => {
     const config = resolveSelfHealingConfig({
       SELF_HEAL_ALLOWED_ACTIONS: ' click , type , unsupported , click ',

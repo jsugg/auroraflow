@@ -6,6 +6,24 @@ function readRepoFile(relativePath: string): string {
   return readFileSync(path.join(process.cwd(), relativePath), 'utf8');
 }
 
+function parseCodeowners(content: string): ReadonlyMap<string, readonly string[]> {
+  const entries = new Map<string, readonly string[]>();
+
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+    if (trimmed.length === 0 || trimmed.startsWith('#')) {
+      continue;
+    }
+
+    const [pattern, ...owners] = trimmed.split(/\s+/);
+    if (pattern !== undefined && owners.length > 0) {
+      entries.set(pattern, owners);
+    }
+  }
+
+  return entries;
+}
+
 describe('documentation surface contract', () => {
   it('ships API-grade onboarding and reference docs', () => {
     const requiredDocs = [
@@ -119,8 +137,7 @@ describe('documentation surface contract', () => {
     expect(contributing).toContain('lightweight');
     expect(contributing).toContain('advisory CODEOWNERS');
     expect(contributing).toContain('Confirm or replace owner handles');
-    expect(codeowners).toContain('Advisory owner map');
-    expect(codeowners).toContain('@jsugg');
+    expect(parseCodeowners(codeowners).get('*')).toContain('@jsugg');
     expect(adrIndex).toContain('ADR 0001');
 
     for (const topic of [

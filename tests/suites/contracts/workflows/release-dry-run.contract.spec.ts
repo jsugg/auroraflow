@@ -1,9 +1,11 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { getWorkflowJob, getWorkflowStep, readWorkflowModel } from '../../../helpers/workflowModel';
 
 const RELEASE_WORKFLOW_PATH = path.join(process.cwd(), '.github/workflows/release.yml');
 const releaseWorkflow = readFileSync(RELEASE_WORKFLOW_PATH, 'utf8');
+const releaseWorkflowModel = readWorkflowModel('.github/workflows/release.yml');
 
 const RELEASE_PROCESS_DOC_PATH = path.join(process.cwd(), 'docs/operations/release-process.md');
 const releaseProcessDoc = readFileSync(RELEASE_PROCESS_DOC_PATH, 'utf8');
@@ -18,9 +20,13 @@ describe('release dry-run workflow contract', () => {
   });
 
   it('declares least-privilege read-only permissions at workflow and job level', () => {
-    expect(releaseWorkflow).toMatch(/\npermissions:\n {2}contents: read\n/);
-    const jobPermissionBlocks = releaseWorkflow.match(/\n {4}permissions:\n {6}contents: read\n/g);
-    expect(jobPermissionBlocks).toHaveLength(2);
+    expect(releaseWorkflowModel.permissions.get('contents')).toBe('read');
+    expect(
+      getWorkflowJob(releaseWorkflowModel, 'release-dry-run').permissions.get('contents'),
+    ).toBe('read');
+    expect(getWorkflowJob(releaseWorkflowModel, 'publish-gate').permissions.get('contents')).toBe(
+      'read',
+    );
     expect(releaseWorkflow).not.toMatch(/^\s*[\w-]+:\s*write\s*$/m);
   });
 
@@ -38,24 +44,47 @@ describe('release dry-run workflow contract', () => {
     for (const usesEntry of usesEntries) {
       expect(usesEntry).toMatch(/@[a-f0-9]{40}$/);
     }
-    expect(releaseWorkflow).toContain('persist-credentials: false');
+    expect(
+      getWorkflowStep(getWorkflowJob(releaseWorkflowModel, 'release-dry-run'), 'Checkout').with.get(
+        'persist-credentials',
+      ),
+    ).toBe('false');
   });
 
-  it('produces verify, build, pack, SBOM, provenance-readiness, and changelog evidence', () => {
-    expect(releaseWorkflow).toContain('run: npm run verify');
-    expect(releaseWorkflow).toContain('run: npm run build');
-    expect(releaseWorkflow).toContain('npm sbom --omit dev --sbom-format spdx');
-    expect(releaseWorkflow).toContain('npm sbom --omit dev --sbom-format cyclonedx');
-    expect(releaseWorkflow).toContain('release-evidence/provenance-readiness.txt');
-    expect(releaseWorkflow).toContain('release-evidence/changelog-draft.md');
-    expect(releaseWorkflow).toContain('name: release-dry-run-evidence');
+  it('produces verify, schema, build, pack, SBOM, provenance, and changelog evidence', () => {
+    const releaseJob = getWorkflowJob(releaseWorkflowModel, 'release-dry-run');
+
+    expect(getWorkflowStep(releaseJob, 'Run quality gates').run).toBe('npm run verify');
+    expect(getWorkflowStep(releaseJob, 'Validate artifact schemas').run).toContain(
+      'npm run schemas:check 2>&1 | tee release-evidence/schema-validation.txt',
+    );
+    expect(getWorkflowStep(releaseJob, 'Build package').run).toBe('npm run build');
+    expect(getWorkflowStep(releaseJob, 'Dry-run package tarball').run).toContain(
+      'npm run pack:dry-run',
+    );
+    expect(getWorkflowStep(releaseJob, 'Generate SBOMs (runtime dependencies)').run).toContain(
+      'npm sbom --omit dev --sbom-format spdx',
+    );
+    expect(getWorkflowStep(releaseJob, 'Generate SBOMs (runtime dependencies)').run).toContain(
+      'npm sbom --omit dev --sbom-format cyclonedx',
+    );
+    expect(getWorkflowStep(releaseJob, 'Check npm provenance readiness').run).toContain(
+      'release-evidence/provenance-readiness.txt',
+    );
+    expect(getWorkflowStep(releaseJob, 'Draft changelog from Conventional Commits').run).toContain(
+      'release-evidence/changelog-draft.md',
+    );
+    expect(getWorkflowStep(releaseJob, 'Upload release evidence').with.get('name')).toBe(
+      'release-dry-run-evidence',
+    );
   });
 
   it('gates the publish placeholder behind a confirmation input, protected environment, and hard refusal', () => {
-    expect(releaseWorkflow).toMatch(/\n {2}publish-gate:\n/);
-    expect(releaseWorkflow).toContain("if: inputs.publish_confirmation != ''");
-    expect(releaseWorkflow).toContain('environment: release');
-    expect(releaseWorkflow).toMatch(/Refuse to publish[\s\S]+?exit 1/);
+    const publishGate = getWorkflowJob(releaseWorkflowModel, 'publish-gate');
+
+    expect(publishGate.if).toBe("inputs.publish_confirmation != ''");
+    expect(publishGate.environment).toBe('release');
+    expect(getWorkflowStep(publishGate, 'Refuse to publish').run).toContain('exit 1');
   });
 });
 
@@ -67,6 +96,7 @@ describe('release process documentation contract', () => {
       'Conventional Commits',
       'SemVer',
       'npm sbom',
+      'schema-validation.txt',
       'provenance',
       'signing',
       'Rollback policy',

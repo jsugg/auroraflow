@@ -240,8 +240,11 @@ Before opening a pull request, run:
 npm run format:check
 npm run lint
 npm run typecheck
+npm test
 npm run test:unit
+npm run test:contracts
 npm run test:integration
+npm run schemas:check
 npm run build
 ```
 

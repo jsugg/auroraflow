@@ -51,6 +51,15 @@ class FakeRedisDriver implements RedisClientDriver {
     void keys;
     return [] as Array<string | null>;
   });
+  public readonly eval: ReturnType<
+    typeof vi.fn<
+      (script: string, options: { keys: string[]; arguments: string[] }) => Promise<unknown>
+    >
+  > = vi.fn(async (script: string, options: { keys: string[]; arguments: string[] }) => {
+    void script;
+    void options;
+    return null;
+  });
   public readonly scanIterator: ReturnType<
     typeof vi.fn<(options: { MATCH: string; COUNT?: number }) => AsyncIterable<string | string[]>>
   > = vi.fn((options: { MATCH: string; COUNT?: number }) => {
@@ -383,6 +392,194 @@ describe('RedisClient', () => {
       COUNT: 250,
     });
     expect(keys).toEqual(['selector-registry:one']);
+  });
+
+  it('maps Redis compare-and-set success replies from EVAL', async () => {
+    fakeDriver.eval.mockResolvedValueOnce([1, null]);
+    const client = new RedisClient({
+      config: {
+        host: '127.0.0.1',
+        port: 6379,
+        database: 0,
+        tls: false,
+        connectTimeoutMs: 1000,
+        maxRetries: 0,
+        baseBackoffMs: 5,
+        maxBackoffMs: 10,
+        keyPrefix: 'aurora',
+      },
+      createClient: () => fakeDriver,
+      sleep: async () => {},
+      random: () => 0,
+      logger: {
+        info: () => {},
+        error: () => {},
+        warn: () => {},
+        debug: () => {},
+      },
+    });
+
+    const result = await client.compareAndSetJsonVersion(
+      'selector-registry:checkout.submit',
+      '{"version":1}',
+      { expectedVersion: null },
+    );
+
+    expect(result).toEqual({ written: true, existingValue: null });
+    expect(fakeDriver.eval).toHaveBeenCalledWith(expect.any(String), {
+      keys: ['aurora:selector-registry:checkout.submit'],
+      arguments: ['__AURORAFLOW_EXPECT_ABSENT__', '{"version":1}', ''],
+    });
+  });
+
+  it('maps Redis compare-and-set conflicts without losing the existing record', async () => {
+    fakeDriver.eval.mockResolvedValueOnce([0, Buffer.from('{"version":2}')]);
+    const client = new RedisClient({
+      config: {
+        host: '127.0.0.1',
+        port: 6379,
+        database: 0,
+        tls: false,
+        connectTimeoutMs: 1000,
+        maxRetries: 0,
+        baseBackoffMs: 5,
+        maxBackoffMs: 10,
+        keyPrefix: 'aurora',
+      },
+      createClient: () => fakeDriver,
+      sleep: async () => {},
+      random: () => 0,
+      logger: {
+        info: () => {},
+        error: () => {},
+        warn: () => {},
+        debug: () => {},
+      },
+    });
+
+    const result = await client.compareAndSetJsonVersion(
+      'selector-registry:checkout.submit',
+      '{"version":3}',
+      { expectedVersion: 2, ttlSeconds: 60 },
+    );
+
+    expect(result).toEqual({ written: false, existingValue: '{"version":2}' });
+    expect(fakeDriver.eval).toHaveBeenCalledWith(expect.any(String), {
+      keys: ['aurora:selector-registry:checkout.submit'],
+      arguments: ['2', '{"version":3}', '60'],
+    });
+  });
+
+  it('rejects malformed Redis compare-and-set replies with actionable diagnostics', async () => {
+    fakeDriver.eval.mockResolvedValueOnce(['unexpected', null]);
+    const client = new RedisClient({
+      config: {
+        host: '127.0.0.1',
+        port: 6379,
+        database: 0,
+        tls: false,
+        connectTimeoutMs: 1000,
+        maxRetries: 0,
+        baseBackoffMs: 5,
+        maxBackoffMs: 10,
+        keyPrefix: 'aurora',
+      },
+      createClient: () => fakeDriver,
+      sleep: async () => {},
+      random: () => 0,
+      logger: {
+        info: () => {},
+        error: () => {},
+        warn: () => {},
+        debug: () => {},
+      },
+    });
+
+    await expect(
+      client.compareAndSetJsonVersion('selector-registry:checkout.submit', '{"version":1}', {
+        expectedVersion: 1,
+      }),
+    ).rejects.toThrow('Unexpected Redis compare-and-set status reply.');
+  });
+
+  it('serializes atomic JSON merge patches and parses buffer replies', async () => {
+    fakeDriver.eval.mockResolvedValueOnce(Buffer.from('{"attempts":2,"validated":1}'));
+    const client = new RedisClient({
+      config: {
+        host: '127.0.0.1',
+        port: 6379,
+        database: 0,
+        tls: false,
+        connectTimeoutMs: 1000,
+        maxRetries: 0,
+        baseBackoffMs: 5,
+        maxBackoffMs: 10,
+        keyPrefix: 'aurora',
+      },
+      createClient: () => fakeDriver,
+      sleep: async () => {},
+      random: () => 0,
+      logger: {
+        info: () => {},
+        error: () => {},
+        warn: () => {},
+        debug: () => {},
+      },
+    });
+
+    const merged = await client.atomicJsonMerge('selector-history:candidate-1', {
+      patch: {
+        defaultValue: { attempts: 1, validated: 0 },
+        increments: { attempts: 1, validated: 1 },
+        set: { lastSeenAt: '2026-06-16T00:00:00.000Z' },
+      },
+      ttlSeconds: 120,
+    });
+
+    expect(merged).toBe('{"attempts":2,"validated":1}');
+    expect(fakeDriver.eval).toHaveBeenCalledWith(expect.any(String), {
+      keys: ['aurora:selector-history:candidate-1'],
+      arguments: [
+        '{"attempts":1,"validated":0}',
+        '{"attempts":1,"validated":1}',
+        '{"lastSeenAt":"2026-06-16T00:00:00.000Z"}',
+        '120',
+      ],
+    });
+  });
+
+  it('rejects malformed Redis atomic merge replies before callers parse JSON', async () => {
+    fakeDriver.eval.mockResolvedValueOnce(42);
+    const client = new RedisClient({
+      config: {
+        host: '127.0.0.1',
+        port: 6379,
+        database: 0,
+        tls: false,
+        connectTimeoutMs: 1000,
+        maxRetries: 0,
+        baseBackoffMs: 5,
+        maxBackoffMs: 10,
+        keyPrefix: 'aurora',
+      },
+      createClient: () => fakeDriver,
+      sleep: async () => {},
+      random: () => 0,
+      logger: {
+        info: () => {},
+        error: () => {},
+        warn: () => {},
+        debug: () => {},
+      },
+    });
+
+    await expect(
+      client.atomicJsonMerge('selector-history:candidate-1', {
+        patch: {
+          defaultValue: {},
+        },
+      }),
+    ).rejects.toThrow('Unexpected Redis atomic JSON merge reply shape.');
   });
 
   it('disconnects cleanly when the client is open', async () => {

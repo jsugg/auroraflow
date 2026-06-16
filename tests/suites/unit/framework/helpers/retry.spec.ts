@@ -140,6 +140,49 @@ describe('retry helper', () => {
     expect(recordedDelays).toEqual([12, 15]);
   });
 
+  it('property: scheduled retry delays stay bounded across backoff and jitter inputs', async () => {
+    const nativeSetTimeout = globalThis.setTimeout.bind(globalThis);
+
+    for (const jitterRatio of [0, 0.1, 0.5, 1]) {
+      for (const randomValue of [0, 0.25, 0.5, 1]) {
+        const recordedDelays: number[] = [];
+        let attempts = 0;
+        vi.spyOn(globalThis, 'setTimeout').mockImplementation(((
+          handler: (...args: unknown[]) => void,
+          timeout?: number,
+          ...args: unknown[]
+        ) => {
+          recordedDelays.push(Number(timeout ?? 0));
+          return nativeSetTimeout(handler, 0, ...args);
+        }) as typeof setTimeout);
+
+        await retry({
+          fn: async () => {
+            attempts += 1;
+            if (attempts < 4) {
+              throw new Error('retry me');
+            }
+            return undefined;
+          },
+          retries: 4,
+          initialDelay: 10,
+          backoffFactor: 2,
+          maxDelay: 25,
+          jitterRatio,
+          random: () => randomValue,
+          logger: null,
+        });
+
+        expect(recordedDelays).toHaveLength(3);
+        for (const delay of recordedDelays) {
+          expect(delay).toBeGreaterThanOrEqual(0);
+          expect(delay).toBeLessThanOrEqual(25);
+        }
+        vi.restoreAllMocks();
+      }
+    }
+  });
+
   it('rejects invalid retry and wait options before scheduling delays', async () => {
     const fn = vi.fn(async () => 'unused');
 

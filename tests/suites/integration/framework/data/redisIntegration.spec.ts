@@ -23,8 +23,9 @@ const runtime: IntegrationRuntime = {
   client: null,
   skipReason: null,
 };
+const REQUIRED_ENV = 'AURORAFLOW_REDIS_INTEGRATION_REQUIRED';
 const CONTAINER_STARTUP_TIMEOUT_MS = 45_000;
-const INTEGRATION_SETUP_TIMEOUT_MS = 60_000;
+const INTEGRATION_SETUP_TIMEOUT_MS = 120_000;
 const concurrentHistoryCandidate: RankedSelfHealingCandidate = {
   id: 'candidate-concurrent-int',
   locator: '#submit',
@@ -53,8 +54,19 @@ function toErrorMessage(error: unknown): string {
   return String(error);
 }
 
+function redisIntegrationRequired(): boolean {
+  return ['1', 'true', 'yes', 'on'].includes(
+    (process.env[REQUIRED_ENV] ?? '').trim().toLowerCase(),
+  );
+}
+
 function requireClient(context: TestContext): RedisClient {
   if (runtime.skipReason || runtime.client === null) {
+    if (redisIntegrationRequired()) {
+      throw new Error(
+        `Redis integration is required but unavailable: ${runtime.skipReason ?? 'unknown setup failure'}`,
+      );
+    }
     context.skip(
       `Docker/Testcontainers is unavailable in this environment. ${runtime.skipReason ?? ''}`.trim(),
     );
@@ -99,6 +111,11 @@ beforeAll(async () => {
       await runtime.container.stop().catch(() => {});
       runtime.container = null;
     }
+    if (redisIntegrationRequired()) {
+      throw new Error(
+        `Redis integration is required but Docker/Testcontainers setup failed: ${runtime.skipReason}`,
+      );
+    }
   }
 }, INTEGRATION_SETUP_TIMEOUT_MS);
 
@@ -112,7 +129,7 @@ afterAll(async () => {
     await runtime.container.stop();
     runtime.container = null;
   }
-});
+}, INTEGRATION_SETUP_TIMEOUT_MS);
 
 defineSelectorStoreConformanceSuite('RedisSelectorStore', {
   create: (context) => {
@@ -161,6 +178,63 @@ describe('RedisClient integration', () => {
     await new Promise((resolve) => setTimeout(resolve, 1_200));
     expect(await client.get('integration:ttl')).toBeNull();
   });
+
+  it(
+    'authenticates to password-protected Redis and rejects wrong credentials',
+    async (context) => {
+      requireClient(context);
+      let authContainer: StartedTestContainer | null = null;
+      let authenticatedClient: RedisClient | null = null;
+      let rejectedClient: RedisClient | null = null;
+
+      try {
+        authContainer = await new GenericContainer('redis:7.2-alpine')
+          .withCommand(['redis-server', '--requirepass', 'aurora-e2e-password'])
+          .withExposedPorts(6379)
+          .withWaitStrategy(Wait.forLogMessage('Ready to accept connections'))
+          .withStartupTimeout(CONTAINER_STARTUP_TIMEOUT_MS)
+          .start();
+
+        authenticatedClient = new RedisClient({
+          env: {
+            AURORAFLOW_REDIS_HOST: authContainer.getHost(),
+            AURORAFLOW_REDIS_PORT: String(authContainer.getMappedPort(6379)),
+            AURORAFLOW_REDIS_PASSWORD: 'aurora-e2e-password',
+            AURORAFLOW_REDIS_CONNECT_TIMEOUT_MS: '5000',
+            AURORAFLOW_REDIS_MAX_RETRIES: '1',
+            AURORAFLOW_REDIS_BASE_BACKOFF_MS: '5',
+            AURORAFLOW_REDIS_MAX_BACKOFF_MS: '50',
+            AURORAFLOW_REDIS_KEY_PREFIX: 'auroraflow-auth-int',
+          },
+        });
+        await authenticatedClient.connect();
+        await authenticatedClient.set('auth:probe', 'ok');
+        await expect(authenticatedClient.get('auth:probe')).resolves.toBe('ok');
+
+        rejectedClient = new RedisClient({
+          env: {
+            AURORAFLOW_REDIS_HOST: authContainer.getHost(),
+            AURORAFLOW_REDIS_PORT: String(authContainer.getMappedPort(6379)),
+            AURORAFLOW_REDIS_PASSWORD: 'wrong-password',
+            AURORAFLOW_REDIS_CONNECT_TIMEOUT_MS: '5000',
+            AURORAFLOW_REDIS_MAX_RETRIES: '0',
+            AURORAFLOW_REDIS_BASE_BACKOFF_MS: '5',
+            AURORAFLOW_REDIS_MAX_BACKOFF_MS: '50',
+            AURORAFLOW_REDIS_KEY_PREFIX: 'auroraflow-auth-int',
+          },
+        });
+
+        await expect(rejectedClient.connect()).rejects.toThrow(
+          /Redis connect failed|NOAUTH|WRONGPASS/i,
+        );
+      } finally {
+        await authenticatedClient?.disconnect().catch(() => {});
+        await rejectedClient?.disconnect().catch(() => {});
+        await authContainer?.stop().catch(() => {});
+      }
+    },
+    INTEGRATION_SETUP_TIMEOUT_MS,
+  );
 });
 
 describe('SelectorRegistryRepository integration', () => {
