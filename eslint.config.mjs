@@ -25,6 +25,18 @@ export default tseslint.config(
       globals: {
         console: 'readonly',
         process: 'readonly',
+        URL: 'readonly',
+      },
+    },
+  },
+  {
+    files: ['tests/fixtures/e2e-app/**/*.js'],
+    languageOptions: {
+      globals: {
+        customElements: 'readonly',
+        document: 'readonly',
+        HTMLElement: 'readonly',
+        window: 'readonly',
       },
     },
   },

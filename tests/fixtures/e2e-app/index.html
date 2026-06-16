@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>AuroraFlow E2E Fixture</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem;
+      }
+
+      main {
+        display: grid;
+        gap: 1.25rem;
+        max-width: 56rem;
+      }
+
+      section {
+        border: 1px solid #ccd3df;
+        border-radius: 0.5rem;
+        padding: 1rem;
+      }
+
+      button {
+        cursor: pointer;
+        margin-block: 0.25rem;
+      }
+
+      iframe {
+        border: 1px solid #99a3b3;
+        height: 8rem;
+        width: 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>AuroraFlow resilient DOM fixture</h1>
+
+      <section aria-label="Guarded self-healing">
+        <p id="guarded-status" role="status">Waiting for guarded action</p>
+        <button data-testid="guarded-submit" type="button">Submit guarded order</button>
+      </section>
+
+      <section aria-label="Dynamic re-render">
+        <p id="dynamic-status" role="status">Waiting for dynamic action</p>
+        <div id="dynamic-root"></div>
+      </section>
+
+      <section aria-label="Shadow DOM">
+        <p id="shadow-status" role="status">Waiting for shadow action</p>
+        <shadow-checkout></shadow-checkout>
+      </section>
+
+      <section aria-label="Same-origin iframe">
+        <p id="iframe-status" role="status">Waiting for iframe action</p>
+        <iframe title="Checkout iframe" src="/iframe.html"></iframe>
+      </section>
+    </main>
+
+    <script src="/fixture-app.js" type="module"></script>
+  </body>
+</html>

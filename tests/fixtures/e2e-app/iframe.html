@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>AuroraFlow iframe fixture</title>
+  </head>
+  <body>
+    <main>
+      <button data-testid="iframe-submit" type="button">Submit iframe order</button>
+      <p id="iframe-local-status" role="status">Waiting inside iframe</p>
+    </main>
+    <script>
+      document.querySelector('[data-testid="iframe-submit"]').addEventListener('click', () => {
+        document.querySelector('#iframe-local-status').textContent = 'Iframe order submitted';
+        window.parent.postMessage({ type: 'auroraflow:iframe-submitted' }, window.location.origin);
+      });
+    </script>
+  </body>
+</html>
