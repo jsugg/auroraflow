@@ -36,7 +36,7 @@ Run the narrowest useful gate first, then the broader gate that matches your cha
 
 | Change area | Minimum validation |
 | --- | --- |
-| Markdown/docs only | `npm run format:check` and `npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts` |
+| Markdown/docs only | `npm run format:check` and `npm run test:contracts -- tests/suites/contracts/docs/documentationSurface.contract.spec.ts` |
 | TypeScript source | Targeted unit/integration tests, `npm run typecheck`, `npm run lint`, `npm run format:check` |
 | Public API surface | Package-surface unit and contract tests plus `npm run typecheck` |
 | JSON Schemas | `npm run schemas:check` and affected contract tests |
@@ -45,7 +45,7 @@ Run the narrowest useful gate first, then the broader gate that matches your cha
 | Observability paths | Focused observability tests; use full-stack smoke only when the task requires it |
 | Release process | Release workflow contracts, `npm run build`, and `npm run pack:dry-run` |
 
-Before merging broad changes, prefer `npm run verify` when local tooling and time permit.
+Before merging broad changes, prefer `npm run verify` when local tooling and time permit. `npm test` is unit-only; run `test:contracts` and `test:integration` explicitly when the change touches contracts or Redis/OTLP paths.
 
 ## Safety guardrails
 

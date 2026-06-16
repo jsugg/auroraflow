@@ -902,7 +902,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
   - Manual: SLO owner review.
 - **Validation commands:**
   - `npm run test:unit -- --run tests/suites/unit/framework/selfHealing/candidateScoring.spec.ts tests/suites/unit/framework/observability/sloDashboard.spec.ts`
-  - `npm run test:integration -- --run tests/suites/contracts/workflows/slo-dashboard-alerting.contract.spec.ts` if supported; otherwise `npm run test:integration`
+  - `npm run test:contracts -- tests/suites/contracts/workflows/slo-dashboard-alerting.contract.spec.ts` if supported; otherwise `npm run test:contracts`
   - `npm run typecheck`
 - **Acceptance criteria:**
   - CI catches unclassified threshold drift.
@@ -1108,7 +1108,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
   - Manual: API governance review.
 - **Validation commands:**
   - `npm run test:unit -- --run tests/suites/unit/framework/packageSurface/packageSurface.spec.ts tests/suites/unit/framework/publicApi/publicApi.spec.ts`
-  - `npm run test:integration -- --run tests/suites/contracts/package/packageSurface.contract.spec.ts`
+  - `npm run test:contracts -- tests/suites/contracts/package/packageSurface.contract.spec.ts`
   - `npm run typecheck`
 - **Acceptance criteria:**
   - Unclassified root export count is zero.
@@ -1193,7 +1193,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
   - Manual: Security/privacy review.
 - **Validation commands:**
   - `npm run format:check`
-  - `npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts` if supported; otherwise `npm run test:integration`
+  - `npm run test:contracts -- tests/suites/contracts/docs/documentationSurface.contract.spec.ts` if supported; otherwise `npm run test:contracts`
 - **Acceptance criteria:**
   - All required data classes are documented.
   - Retention guidance distinguishes project defaults from consumer-owned CI/Redis/observability.
@@ -1316,7 +1316,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
   - Manual: CI duration review.
 - **Validation commands:**
   - `npm run workflows:lint`
-  - `npm run test:integration -- --run tests/suites/contracts/workflows/quality-node-compat.contract.spec.ts tests/suites/contracts/workflows/ci-browser-install.contract.spec.ts`
+  - `npm run test:contracts -- tests/suites/contracts/workflows/quality-node-compat.contract.spec.ts tests/suites/contracts/workflows/ci-browser-install.contract.spec.ts`
   - `npm run test:smoke` if local browsers available.
 - **Acceptance criteria:**
   - Peer floor is tested before release.
@@ -1399,7 +1399,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
   - Manual: Maintainer approval.
 - **Validation commands:**
   - `npm run format:check`
-  - `npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts`
+  - `npm run test:contracts -- tests/suites/contracts/docs/documentationSurface.contract.spec.ts`
 - **Acceptance criteria:**
   - Critical areas have owner/reviewer guidance.
   - ADRs map to related `AUR-ARCH-*` issues.
@@ -1758,7 +1758,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 - **Files/directories out of scope:** Managed Redis provisioning.
 - **Implementation outline:** Add runbook sections for TLS, auth, ACL, prefixes, backup/restore, eviction, retention, capacity, incidents, managed Redis Lua compatibility.
 - **Test plan:** Manual SRE/security review; docs contract.
-- **Validation commands:** `npm run format:check`, `npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts`
+- **Validation commands:** `npm run format:check`, `npm run test:contracts -- tests/suites/contracts/docs/documentationSurface.contract.spec.ts`
 - **Acceptance criteria:** Runbook covers all listed controls and states consumer/operator ownership.
 - **Rollback strategy:** Revert docs.
 - **Risks:** Users treat examples as production policy.
@@ -1833,7 +1833,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 - **Files/directories out of scope:** Removing full stack; making observability mandatory.
 - **Implementation outline:** Add support-tier table; add lite profile if useful; path-filter heavy smokes; keep artifact-only default.
 - **Test plan:** Lite smoke; existing full smoke; docs contract.
-- **Validation commands:** `npm run observability:ci:smoke` if supported, `npm run test:integration -- --run tests/suites/contracts/observability/observabilityContract.spec.ts`, `npm run workflows:lint`
+- **Validation commands:** `npm run observability:ci:smoke` if supported, `npm run test:contracts -- tests/suites/contracts/observability/observabilityContract.spec.ts`, `npm run workflows:lint`
 - **Acceptance criteria:** Support boundary is explicit; local development remains artifact-only/no-op by default.
 - **Rollback strategy:** Docs-only boundary first; revert compose profile if flaky.
 - **Risks:** Optional assets become mandatory.
@@ -2206,10 +2206,10 @@ Where exact task-specific commands need future files, use the closest existing s
 | `AUR-VAL-020` | `017`, `028`, `029`, `036` | Store conformance/Redis integration | unit/integration | `npm run test:unit -- --run tests/suites/unit/framework/data && npm run test:integration -- --run tests/suites/integration/framework/data/redisIntegration.spec.ts` | Memory/Redis conformance passes | Yes for store changes | Memory-only if Redis unavailable, record limitation | Backend matrix |
 | `AUR-VAL-021` | `029` | Schema migration/repair | unit/schema/integration | `npm run schemas:check && npm run test:unit -- --run tests/suites/unit/framework/data/selectorRegistry.spec.ts` | Old records read; repair dry-run detects drift | Yes | Manual fixture review if Redis unavailable | Fixture versions |
 | `AUR-VAL-022` | `018`, `030` | Trend corruption/durable export | unit/schema | `npm run test:unit -- --run tests/suites/unit/framework/observability/trends.spec.ts && npm run schemas:check` | Malformed line skipped; warnings surfaced | Yes | Manual sample read | Skipped-line count |
-| `AUR-VAL-023` | `019`, `031`, `040` | Observability smoke/support boundary | smoke/contract | `npm run observability:ci:smoke` and `npm run test:integration -- --run tests/suites/contracts/observability/observabilityContract.spec.ts` | Lite/full contracts pass when environment supports | Yes for observability changes | Record service unavailable and run unit/contract subset | Smoke duration/results |
+| `AUR-VAL-023` | `019`, `031`, `040` | Observability smoke/support boundary | smoke/contract | `npm run observability:ci:smoke` and `npm run test:contracts -- tests/suites/contracts/observability/observabilityContract.spec.ts` | Lite/full contracts pass when environment supports | Yes for observability changes | Record service unavailable and run unit/contract subset | Smoke duration/results |
 | `AUR-VAL-024` | `032`, `024` | Failure-path benchmark | performance smoke | Command missing; add benchmark script in task | Baseline recorded, no hard gate initially | Yes for benchmark task | Manual local timing with fixed fixture | Baseline numbers |
 | `AUR-VAL-025` | `010`, `014`, `037` | Workflow lint/security | CI/security | `npm run workflows:lint && npm run workflows:security` | Workflows lint and security scan pass | Yes for workflow changes | If `zizmor` unavailable, record and run `npm run workflows:lint` | Lint/security output |
-| `AUR-VAL-026` | docs/governance tasks | Docs validation | docs/contract | `npm run format:check && npm run test:integration -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts` | Docs formatted and discoverable | Yes for docs-surface changes | Manual markdown review if contract path unsupported | Docs touched |
+| `AUR-VAL-026` | docs/governance tasks | Docs validation | docs/contract | `npm run format:check && npm run test:contracts -- tests/suites/contracts/docs/documentationSurface.contract.spec.ts` | Docs formatted and discoverable | Yes for docs-surface changes | Manual markdown review if contract path unsupported | Docs touched |
 | `AUR-VAL-027` | `009`, `010`, `038` | Package build/dry pack | build/package | `npm run build && npm run pack:dry-run` | Build and dry package succeed | Yes before release/package decisions | Record build unavailable; run typecheck | Build/dry-pack log |
 | `AUR-VAL-028` | `010`, `011`, `012`, `025` | Security scan/privacy/release posture | security | `npm run security:check` | Workflow security and npm audit high pass | Yes for release/security changes | If network/audit unavailable, run workflows security and record audit skipped | Scan output |
 

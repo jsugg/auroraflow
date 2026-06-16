@@ -59,7 +59,15 @@ jobs:
         run: npm run tools:actionlint
 
       - name: Run quality gates
+        env:
+          AURORAFLOW_REDIS_INTEGRATION_REQUIRED: 'true'
         run: npm run verify
+
+      - name: Validate artifact schemas
+        run: |
+          set -o pipefail
+          mkdir -p release-evidence
+          npm run schemas:check 2>&1 | tee release-evidence/schema-validation.txt
 
       - name: Build package
         run: npm run build

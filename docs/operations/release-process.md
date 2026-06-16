@@ -27,10 +27,11 @@ Each run uploads a `release-dry-run-evidence` artifact (30-day retention) contai
 | `pack-report.json` | Exact file list and sizes `npm pack` would publish |
 | `sbom.spdx.json` | SPDX SBOM of runtime dependencies (`npm sbom --omit dev`) |
 | `sbom.cyclonedx.json` | CycloneDX SBOM of runtime dependencies |
+| `schema-validation.txt` | `npm run schemas:check` output proving artifact schemas compile before packaging |
 | `provenance-readiness.txt` | Verification that package metadata satisfies npm provenance prerequisites |
 | `changelog-draft.md` | Conventional Commits log since the previous tag, input for curated notes |
 
-The run also executes the full `npm run verify` gate and a clean `npm run build` so release evidence always reflects a healthy tree.
+The run also executes the full `npm run verify` gate and a clean `npm run build` so release evidence always reflects a healthy tree. Schema validation is also recorded as standalone release evidence, even though it is part of `verify`.
 
 ## Playwright peer compatibility
 
@@ -89,6 +90,7 @@ If a published release is broken or compromised:
 ## Pre-release checklist
 
 - [ ] `npm run verify` green on the release commit.
+- [ ] `npm run schemas:check` evidence recorded in `schema-validation.txt`.
 - [ ] Playwright floor/current/latest peer matrix green.
 - [ ] Release dry-run workflow green; evidence artifact reviewed (pack contents, SBOMs, provenance readiness, changelog draft).
 - [ ] Release notes curated from the changelog draft.

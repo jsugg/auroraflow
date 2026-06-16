@@ -43,9 +43,8 @@ npx playwright install --with-deps
 | `src/framework/observability/` | No-op/default telemetry facade, OpenTelemetry adapter, attribute builders, flakiness reports, SLO dashboards, and alert evaluation. |
 | `src/utils/logger.ts` | Structured logging configuration and redaction defaults. |
 | `tests/suites/unit/` | Fast unit tests. |
-| `tests/suites/framework/` | Framework behavior tests. |
-| `tests/suites/integration/` | Redis/Testcontainers integration coverage. |
-| `tests/suites/contracts/` | Package, workflow, infrastructure, and documentation contracts. |
+| `tests/suites/contracts/` | Package, workflow, infrastructure, documentation, and schema-adjacent contracts. |
+| `tests/suites/integration/` | Redis/Testcontainers and OTLP integration coverage. |
 | `tests/suites/e2e/examples/` | Playwright-backed example and smoke scenarios. |
 | `.github/workflows/` | Quality, examples, security, and E2E matrix workflows. |
 | `observability/` | Local stack configuration and reference production manifests. |
@@ -58,8 +57,11 @@ npx playwright install --with-deps
 npm run format:check
 npm run lint
 npm run typecheck
+npm test
 npm run test:unit
+npm run test:contracts
 npm run test:integration
+npm run schemas:check
 npm run build
 ```
 
@@ -69,7 +71,21 @@ Run the repository verification target:
 npm run verify
 ```
 
-`npm run verify` runs formatting, linting, typechecking, unit/framework tests, integration/contracts, ShellCheck, and workflow linting.
+`npm test` is the unit-only fast path. It must not require browsers, Docker, Redis, or an OTLP collector.
+
+`npm run test:contracts` validates package, workflow, infrastructure, and documentation contracts without Redis/Testcontainers or browser setup.
+
+`npm run test:integration` is reserved for real integration coverage (Redis/Testcontainers and OTLP export). Use `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` when Redis evidence must block instead of skip.
+
+`npm run verify` runs repo-local actionlint bootstrap, formatting, linting, typechecking, unit tests, contracts, Redis/OTLP integration, schema validation, ShellCheck, and workflow linting.
+
+| Command | Cost tier | Scope |
+| --- | --- | --- |
+| `npm test` / `npm run test:unit` | Fast local | Unit tests only; no browser, Docker, Redis, or OTLP dependency. |
+| `npm run test:contracts` | Static/contract | Package, workflow, infrastructure, and docs contracts. |
+| `npm run test:integration` | Real integration | Redis/Testcontainers and OTLP export. |
+| `npm run test:e2e` | Browser | Playwright browser projects. |
+| `npm run verify` | Full local gate | Static checks, unit, contracts, integration, schemas, ShellCheck, and workflow lint. |
 
 ### Browser suites
 
