@@ -230,7 +230,7 @@ Do not weaken these to make future work easier.
 ### `AUR-QE-107 — Replace brittle contract text assertions`
 
 - **Objective:** Improve contract signal and reduce maintenance drag.
-- **Current state:** QE-01D baseline is implemented. Contract specs no longer use raw `toContain`; workflow/Compose/JSON checks use parsed models where practical; remaining protected text checks must go through `tests/helpers/contractAssertions.ts` with explicit safety or compatibility rationale.
+- **Current state:** Implemented. Contract specs use no raw `toContain`/`toMatch` and no bare boolean `toBe(true)`/`toBe(false)`; workflow/Compose/JSON checks use parsed models, and every remaining protected text check goes through `tests/helpers/contractAssertions.ts` with explicit safety or compatibility rationale. The `test-taxonomy` contract enforces this by failing when any `tests/suites/contracts/**` spec uses a raw text matcher or a bare boolean assertion.
 - **Implementation steps:**
   1. Inventory raw `toContain` checks in `tests/suites/contracts/**`.
   2. Classify each as public compatibility, safety invariant, or low-value wording.
@@ -543,7 +543,7 @@ Execute AUR-QE-105. Add typed per-test artifact-root helpers for Playwright and 
 QE-01D (QE-1/2) — semantic contract assertions baseline:
 
 ```text
-AUR-QE-107 baseline is complete. Keep future contract changes semantic-first: raw toContain stays banned, workflow/JSON/Compose checks should use parsed models where practical, and any remaining public compatibility or safety wording checks must include an explicit rationale through tests/helpers/contractAssertions.ts.
+AUR-QE-107 is complete. Keep future contract changes semantic-first: raw toContain/toMatch and bare boolean toBe(true)/toBe(false) stay banned in contract specs, workflow/JSON/Compose checks should use parsed models where practical, and any remaining public compatibility or safety wording checks must include an explicit rationale through tests/helpers/contractAssertions.ts.
 ```
 
 QE-02A (QE-2) — security and CLI effect boundaries:

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expectInvariant, expectTextIncludes } from '../../../helpers/contractAssertions';
+import { expectTextIncludes, expectTextMatches } from '../../../helpers/contractAssertions';
 import { getWorkflowJob, getWorkflowStep, readWorkflowModel } from '../../../helpers/workflowModel';
 
 const securityWorkflow = readWorkflowModel('.github/workflows/security.yml');
@@ -9,12 +9,10 @@ describe('security workflow secret scanning contract', () => {
     const secretScanJob = getWorkflowJob(securityWorkflow, 'secret-scan');
 
     expect(secretScanJob.name).toBe('Secret Scan (gitleaks)');
-    expectInvariant(
-      /^gitleaks\/gitleaks-action@[a-f0-9]{40}$/u.test(
-        getWorkflowStep(secretScanJob, 'Run gitleaks scan').uses ?? '',
-      ),
-      'Secret scan job must use gitleaks pinned to an immutable action SHA.',
-    );
+    expectTextMatches(getWorkflowStep(secretScanJob, 'Run gitleaks scan').uses ?? '', {
+      pattern: /^gitleaks\/gitleaks-action@[a-f0-9]{40}$/u,
+      rationale: 'Secret scan job must use gitleaks pinned to an immutable action SHA.',
+    });
   });
 
   it('enforces secret scan results in Security Gate merge blocking logic', () => {

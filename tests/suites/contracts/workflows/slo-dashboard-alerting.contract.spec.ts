@@ -1,7 +1,11 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { expectTextIncludes, expectTextMatches } from '../../../helpers/contractAssertions';
+import {
+  expectInvariant,
+  expectTextIncludes,
+  expectTextMatches,
+} from '../../../helpers/contractAssertions';
 import { getWorkflowJob, getWorkflowStep, readWorkflowModel } from '../../../helpers/workflowModel';
 import { parseAlertPolicy } from '../../../../src/framework/observability/alertPolicies';
 import {
@@ -163,7 +167,10 @@ describe('ci.yml SLO dashboard and alerting contract', () => {
       expect(policyRule?.operator).toBe(breachOperatorFor(target.comparator));
       expect(policyRule?.threshold).toBe(target.threshold);
       expect(policyRule?.severity).toBe('warning');
-      expect(policyRule?.blockOnBreach ?? false).toBe(false);
+      expectInvariant(
+        (policyRule?.blockOnBreach ?? false) === false,
+        `${metricKey} SLO policy must stay warning-only until a blocking policy is explicitly adopted.`,
+      );
       expect(prometheusAlert.operator).toBe(prometheusOperatorFor(target.comparator));
       expect(
         extractPrometheusThreshold({

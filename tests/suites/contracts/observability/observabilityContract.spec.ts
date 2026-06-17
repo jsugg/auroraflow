@@ -5,6 +5,7 @@ import {
   expectInvariant,
   expectTextExcludes,
   expectTextIncludes,
+  expectTextMatches,
 } from '../../../helpers/contractAssertions';
 import { getComposeService, readComposeModel } from '../../../helpers/composeModel';
 import { getWorkflowJob, getWorkflowStep, readWorkflowModel } from '../../../helpers/workflowModel';
@@ -175,7 +176,10 @@ describe('observability contract documentation', () => {
     ] as const;
 
     for (const requiredPath of requiredPaths) {
-      expect(existsSync(path.join(OBSERVABILITY_ROOT, requiredPath))).toBe(true);
+      expectInvariant(
+        existsSync(path.join(OBSERVABILITY_ROOT, requiredPath)),
+        `Observability stack must ship ${requiredPath}.`,
+      );
     }
   });
 
@@ -341,20 +345,20 @@ describe('observability contract documentation', () => {
       text: 'status="failure"',
       rationale: 'Prometheus rules must not use generic status label values.',
     });
-    expect(
+    expectInvariant(
       dashboardStrings.some((value) => value.includes('auroraflow_action_status')),
       'Grafana dashboards must query snapshot-proven action status labels.',
-    ).toBe(true);
-    expect(
+    );
+    expectInvariant(
       dashboardStrings.some((value) => value.includes('auroraflow_redis_operation_status')),
       'Grafana dashboards must query snapshot-proven Redis status labels.',
-    ).toBe(true);
-    expect(
+    );
+    expectInvariant(
       dashboardStrings.every(
         (value) => !value.includes(' by (status)') && !value.includes('{{status}}'),
       ),
       'Grafana dashboards must not group or template by generic status label.',
-    ).toBe(true);
+    );
   });
 
   it('ships valid Grafana dashboard JSON files', () => {
@@ -383,9 +387,14 @@ describe('observability contract documentation', () => {
         panels?: unknown[];
       };
 
-      expect(typeof dashboard.title).toBe('string');
-      expect(Array.isArray(dashboard.panels)).toBe(true);
-      expect(dashboard.panels?.length).toBeGreaterThan(0);
+      expectInvariant(
+        typeof dashboard.title === 'string',
+        `${dashboardFile} must declare a string dashboard title.`,
+      );
+      expectInvariant(
+        Array.isArray(dashboard.panels) && dashboard.panels.length > 0,
+        `${dashboardFile} must define at least one dashboard panel.`,
+      );
     }
   });
 
@@ -405,18 +414,18 @@ describe('observability contract documentation', () => {
         'auroraflow-logs-%{+YYYY.MM.dd}',
       ]),
     );
-    expectInvariant(
-      /"_jsonparsefailure" in \[tags\]/u.test(logstashPipeline),
-      'Logstash pipeline must route parse failures to dead-letter indices.',
-    );
-    expectInvariant(
-      /secret_key_pattern = .+authorization\|cookie\|session/u.test(logstashPipeline),
-      'Logstash pipeline must redact credential-bearing keys.',
-    );
-    expectInvariant(
-      /"auroraflow\.ingest_schema_version" => "1"/u.test(logstashPipeline),
-      'Logstash pipeline must tag ingested events with schema version.',
-    );
+    expectTextMatches(logstashPipeline, {
+      pattern: /"_jsonparsefailure" in \[tags\]/u,
+      rationale: 'Logstash pipeline must route parse failures to dead-letter indices.',
+    });
+    expectTextMatches(logstashPipeline, {
+      pattern: /secret_key_pattern = .+authorization\|cookie\|session/u,
+      rationale: 'Logstash pipeline must redact credential-bearing keys.',
+    });
+    expectTextMatches(logstashPipeline, {
+      pattern: /"auroraflow\.ingest_schema_version" => "1"/u,
+      rationale: 'Logstash pipeline must tag ingested events with schema version.',
+    });
 
     const templatesPath = path.join(OBSERVABILITY_ROOT, 'elastic', 'index-templates');
     for (const templateFile of readdirSync(templatesPath).filter((fileName) =>
@@ -430,10 +439,10 @@ describe('observability contract documentation', () => {
         };
       };
 
-      expectInvariant(
-        /^auroraflow-.+\*$/u.test(template.index_patterns?.[0] ?? ''),
-        `${templateFile} must target AuroraFlow indices only.`,
-      );
+      expectTextMatches(template.index_patterns?.[0] ?? '', {
+        pattern: /^auroraflow-.+\*$/u,
+        rationale: `${templateFile} must target AuroraFlow indices only.`,
+      });
       expect(template.template?.mappings).toBeDefined();
       expect(template.template?.settings?.['index.lifecycle.name']).toBe(
         'auroraflow-local-retention',
@@ -469,7 +478,10 @@ describe('observability contract documentation', () => {
         'auroraflow-ingest-dead-letter-*',
       ]),
     );
-    expect(savedObjects.every((savedObject) => savedObject.type === 'index-pattern')).toBe(true);
+    expectInvariant(
+      savedObjects.every((savedObject) => savedObject.type === 'index-pattern'),
+      'Kibana saved objects must all be index-pattern definitions.',
+    );
   });
 
   it('ships production hardening manifests and operator guidance', () => {
@@ -491,17 +503,20 @@ describe('observability contract documentation', () => {
       'utf8',
     );
 
-    expect(
+    expectInvariant(
       getComposeService(productionCompose, 'otel-collector').environment.has(
         'AURORAFLOW_OTEL_BASIC_AUTH_HTPASSWD',
       ),
-    ).toBe(true);
-    expect(
+      'Production collector service must require a basic-auth htpasswd secret.',
+    );
+    expectInvariant(
       getComposeService(productionCompose, 'grafana').environment.has('GF_SECURITY_ADMIN_PASSWORD'),
-    ).toBe(true);
-    expect(
+      'Production Grafana service must require an admin password secret.',
+    );
+    expectInvariant(
       getComposeService(productionCompose, 'elasticsearch').environment.has('ELASTIC_PASSWORD'),
-    ).toBe(true);
+      'Production Elasticsearch service must require an elastic password secret.',
+    );
     for (const text of [
       'basicauth/server',
       'cert_file: /run/secrets/auroraflow-observability/tls',

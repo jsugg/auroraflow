@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { expectInvariant } from '../../../helpers/contractAssertions';
 
 const DEPENDABOT_PATH = path.join(process.cwd(), '.github/dependabot.yml');
 
@@ -77,7 +78,10 @@ function parseQuotedScalar(value: string): string {
 
 describe('dependabot configuration contract', () => {
   it('defines repository-level dependabot automation config', () => {
-    expect(existsSync(DEPENDABOT_PATH)).toBe(true);
+    expectInvariant(
+      existsSync(DEPENDABOT_PATH),
+      'Repository must ship .github/dependabot.yml automation config.',
+    );
   });
 
   it('covers npm and github-actions ecosystems on a weekly schedule', () => {
