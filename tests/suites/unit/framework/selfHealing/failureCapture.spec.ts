@@ -11,6 +11,11 @@ import type {
   SelfHealingConfig,
   SelfHealingMode,
 } from '../../../../../src/framework/selfHealing/types';
+import {
+  cleanupSelfHealingArtifactScope,
+  createVitestSelfHealingArtifactScope,
+  readSelfHealingArtifactFor,
+} from '../../../../helpers/selfHealingArtifacts';
 
 function selfHealingConfig(mode: SelfHealingMode): SelfHealingConfig {
   return {
@@ -182,6 +187,46 @@ describe('captureFailureEvent', () => {
       component: 'CheckoutPage',
       errorCode: 'page_action_click_failed',
     });
+  });
+
+  it('writes default file artifacts to the directory declared by the capture env', async () => {
+    const scope = await createVitestSelfHealingArtifactScope({
+      prefix: 'failure-capture',
+      runId: 'capture-run',
+      testId: 'capture-test',
+    });
+
+    try {
+      await captureFailureEvent({
+        config: selfHealingConfig('suggest'),
+        pageObjectName: 'ExamplePage',
+        action: {
+          type: 'click',
+          target: '#submit',
+          description: 'Error clicking selector #submit',
+        },
+        error: new Error('click failed'),
+        env: scope.env,
+        now: () => new Date('2026-06-16T00:00:00.000Z'),
+        randomSuffix: () => 'scoped-output',
+      });
+
+      const artifact = await readSelfHealingArtifactFor<{
+        action: { type: string };
+        eventId: string;
+        runId?: string;
+        testId?: string;
+      }>(scope);
+
+      expect(artifact).toMatchObject({
+        action: { type: 'click' },
+        eventId: '2026-06-16T00-00-00-000Z_scoped-output',
+        runId: 'capture-run',
+        testId: 'capture-test',
+      });
+    } finally {
+      await cleanupSelfHealingArtifactScope(scope);
+    }
   });
 
   it('omits screenshot paths when the sensitive policy disables capture', async () => {

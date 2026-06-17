@@ -33,7 +33,7 @@
     "test": "npm run test:unit",
     "test:unit": "vitest run tests/suites/unit",
     "test:coverage": "npm run test:coverage:critical && npm run test:coverage:global",
-    "test:contracts": "vitest run tests/suites/contracts",
+    "test:contracts": "vitest run tests/suites/contracts --config=configs/vitest.contracts.mts",
     "test:integration": "vitest run tests/suites/integration",
     "test:integration:all": "npm run test:integration && npm run test:contracts",
     "test:smoke": "npx playwright test --config=configs/playwright.config.ts --project='Google Chrome' --grep @smoke --timeout=60000 --workers=1",
@@ -68,7 +68,7 @@
     "verify:smoke": "npm run verify && npm run test:smoke",
     "test:coverage:critical": "vitest run tests/suites/unit/framework/selfHealing/artifactPrivacy.spec.ts tests/suites/unit/framework/selfHealing/config.spec.ts tests/suites/unit/framework/selfHealing/guardedValidation.spec.ts tests/suites/unit/framework/selfHealing/historyRepository.spec.ts tests/suites/unit/framework/selfHealing/promotionWorkflow.spec.ts tests/suites/unit/framework/selfHealing/registryRuntime.spec.ts tests/suites/unit/framework/observability/trends.spec.ts --coverage",
     "test:coverage:global": "vitest run tests/suites/unit --config=configs/vitest.coverage-global.mts --coverage",
-    "test:e2e:guarded": "npm run test:e2e -- --project='Google Chrome' --grep 'guarded self-heal' --workers=1"
+    "test:e2e:guarded": "npm run test:e2e -- --project='Google Chrome' --grep 'guarded self-heal' --workers=2"
   },
   "engines": {
     "node": ">=20 <25"

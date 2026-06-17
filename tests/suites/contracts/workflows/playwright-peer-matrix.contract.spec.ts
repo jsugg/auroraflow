@@ -1,40 +1,74 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { expectInvariant, expectTextIncludes } from '../../../helpers/contractAssertions';
+import { getWorkflowJob, getWorkflowStep, readWorkflowModel } from '../../../helpers/workflowModel';
 
-const WORKFLOW_PATH = path.join(
-  process.cwd(),
-  '.github',
-  'workflows',
-  'playwright-peer-matrix.yml',
-);
-const workflow = readFileSync(WORKFLOW_PATH, 'utf8');
+const workflow = readWorkflowModel('.github/workflows/playwright-peer-matrix.yml');
 
 describe('Playwright peer matrix workflow', () => {
   it('tests floor, lockfile-current, and latest supported 1.x lanes', () => {
-    expect(workflow).toContain('- lane: floor\n            version_spec: 1.59.1');
-    expect(workflow).toContain("- lane: current\n            version_spec: ''");
-    expect(workflow).toContain('- lane: latest\n            version_spec: ^1.59.0');
-    expect(workflow).toContain('Playwright ${process.env.PLAYWRIGHT_LANE}: ${playwrightVersion}');
-    expect(workflow).toContain('playwright-core@${PLAYWRIGHT_VERSION_SPEC}');
-    expect(workflow).toContain('outside >=1.59 <2');
+    const peerMatrixJob = getWorkflowJob(workflow, 'peer-matrix');
+
+    expect(
+      peerMatrixJob.strategy?.include.map((entry) => ({
+        lane: entry.get('lane'),
+        versionSpec: entry.get('version_spec'),
+      })),
+      'Playwright compatibility matrix must cover floor, lockfile-current, and latest 1.x lanes.',
+    ).toEqual([
+      { lane: 'floor', versionSpec: '1.59.1' },
+      { lane: 'current', versionSpec: '' },
+      { lane: 'latest', versionSpec: '^1.59.0' },
+    ]);
+    expectTextIncludes(
+      getWorkflowStep(peerMatrixJob, 'Verify installed Playwright version').run ?? '',
+      {
+        text: 'outside >=1.59 <2',
+        rationale:
+          'Peer matrix must fail loudly when resolved Playwright version leaves peer range.',
+      },
+    );
+    expectTextIncludes(
+      getWorkflowStep(peerMatrixJob, 'Install matrix Playwright version').run ?? '',
+      {
+        text: 'playwright-core@${PLAYWRIGHT_VERSION_SPEC}',
+        rationale:
+          'Peer matrix must keep playwright, playwright-core, and @playwright/test aligned.',
+      },
+    );
   });
 
   it('runs heavy browser coverage only on scheduled, manual, or release calls', () => {
-    expect(workflow).toContain('schedule:');
-    expect(workflow).toContain("cron: '0 5 * * 0'");
-    expect(workflow).toContain('workflow_dispatch:');
-    expect(workflow).toContain('workflow_call:');
-    expect(workflow).not.toContain('pull_request:');
-    expect(workflow).toContain('npx playwright install --with-deps chrome');
-    expect(workflow).toContain('npm run test:smoke');
+    const peerMatrixJob = getWorkflowJob(workflow, 'peer-matrix');
+
+    expect(
+      [...workflow.triggers].sort(),
+      'Peer matrix must stay off pull_request and run only by schedule, manual dispatch, or release workflow_call.',
+    ).toEqual(['schedule', 'workflow_call', 'workflow_dispatch']);
+    expect(getWorkflowStep(peerMatrixJob, 'Install Playwright Chrome').run).toBe(
+      'npx playwright install --with-deps chrome',
+    );
+    expect(getWorkflowStep(peerMatrixJob, 'Run Chrome smoke suite').run).toBe('npm run test:smoke');
   });
 
   it('keeps compatibility scope focused and bounded', () => {
-    expect(workflow).toContain('timeout-minutes: 20');
-    expect(workflow).toContain('max-parallel: 2');
-    expect(workflow).toContain('npm run typecheck');
-    expect(workflow).toContain('pageObjectBase.spec.ts');
-    expect(workflow).not.toContain('test:e2e');
+    const peerMatrixJob = getWorkflowJob(workflow, 'peer-matrix');
+
+    expect(peerMatrixJob.timeoutMinutes).toBe(20);
+    expect(peerMatrixJob.strategy?.maxParallel).toBe(2);
+    expect(getWorkflowStep(peerMatrixJob, 'Run compatibility typecheck').run).toBe(
+      'npm run typecheck',
+    );
+    expectTextIncludes(
+      getWorkflowStep(peerMatrixJob, 'Run focused compatibility unit tests').run ?? '',
+      {
+        text: 'pageObjectBase.spec.ts',
+        rationale:
+          'Peer matrix must focus on public compatibility units instead of full E2E breadth.',
+      },
+    );
+    expectInvariant(
+      peerMatrixJob.steps.every((step) => step.run !== 'npm run test:e2e'),
+      'Peer matrix must not run full E2E; smoke suite is the bounded browser proof.',
+    );
   });
 });

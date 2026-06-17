@@ -1,7 +1,4 @@
 import type { Page } from 'playwright';
-import { readFileSync } from 'node:fs';
-import { readdir, rm } from 'node:fs/promises';
-import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { METRIC_NAMES } from '../../../../../src/framework/observability/metricNames';
 import {
@@ -15,6 +12,13 @@ import {
   SYNTHETIC_SECRET,
   createSyntheticSecretDomSnapshot,
 } from '../../../../fixtures/privacy/syntheticSecrets';
+import {
+  applySelfHealingArtifactScopeEnv,
+  cleanupSelfHealingArtifactScope,
+  createVitestSelfHealingArtifactScope,
+  readSelfHealingArtifactFor,
+  type SelfHealingArtifactScope,
+} from '../../../../helpers/selfHealingArtifacts';
 
 class TestPageObject extends PageObjectBase {
   constructor(
@@ -104,18 +108,32 @@ function createPageMock(): PageMock {
 describe('PageObjectBase self-healing integration', () => {
   let pageMock: PageMock;
   let pageObject: TestPageObject;
-  const artifactsDir = path.join(process.cwd(), 'test-results', 'self-healing');
+  let artifactScope: SelfHealingArtifactScope | undefined;
+
+  function currentArtifactScope(): SelfHealingArtifactScope {
+    if (artifactScope === undefined) {
+      throw new Error('Self-healing artifact scope was not initialized for this test.');
+    }
+    return artifactScope;
+  }
+
+  async function readPageObjectArtifact<T>(): Promise<T> {
+    return readSelfHealingArtifactFor<T>(currentArtifactScope());
+  }
 
   beforeEach(async () => {
-    process.env.AURORAFLOW_RUN_ID = 'local-run';
-    process.env.AURORAFLOW_TEST_ID = 'spec-1';
+    artifactScope = await createVitestSelfHealingArtifactScope({
+      prefix: 'page-object-base-self-healing',
+      runId: 'local-run',
+      testId: 'spec-1',
+    });
+    applySelfHealingArtifactScopeEnv(artifactScope);
     process.env.SELF_HEAL_MODE = 'suggest';
     process.env.SELF_HEAL_MIN_CONFIDENCE = '0.95';
     delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
     delete process.env.SELF_HEAL_ALLOWED_DOMAINS;
     delete process.env.SELF_HEAL_REGISTRY_MODE;
     delete process.env.AURORAFLOW_ARTIFACT_PRIVACY_PRESET;
-    await rm(artifactsDir, { recursive: true, force: true });
     pageMock = createPageMock();
     pageObject = new TestPageObject(pageMock as unknown as Page);
   });
@@ -129,8 +147,10 @@ describe('PageObjectBase self-healing integration', () => {
     delete process.env.SELF_HEAL_ALLOWED_DOMAINS;
     delete process.env.SELF_HEAL_REGISTRY_MODE;
     delete process.env.AURORAFLOW_ARTIFACT_PRIVACY_PRESET;
+    delete process.env.SELF_HEAL_ARTIFACTS_DIR;
     resetTelemetryForTests();
-    await rm(artifactsDir, { recursive: true, force: true });
+    await cleanupSelfHealingArtifactScope(artifactScope);
+    artifactScope = undefined;
   });
 
   it('captures structured failure context for failed type action', async () => {
@@ -140,11 +160,7 @@ describe('PageObjectBase self-healing integration', () => {
       'Error typing in selector #username: fill failed',
     );
 
-    const artifacts = await readdir(artifactsDir);
-    expect(artifacts).toHaveLength(1);
-
-    const artifactPath = path.join(artifactsDir, artifacts[0]);
-    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+    const content = await readPageObjectArtifact<{
       mode: string;
       pageObjectName: string;
       component: string;
@@ -159,7 +175,7 @@ describe('PageObjectBase self-healing integration', () => {
       action: { type: string; target?: string };
       currentUrl?: string;
       suggestions: Array<{ locator: string; score: number }>;
-    };
+    }>();
 
     expect(content.mode).toBe('suggest');
     expect(content.pageObjectName).toBe('TestPageObject');
@@ -192,10 +208,9 @@ describe('PageObjectBase self-healing integration', () => {
     );
 
     expect(pageMock.screenshot).not.toHaveBeenCalled();
-    const artifacts = await readdir(artifactsDir);
-    const artifact = readFileSync(path.join(artifactsDir, artifacts[0]), 'utf8');
-    expect(artifact).not.toContain(SYNTHETIC_SECRET);
-    expect(JSON.parse(artifact)).not.toHaveProperty('screenshotPath');
+    const artifact = await readPageObjectArtifact<Record<string, unknown>>();
+    expect(JSON.stringify(artifact)).not.toContain(SYNTHETIC_SECRET);
+    expect(artifact).not.toHaveProperty('screenshotPath');
     expect(JSON.stringify({ spans: telemetry.spans, counters: telemetry.counters })).not.toContain(
       SYNTHETIC_SECRET,
     );
@@ -210,11 +225,7 @@ describe('PageObjectBase self-healing integration', () => {
 
     await expect(pageObject.type('#username', 'alice')).resolves.toBeNull();
 
-    const artifacts = await readdir(artifactsDir);
-    expect(artifacts).toHaveLength(1);
-
-    const artifactPath = path.join(artifactsDir, artifacts[0]);
-    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+    const content = await readPageObjectArtifact<{
       mode: string;
       guardedValidation?: {
         mode: string;
@@ -238,7 +249,7 @@ describe('PageObjectBase self-healing integration', () => {
         succeeded: boolean;
         locator?: string;
       };
-    };
+    }>();
 
     expect(content.mode).toBe('guarded');
     expect(content.guardedValidation).toBeDefined();
@@ -274,15 +285,13 @@ describe('PageObjectBase self-healing integration', () => {
     await expect(pageObject.click('#submit')).resolves.toBeNull();
     expect(pageMock.locatorFirst.click).toHaveBeenCalledTimes(1);
 
-    const artifacts = await readdir(artifactsDir);
-    const artifactPath = path.join(artifactsDir, artifacts[0]);
-    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+    const content = await readPageObjectArtifact<{
       guardedAutoHeal?: {
         attempted: boolean;
         succeeded: boolean;
         locator?: string;
       };
-    };
+    }>();
 
     expect(content.guardedAutoHeal).toMatchObject({
       attempted: true,
@@ -348,9 +357,7 @@ describe('PageObjectBase self-healing integration', () => {
     expect(pageMock.getByTestId).toHaveBeenCalledWith('submit-order');
     expect(pageMock.locatorFirst.click).toHaveBeenCalledTimes(1);
 
-    const artifacts = await readdir(artifactsDir);
-    const artifactPath = path.join(artifactsDir, artifacts[0]);
-    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+    const content = await readPageObjectArtifact<{
       action: { selectorId?: string };
       sat?: {
         candidates: Array<{
@@ -367,7 +374,7 @@ describe('PageObjectBase self-healing integration', () => {
         succeeded: boolean;
         locator?: string;
       };
-    };
+    }>();
 
     expect(content.action.selectorId).toBe('checkout.submit');
     expect(content.sat?.candidates[0]).toMatchObject({
@@ -450,9 +457,7 @@ describe('PageObjectBase self-healing integration', () => {
       }),
     );
 
-    const artifacts = await readdir(artifactsDir);
-    const artifactPath = path.join(artifactsDir, artifacts[0]);
-    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+    const content = await readPageObjectArtifact<{
       eventId: string;
       action: { selectorId?: string };
       guardedValidation?: { acceptedLocator?: string };
@@ -466,7 +471,7 @@ describe('PageObjectBase self-healing integration', () => {
           selectorId?: string;
         };
       };
-    };
+    }>();
 
     expect(content.action.selectorId).toBe('checkout.submit');
     expect(content.registryPersistence).toMatchObject({
@@ -507,16 +512,14 @@ describe('PageObjectBase self-healing integration', () => {
     });
     expect(pageMock.locatorFirst.click).toHaveBeenCalledWith({});
 
-    const artifacts = await readdir(artifactsDir);
-    const artifactPath = path.join(artifactsDir, artifacts[0]);
-    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+    const content = await readPageObjectArtifact<{
       action: { type: string; target?: string };
       guardedAutoHeal?: {
         attempted: boolean;
         succeeded: boolean;
         locator?: string;
       };
-    };
+    }>();
 
     expect(content.action).toMatchObject({ type: 'click', target: '#submit' });
     expect(content.guardedAutoHeal).toMatchObject({
@@ -548,15 +551,13 @@ describe('PageObjectBase self-healing integration', () => {
       'Error clicking on selector #submit: click failed',
     );
 
-    const artifacts = await readdir(artifactsDir);
-    const artifactPath = path.join(artifactsDir, artifacts[0]);
-    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+    const content = await readPageObjectArtifact<{
       guardedAutoHeal?: {
         attempted: boolean;
         succeeded: boolean;
         errorMessage?: string;
       };
-    };
+    }>();
 
     expect(content.guardedAutoHeal).toMatchObject({
       attempted: true,
@@ -588,9 +589,7 @@ describe('PageObjectBase self-healing integration', () => {
 
     expect(pageMock.locatorFirst.click).not.toHaveBeenCalled();
 
-    const artifacts = await readdir(artifactsDir);
-    const artifactPath = path.join(artifactsDir, artifacts[0]);
-    const content = JSON.parse(readFileSync(artifactPath, 'utf8')) as {
+    const content = await readPageObjectArtifact<{
       guardedValidation?: {
         policy: {
           blockedReason?: string;
@@ -601,7 +600,7 @@ describe('PageObjectBase self-healing integration', () => {
         succeeded: boolean;
         skippedReason?: string;
       };
-    };
+    }>();
 
     expect(content.guardedValidation?.policy.blockedReason).toBe('domain_not_allowed');
     expect(content.guardedAutoHeal).toMatchObject({

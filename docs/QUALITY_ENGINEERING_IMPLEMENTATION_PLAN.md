@@ -90,6 +90,8 @@ These items are now treated as baseline evidence, not open tasks:
 - `tests/suites/integration/framework/data/redisIntegration.spec.ts` supports `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true`.
 - `configs/vitest.coverage-global.mts` and `test:coverage` provide global plus critical coverage.
 - `tests/helpers/selectorStoreConformance.ts` is the baseline for memory/Redis store behavior.
+- QE-01B split Node compatibility from Docker/browser-heavy gates: Node 20/22/24 now runs lint, typecheck, and unit tests only; Node 22 owns repository contracts, Redis-required integration, schemas, ShellCheck, workflow lint, and coverage; guarded Chrome proof remains separate.
+- `AUR-QE-105`: self-healing tests use typed Playwright/Vitest artifact scopes, write artifacts through `SELF_HEAL_ARTIFACTS_DIR`, and scope evidence reads by per-test root plus run/test ID; guarded Chrome proof runs with two workers.
 
 Do not weaken these to make future work easier.
 
@@ -175,6 +177,7 @@ Do not weaken these to make future work easier.
 ### `AUR-QE-104 — Split CI matrix from Docker/browser heavy gates`
 
 - **Objective:** Preserve compatibility evidence while reducing duplicated Docker/browser work.
+- **Current state:** Implemented by QE-01B: `quality.yml` separates `Node Compatibility (Node 20/22/24)`, `Repository Gates (Node 22)`, `Coverage (Critical + Global)`, `Guarded Self-Heal Proof (Chrome)`, and path/label-triggered `Risk-Triggered E2E (Chrome)`.
 - **Implementation steps:**
   1. In `quality.yml`, make Node 20/22/24 matrix run install + lint + typecheck + unit.
   2. Run Redis integration/contracts once on Node 22 with `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true`.
@@ -193,6 +196,7 @@ Do not weaken these to make future work easier.
 ### `AUR-QE-105 — Isolate self-healing artifact directories`
 
 - **Objective:** Remove shared filesystem race risk from self-healing tests.
+- **Current state:** Implemented by QE-01C: `tests/helpers/selfHealingArtifacts.ts` provides typed per-test artifact scopes; Playwright tests use `testInfo.outputPath()`, Vitest uses `mkdtemp`, and no self-healing test deletes the shared `test-results/self-healing` directory.
 - **Implementation steps:**
   1. Create typed test helper for per-test artifact roots.
   2. Use `testInfo.outputPath()` in Playwright and `mkdtemp` in Vitest.
@@ -210,6 +214,7 @@ Do not weaken these to make future work easier.
 ### `AUR-QE-106 — Update developer testing docs`
 
 - **Objective:** Keep contributor docs aligned with real commands and gates.
+- **Current state:** Implemented by QE-01B: developer docs describe command names, cost tiers, local vs CI gates, Redis skip/required behavior, guarded Chrome proof, and critical/global/future risk-weighted coverage guidance.
 - **Implementation steps:**
   1. Update test layout table.
   2. Add local vs CI gate table.
@@ -225,6 +230,7 @@ Do not weaken these to make future work easier.
 ### `AUR-QE-107 — Replace brittle contract text assertions`
 
 - **Objective:** Improve contract signal and reduce maintenance drag.
+- **Current state:** QE-01D baseline is implemented. Contract specs no longer use raw `toContain`; workflow/Compose/JSON checks use parsed models where practical; remaining protected text checks must go through `tests/helpers/contractAssertions.ts` with explicit safety or compatibility rationale.
 - **Implementation steps:**
   1. Inventory raw `toContain` checks in `tests/suites/contracts/**`.
   2. Classify each as public compatibility, safety invariant, or low-value wording.
@@ -534,10 +540,10 @@ QE-01C (QE-1) — self-healing artifact-root isolation:
 Execute AUR-QE-105. Add typed per-test artifact-root helpers for Playwright and Vitest, stop deleting shared self-healing output paths, scope evidence lookup to the current test root/run/test id, and prove guarded self-healing can run without cross-test artifact races.
 ```
 
-QE-01D (QE-1/2) — semantic contract assertions:
+QE-01D (QE-1/2) — semantic contract assertions baseline:
 
 ```text
-Execute AUR-QE-107. Inventory raw text assertions in tests/suites/contracts, keep only public compatibility or safety wording checks with explicit rationale, replace workflow/JSON/Compose checks with parsed semantic assertions where practical, and ensure contract failures report the protected invariant instead of incidental prose.
+AUR-QE-107 baseline is complete. Keep future contract changes semantic-first: raw toContain stays banned, workflow/JSON/Compose checks should use parsed models where practical, and any remaining public compatibility or safety wording checks must include an explicit rationale through tests/helpers/contractAssertions.ts.
 ```
 
 QE-02A (QE-2) — security and CLI effect boundaries:

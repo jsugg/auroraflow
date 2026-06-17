@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { expectTextIncludes } from '../../../helpers/contractAssertions';
 import {
   extractRootExports,
   findDuplicateNames,
@@ -24,7 +25,10 @@ const packageJson = JSON.parse(readFileSync(path.join(process.cwd(), 'package.js
 describe('package surface contract', () => {
   it('publishes a named root entrypoint with declarations and curated files', () => {
     expect(packageJson.name).toBe('auroraflow');
-    expect(packageJson.description).toContain('TypeScript Playwright test automation framework');
+    expectTextIncludes(packageJson.description ?? '', {
+      text: 'TypeScript Playwright test automation framework',
+      rationale: 'npm package description must preserve public discovery wording.',
+    });
     expect(packageJson.main).toBe('./dist/index.js');
     expect(packageJson.types).toBe('./dist/index.d.ts');
     expect(packageJson.exports?.['.']).toEqual({
@@ -38,7 +42,9 @@ describe('package surface contract', () => {
   });
 
   it('defines build and pack scripts that produce the package artifact surface', () => {
-    expect(packageJson.scripts?.clean).toContain("rmSync('dist'");
+    expect(packageJson.scripts?.clean).toBe(
+      "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
+    );
     expect(packageJson.scripts?.build).toBe('npm run clean && tsc -p tsconfig.build.json');
     expect(packageJson.scripts?.prepack).toBe('npm run build');
     expect(packageJson.scripts?.['pack:dry-run']).toBe('npm pack --dry-run');

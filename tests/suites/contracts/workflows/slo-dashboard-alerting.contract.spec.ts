@@ -1,6 +1,8 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { expectTextIncludes, expectTextMatches } from '../../../helpers/contractAssertions';
+import { getWorkflowJob, getWorkflowStep, readWorkflowModel } from '../../../helpers/workflowModel';
 import { parseAlertPolicy } from '../../../../src/framework/observability/alertPolicies';
 import {
   SLO_METRIC_TARGETS,
@@ -18,13 +20,12 @@ import type {
   SelfHealingSuggestionStrategy,
 } from '../../../../src/framework/selfHealing/types';
 
-const CI_WORKFLOW_PATH = path.join(process.cwd(), '.github/workflows/ci.yml');
 const SLO_ALERT_POLICY_PATH = path.join(process.cwd(), 'configs/quality/slo-alert-policy.json');
 const PROMETHEUS_RULES_PATH = path.join(
   process.cwd(),
   'observability/prometheus/rules/auroraflow.yml',
 );
-const ciWorkflow = readFileSync(CI_WORKFLOW_PATH, 'utf8');
+const ciWorkflow = readWorkflowModel('.github/workflows/ci.yml');
 const prometheusRules = readFileSync(PROMETHEUS_RULES_PATH, 'utf8');
 
 const SLO_METRIC_KEYS = [
@@ -110,18 +111,42 @@ function weightedScore(signals: SelfHealingSuggestionSignals): number {
 
 describe('ci.yml SLO dashboard and alerting contract', () => {
   it('defines a dedicated SLO dashboard and alerts job after flakiness aggregation', () => {
-    expect(ciWorkflow).toContain('slo-dashboard:');
-    expect(ciWorkflow).toContain('name: SLO Dashboard and Alerts');
-    expect(ciWorkflow).toContain('needs: flakiness-report');
+    const sloDashboardJob = getWorkflowJob(ciWorkflow, 'slo-dashboard');
+
+    expect(sloDashboardJob.name).toBe('SLO Dashboard and Alerts');
+    expect(sloDashboardJob.needs).toEqual(['flakiness-report']);
   });
 
   it('generates dashboard and alert artifacts with repository policy config', () => {
-    expect(ciWorkflow).toContain('npm run slo:dashboard --');
-    expect(ciWorkflow).toContain('npm run slo:alerts --');
-    expect(ciWorkflow).toContain('configs/quality/slo-alert-policy.json');
-    expect(ciWorkflow).toContain('Restore SLO trend history');
-    expect(ciWorkflow).toContain('--trend-output .auroraflow-trends/slo-trends.jsonl');
-    expect(ciWorkflow).toContain('name: slo-dashboard-alerts');
+    const sloDashboardJob = getWorkflowJob(ciWorkflow, 'slo-dashboard');
+    const dashboardRun = getWorkflowStep(sloDashboardJob, 'Generate SLO dashboard').run ?? '';
+    const alertsRun = getWorkflowStep(sloDashboardJob, 'Evaluate SLO alert policies').run ?? '';
+
+    expect(getWorkflowStep(sloDashboardJob, 'Restore SLO trend history').with.get('path')).toBe(
+      '.auroraflow-trends/slo-trends.jsonl',
+    );
+    for (const text of [
+      'npm run slo:dashboard --',
+      '--trend-output .auroraflow-trends/slo-trends.jsonl',
+    ]) {
+      expectTextIncludes(dashboardRun, {
+        text,
+        rationale: 'SLO dashboard job must write dashboard and trend artifacts.',
+      });
+    }
+    for (const text of [
+      'npm run slo:alerts --',
+      'configs/quality/slo-alert-policy.json',
+      '--trend-output .auroraflow-trends/slo-trends.jsonl',
+    ]) {
+      expectTextIncludes(alertsRun, {
+        text,
+        rationale: 'SLO alert job must evaluate repository policy and persist trend artifacts.',
+      });
+    }
+    expect(
+      getWorkflowStep(sloDashboardJob, 'Upload SLO dashboard and alert artifacts').with.get('name'),
+    ).toBe('slo-dashboard-alerts');
   });
 
   it('keeps dashboard, policy JSON, and Prometheus SLO thresholds aligned and warning-only', () => {
@@ -146,9 +171,10 @@ describe('ci.yml SLO dashboard and alerting contract', () => {
           operator: prometheusAlert.operator,
         }),
       ).toBe(target.threshold);
-      expect(extractAlertBlock(prometheusRules, prometheusAlert.alertName)).toMatch(
-        /severity:\s*warning/,
-      );
+      expectTextMatches(extractAlertBlock(prometheusRules, prometheusAlert.alertName), {
+        pattern: /severity:\s*warning/,
+        rationale: `${prometheusAlert.alertName} must stay warning-only until blocking SLO policy is explicitly adopted.`,
+      });
     }
   });
 });

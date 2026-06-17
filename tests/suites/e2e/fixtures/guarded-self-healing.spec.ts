@@ -1,6 +1,4 @@
 import { expect, test, type Page } from '@playwright/test';
-import { readFile, readdir, rm } from 'node:fs/promises';
-import path from 'node:path';
 import { DEFAULT_SELF_HEAL_MIN_CONFIDENCE } from '../../../../src/framework/selfHealing/config';
 import {
   resetTelemetryForTests,
@@ -11,6 +9,12 @@ import type {
   SelectorRegistryEntry,
   SelfHealingRegistryRuntime,
 } from '../../../../src/framework/selfHealing/registryContracts';
+import {
+  SELF_HEALING_ARTIFACT_ENV_KEYS,
+  createPlaywrightSelfHealingArtifactScope,
+  readSelfHealingArtifactFor,
+  type SelfHealingArtifactScope,
+} from '../../../helpers/selfHealingArtifacts';
 import { CapturingTelemetry } from '../../unit/framework/observability/capturingTelemetry';
 import { FixtureSelfHealingPage } from './fixtureApp';
 
@@ -19,18 +23,18 @@ import { FixtureSelfHealingPage } from './fixtureApp';
 declare const window: { dispatchEvent(event: unknown): boolean };
 declare const Event: new (type: string) => unknown;
 
-const ARTIFACTS_DIR = path.join(process.cwd(), 'test-results', 'self-healing');
-const GUARDED_ACTION_TIMEOUT_MS = 2_000;
+// Parallel proof validates guarded recovery, not a sub-second click budget.
+const GUARDED_ACTION_TIMEOUT_MS = 3_000;
+
+test.setTimeout(90_000);
 
 // The framework resolves self-healing config and correlation identifiers from
 // `process.env` (PageObjectBase reads it directly), so these tests drive the
 // real config path by setting process.env and restoring it per test — the same
-// pattern as tests/suites/e2e/examples/self-healing-sat.spec.ts. No production
-// code is modified; the registry runtime is supplied through the existing
+// pattern as tests/suites/e2e/examples/self-healing-sat.spec.ts. The registry runtime is supplied through the existing
 // `resolveRegistryRuntime` override seam on FixtureSelfHealingPage.
 const SELF_HEAL_ENV_KEYS = [
-  'AURORAFLOW_RUN_ID',
-  'AURORAFLOW_TEST_ID',
+  ...SELF_HEALING_ARTIFACT_ENV_KEYS,
   'SELF_HEAL_MODE',
   'SELF_HEAL_MIN_CONFIDENCE',
   'SELF_HEAL_ALLOWED_ACTIONS',
@@ -41,7 +45,8 @@ const SELF_HEAL_ENV_KEYS = [
   'SELF_HEAL_SAT_ENABLED',
 ] as const;
 
-let previousEnv: Map<(typeof SELF_HEAL_ENV_KEYS)[number], string | undefined>;
+let previousEnv: Map<(typeof SELF_HEAL_ENV_KEYS)[number], string | undefined> | undefined;
+let artifactScope: SelfHealingArtifactScope | undefined;
 
 function applyGuardedEnv(env: Readonly<Record<string, string | undefined>>): void {
   for (const key of SELF_HEAL_ENV_KEYS) {
@@ -94,10 +99,16 @@ interface GuardedArtifact {
   };
 }
 
-function createGuardedEnv(testId: string): Record<string, string | undefined> {
+function currentArtifactScope(): SelfHealingArtifactScope {
+  if (artifactScope === undefined) {
+    throw new Error('Self-healing artifact scope was not initialized for this test.');
+  }
+  return artifactScope;
+}
+
+function createGuardedEnv(scope: SelfHealingArtifactScope): Record<string, string | undefined> {
   return {
-    AURORAFLOW_RUN_ID: `guarded-e2e-${testId}`,
-    AURORAFLOW_TEST_ID: testId,
+    ...scope.env,
     SELF_HEAL_MODE: 'guarded',
     SELF_HEAL_ALLOWED_ACTIONS: 'click,type,read,wait',
     SELF_HEAL_ALLOWED_DOMAINS: '127.0.0.1,localhost',
@@ -144,22 +155,8 @@ function registryEntry(input: {
   };
 }
 
-async function readArtifactFor(
-  env: Readonly<Record<string, string | undefined>>,
-): Promise<GuardedArtifact> {
-  const files = await readdir(ARTIFACTS_DIR).catch(() => []);
-  for (const file of files) {
-    if (!file.endsWith('.json')) {
-      continue;
-    }
-    const artifact = JSON.parse(
-      await readFile(path.join(ARTIFACTS_DIR, file), 'utf8'),
-    ) as GuardedArtifact;
-    if (artifact.runId === env.AURORAFLOW_RUN_ID && artifact.testId === env.AURORAFLOW_TEST_ID) {
-      return artifact;
-    }
-  }
-  throw new Error(`No guarded self-healing artifact found for ${env.AURORAFLOW_TEST_ID}.`);
+async function readArtifactFor(scope: SelfHealingArtifactScope): Promise<GuardedArtifact> {
+  return readSelfHealingArtifactFor<GuardedArtifact>(scope);
 }
 
 async function runGuardedClick({
@@ -181,33 +178,40 @@ async function runGuardedClick({
   await pageObject.click(staleSelector, { selectorId, timeout: GUARDED_ACTION_TIMEOUT_MS });
 }
 
-test.describe.configure({ mode: 'serial' });
+test.describe.configure({ mode: 'parallel' });
 
-test.beforeEach(async () => {
+test.beforeEach(async ({ page }, testInfo) => {
+  void page;
   previousEnv = new Map(SELF_HEAL_ENV_KEYS.map((key) => [key, process.env[key]]));
   for (const key of SELF_HEAL_ENV_KEYS) {
     delete process.env[key];
   }
-  await rm(ARTIFACTS_DIR, { recursive: true, force: true });
+  artifactScope = await createPlaywrightSelfHealingArtifactScope(testInfo, {
+    prefix: 'guarded-self-healing',
+  });
 });
 
 test.afterEach(async () => {
-  for (const key of SELF_HEAL_ENV_KEYS) {
-    const value = previousEnv.get(key);
-    if (value === undefined) {
-      delete process.env[key];
-    } else {
-      process.env[key] = value;
+  if (previousEnv !== undefined) {
+    for (const key of SELF_HEAL_ENV_KEYS) {
+      const value = previousEnv.get(key);
+      if (value === undefined) {
+        delete process.env[key];
+      } else {
+        process.env[key] = value;
+      }
     }
   }
   resetTelemetryForTests();
-  await rm(ARTIFACTS_DIR, { recursive: true, force: true });
+  artifactScope = undefined;
+  previousEnv = undefined;
 });
 
 test('guarded self-heal auto-applies registry candidate at default 0.92', async ({ page }) => {
   const telemetry = new CapturingTelemetry();
   setTelemetryForTests(telemetry);
-  const env = createGuardedEnv('default-gate');
+  const scope = currentArtifactScope();
+  const env = createGuardedEnv(scope);
   expect(env.SELF_HEAL_MIN_CONFIDENCE).toBeUndefined();
   const acceptedLocator = "page.getByTestId('guarded-submit')";
 
@@ -220,7 +224,7 @@ test('guarded self-heal auto-applies registry candidate at default 0.92', async 
   });
 
   await expect(page.locator('#guarded-status')).toHaveText('Guarded order submitted');
-  const artifact = await readArtifactFor(env);
+  const artifact = await readArtifactFor(scope);
 
   expect(artifact.minConfidence).toBe(DEFAULT_SELF_HEAL_MIN_CONFIDENCE);
   expect(artifact.guardedValidation?.acceptedLocator).toBe(acceptedLocator);
@@ -249,7 +253,8 @@ test('guarded self-heal auto-applies registry candidate at default 0.92', async 
 });
 
 test('guarded self-heal rejects fresh DOM candidates at default 0.92', async ({ page }) => {
-  const env = createGuardedEnv('fresh-dom-rejected');
+  const scope = currentArtifactScope();
+  const env = createGuardedEnv(scope);
   applyGuardedEnv(env);
   const pageObject = new FixtureSelfHealingPage(page);
   await pageObject.openFixture();
@@ -262,7 +267,7 @@ test('guarded self-heal rejects fresh DOM candidates at default 0.92', async ({ 
   ).rejects.toThrow('Error clicking on selector #legacy-guarded-submit');
   await expect(page.locator('#guarded-status')).toHaveText('Waiting for guarded action');
 
-  const artifact = await readArtifactFor(env);
+  const artifact = await readArtifactFor(scope);
   expect(artifact.minConfidence).toBe(DEFAULT_SELF_HEAL_MIN_CONFIDENCE);
   expect(artifact.guardedValidation?.acceptedLocator).toBeUndefined();
   expect(
@@ -276,7 +281,7 @@ test('guarded self-heal rejects fresh DOM candidates at default 0.92', async ({ 
 });
 
 test('guarded self-heal recovers dynamic re-render fixture by effect', async ({ page }) => {
-  const env = createGuardedEnv('dynamic-rerender');
+  const env = createGuardedEnv(currentArtifactScope());
   applyGuardedEnv(env);
   const pageObject = new FixtureSelfHealingPage(
     page,
@@ -300,7 +305,7 @@ test('guarded self-heal recovers dynamic re-render fixture by effect', async ({ 
 });
 
 test('guarded self-heal recovers open shadow DOM fixture by effect', async ({ page }) => {
-  const env = createGuardedEnv('shadow-dom');
+  const env = createGuardedEnv(currentArtifactScope());
   await runGuardedClick({
     env,
     page,
@@ -324,7 +329,7 @@ test('guarded self-heal recovers open shadow DOM fixture by effect', async ({ pa
 // Kept as a fixme so the gap is visible and re-enabled when frame-aware
 // candidates land — not deleted, and not patched in src under this test-only scope.
 test.fixme('guarded self-heal recovers same-origin iframe fixture by effect', async ({ page }) => {
-  const env = createGuardedEnv('iframe');
+  const env = createGuardedEnv(currentArtifactScope());
   await runGuardedClick({
     env,
     page,

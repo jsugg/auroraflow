@@ -1,7 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-import { readFile, readdir, rm } from 'node:fs/promises';
-import path from 'node:path';
 import { PageObjectBase } from '../../../../src/pageObjects/pageObjectBase';
+import {
+  SELF_HEALING_ARTIFACT_ENV_KEYS,
+  applySelfHealingArtifactScopeEnv,
+  createPlaywrightSelfHealingArtifactScope,
+  readSelfHealingArtifactFor,
+} from '../../../helpers/selfHealingArtifacts';
 
 class SelfHealingSatFixturePage extends PageObjectBase {
   constructor(page: Page) {
@@ -9,10 +13,8 @@ class SelfHealingSatFixturePage extends PageObjectBase {
   }
 }
 
-const ARTIFACTS_DIR = path.join(process.cwd(), 'test-results', 'self-healing');
 const ENV_KEYS = [
-  'AURORAFLOW_RUN_ID',
-  'AURORAFLOW_TEST_ID',
+  ...SELF_HEALING_ARTIFACT_ENV_KEYS,
   'SELF_HEAL_MODE',
   'SELF_HEAL_MIN_CONFIDENCE',
   'SELF_HEAL_SAT_ENABLED',
@@ -37,12 +39,15 @@ function restoreEnv(values: ReadonlyMap<(typeof ENV_KEYS)[number], string | unde
   }
 }
 
-test('self-healing SAT enriches a deterministic failed page-object action', async ({ page }) => {
+test('self-healing SAT enriches a deterministic failed page-object action', async ({
+  page,
+}, testInfo) => {
   const previousEnv = captureEnv();
+  const artifactScope = await createPlaywrightSelfHealingArtifactScope(testInfo, {
+    prefix: 'self-healing-sat',
+  });
   try {
-    await rm(ARTIFACTS_DIR, { recursive: true, force: true });
-    process.env.AURORAFLOW_RUN_ID = 'sat-e2e-run';
-    process.env.AURORAFLOW_TEST_ID = 'sat-e2e-test';
+    applySelfHealingArtifactScopeEnv(artifactScope);
     process.env.SELF_HEAL_MODE = 'suggest';
     process.env.SELF_HEAL_MIN_CONFIDENCE = '0.9';
     process.env.SELF_HEAL_SAT_ENABLED = 'true';
@@ -66,9 +71,9 @@ test('self-healing SAT enriches a deterministic failed page-object action', asyn
       'Error clicking on selector #missing-submit',
     );
 
-    const artifacts = await readdir(ARTIFACTS_DIR);
-    expect(artifacts).toHaveLength(1);
-    const artifact = JSON.parse(await readFile(path.join(ARTIFACTS_DIR, artifacts[0]), 'utf8')) as {
+    const artifact = await readSelfHealingArtifactFor<{
+      runId?: string;
+      testId?: string;
       sat?: {
         enabled: boolean;
         snapshot?: {
@@ -83,7 +88,7 @@ test('self-healing SAT enriches a deterministic failed page-object action', asyn
           };
         }>;
       };
-    };
+    }>(artifactScope);
 
     expect(artifact.sat).toBeDefined();
     expect(artifact.sat?.enabled).toBe(true);
@@ -105,6 +110,5 @@ test('self-healing SAT enriches a deterministic failed page-object action', asyn
     );
   } finally {
     restoreEnv(previousEnv);
-    await rm(ARTIFACTS_DIR, { recursive: true, force: true });
   }
 });
