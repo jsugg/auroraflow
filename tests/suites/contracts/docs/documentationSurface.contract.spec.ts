@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { expectTextExcludes, expectTextIncludes } from '../../../helpers/contractAssertions';
 
 function readRepoFile(relativePath: string): string {
   return readFileSync(path.join(process.cwd(), relativePath), 'utf8');
@@ -65,11 +66,22 @@ describe('documentation surface contract', () => {
       'Trends',
       'Audit records',
     ]) {
-      expect(privacy).toContain(dataClass);
+      expectTextIncludes(privacy, {
+        text: dataClass,
+        rationale: 'Privacy guide must enumerate public data classes for retention decisions.',
+      });
     }
-    expect(privacy).toContain('AURORAFLOW_ARTIFACT_PRIVACY_PRESET');
-    expect(privacy).toContain('consumer-owned');
-    expect(privacy).toContain('does not claim support for regulated PII');
+    for (const text of [
+      'AURORAFLOW_ARTIFACT_PRIVACY_PRESET',
+      'consumer-owned',
+      'does not claim support for regulated PII',
+    ]) {
+      expectTextIncludes(privacy, {
+        text,
+        rationale:
+          'Privacy guide must preserve safety boundary and consumer-owned retention wording.',
+      });
+    }
   });
 
   it('documents lifecycle and fixture contract without claiming Phase 2 implementation', () => {
@@ -91,12 +103,25 @@ describe('documentation surface contract', () => {
       'Playwright `Page`, `BrowserContext`, and `Browser` objects are never closed',
       'no process-exit hooks',
     ]) {
-      expect(docs).toContain(requiredTerm);
+      expectTextIncludes(docs, {
+        text: requiredTerm,
+        rationale: 'Lifecycle docs must preserve planned public lifecycle API contract.',
+      });
     }
 
-    expect(lifecycle).toContain('design contract for `AUR-IMPL-013`');
-    expect(lifecycle).toContain('implementation remains a Phase 2 task');
-    expect(development).toContain('labeled as planned until `AUR-IMPL-023`');
+    for (const text of [
+      'design contract for `AUR-IMPL-013`',
+      'implementation remains a Phase 2 task',
+    ]) {
+      expectTextIncludes(lifecycle, {
+        text,
+        rationale: 'Lifecycle docs must not imply Phase 2 runtime implementation has shipped.',
+      });
+    }
+    expectTextIncludes(development, {
+      text: 'labeled as planned until `AUR-IMPL-023`',
+      rationale: 'Development docs must label lifecycle fixture surface as planned.',
+    });
   });
 
   it('keeps current maturity claims aligned with implemented promotion workflows', () => {
@@ -109,14 +134,26 @@ describe('documentation surface contract', () => {
       .map(readRepoFile)
       .join('\n');
 
-    expect(docs).toContain('reviewable pending promotion records');
-    expect(docs).toContain('approve, reject, conflict, and rollback workflows');
-    expect(docs).toContain('source-code rewrites remain out of scope');
-    expect(docs).not.toContain('not active persistence workflows');
-    expect(docs).not.toContain('SAT history and promotion logic are not wired to Redis yet');
-    expect(docs).not.toContain(
+    for (const text of [
+      'reviewable pending promotion records',
+      'approve, reject, conflict, and rollback workflows',
+      'source-code rewrites remain out of scope',
+    ]) {
+      expectTextIncludes(docs, {
+        text,
+        rationale: 'Self-healing docs must reflect implemented promotion workflow maturity.',
+      });
+    }
+    for (const text of [
+      'not active persistence workflows',
+      'SAT history and promotion logic are not wired to Redis yet',
       'reviewed approval/rejection/rollback flows and source-code rewrites remain out of scope',
-    );
+    ]) {
+      expectTextExcludes(docs, {
+        text,
+        rationale: 'Self-healing docs must not preserve stale pre-promotion maturity wording.',
+      });
+    }
   });
 
   it('documents lightweight contribution governance and advisory ownership', () => {
@@ -134,11 +171,20 @@ describe('documentation surface contract', () => {
       .map(readRepoFile)
       .join('\n');
 
-    expect(contributing).toContain('lightweight');
-    expect(contributing).toContain('advisory CODEOWNERS');
-    expect(contributing).toContain('Confirm or replace owner handles');
-    expect(parseCodeowners(codeowners).get('*')).toContain('@jsugg');
-    expect(adrIndex).toContain('ADR 0001');
+    for (const text of ['lightweight', 'advisory CODEOWNERS', 'Confirm or replace owner handles']) {
+      expectTextIncludes(contributing, {
+        text,
+        rationale: 'Contribution docs must preserve lightweight advisory governance wording.',
+      });
+    }
+    expect(
+      parseCodeowners(codeowners).get('*'),
+      'CODEOWNERS must keep documented advisory ownership route until maintainers confirm replacement.',
+    ).toEqual(['@jsugg']);
+    expectTextIncludes(adrIndex, {
+      text: 'ADR 0001',
+      rationale: 'ADR index must expose accepted architecture decision records.',
+    });
 
     for (const topic of [
       'Safety-first self-healing',
@@ -148,7 +194,10 @@ describe('documentation surface contract', () => {
       'Observability boundary',
       'Release policy',
     ]) {
-      expect(adrDocs).toContain(topic);
+      expectTextIncludes(adrDocs, {
+        text: topic,
+        rationale: 'ADR docs must preserve accepted decision topics.',
+      });
     }
 
     for (const issueId of [
@@ -158,7 +207,10 @@ describe('documentation surface contract', () => {
       'AUR-ARCH-040',
       'AUR-ARCH-041',
     ]) {
-      expect(adrDocs).toContain(issueId);
+      expectTextIncludes(adrDocs, {
+        text: issueId,
+        rationale: 'ADR docs must preserve architecture issue traceability.',
+      });
     }
   });
 });

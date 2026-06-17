@@ -1,12 +1,12 @@
-import { readFileSync } from 'node:fs';
-import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { expectInvariant } from '../../../helpers/contractAssertions';
+import { getWorkflowJob, getWorkflowStep, readWorkflowModel } from '../../../helpers/workflowModel';
 
-const CI_WORKFLOW_PATH = path.join(process.cwd(), '.github/workflows/ci.yml');
-const ciWorkflow = readFileSync(CI_WORKFLOW_PATH, 'utf8');
+const ciWorkflow = readWorkflowModel('.github/workflows/ci.yml');
 
 describe('ci.yml browser provisioning contract', () => {
   it('defines install_args for each E2E matrix project', () => {
+    const e2eJob = getWorkflowJob(ciWorkflow, 'e2e');
     const expectedProjectMappings = [
       { project: 'Google Chrome', installArgs: 'chrome' },
       { project: 'Firefox', installArgs: 'firefox' },
@@ -16,30 +16,42 @@ describe('ci.yml browser provisioning contract', () => {
       { project: 'Mobile Safari', installArgs: 'webkit' },
     ];
 
-    for (const mapping of expectedProjectMappings) {
-      const mappingRegex = new RegExp(
-        `- project: ${mapping.project.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\n\\s+install_args: ${mapping.installArgs}`,
-        'm',
-      );
-      expect(ciWorkflow).toMatch(mappingRegex);
-    }
+    expect(
+      e2eJob.strategy?.include.map((entry) => ({
+        project: entry.get('project'),
+        installArgs: entry.get('install_args'),
+      })),
+      'E2E matrix must map every browser project to matching Playwright install arguments.',
+    ).toEqual(expectedProjectMappings);
   });
 
   it('uses a browser cache key scoped by install_args', () => {
-    expect(ciWorkflow).toContain(
-      "key: ${{ runner.os }}-playwright-${{ matrix.install_args }}-${{ hashFiles('package-lock.json') }}",
+    const cacheStep = getWorkflowStep(
+      getWorkflowJob(ciWorkflow, 'e2e'),
+      'Cache Playwright browsers',
+    );
+
+    expect(
+      cacheStep.with.get('key'),
+      'Browser cache key must be partitioned by matrix.install_args to avoid cross-browser reuse.',
+    ).toBe(
+      "${{ runner.os }}-playwright-${{ matrix.install_args }}-${{ hashFiles('package-lock.json') }}",
     );
   });
 
   it('always installs the required browser even when cache is restored', () => {
-    const installStep = ciWorkflow.match(
-      /- name: Ensure required Playwright browser is installed[\s\S]*?(?=\n\s+- name:|\n$)/,
+    const installStep = getWorkflowStep(
+      getWorkflowJob(ciWorkflow, 'e2e'),
+      'Ensure required Playwright browser is installed',
     );
 
-    expect(installStep).not.toBeNull();
-    expect(installStep?.[0]).not.toMatch(/\n\s+if:/);
-    expect(installStep?.[0]).toContain(
-      'run: npx playwright install --with-deps ${{ matrix.install_args }}',
+    expectInvariant(
+      installStep.if === undefined,
+      'Browser install step must not be cache-gated; restored caches can still miss executables.',
     );
+    expect(
+      installStep.run,
+      'Browser install step must install the matrix-selected browser explicitly.',
+    ).toBe('npx playwright install --with-deps ${{ matrix.install_args }}');
   });
 });

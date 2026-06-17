@@ -66,7 +66,7 @@ Redis keys are namespaced and selector updates use versioned compare-and-set for
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `SELF_HEAL_ARTIFACTS_DIR` | `test-results/self-healing` | Input artifact directory. |
+| `SELF_HEAL_ARTIFACTS_DIR` | `test-results/self-healing` | Self-healing artifact output directory and governance input directory. |
 | `SELF_HEAL_REQUIRE_ACK_FOR_ACCEPTED` | `true` | Fails governance when guarded accepted candidates need review. |
 | `SELF_HEAL_ACKNOWLEDGED` | `false` | Acknowledges accepted candidates after review. |
 | `SELF_HEAL_GOVERNANCE_SUMMARY_JSON` | `test-results/self-healing-governance-summary.json` | JSON summary path. |

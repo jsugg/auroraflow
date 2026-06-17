@@ -23,6 +23,8 @@ import { getTelemetry } from '../observability/telemetry';
 import { DEFAULT_ARTIFACT_PRIVACY_POLICY, type ArtifactPrivacyPolicy } from './artifactPrivacy';
 
 export type FailureArtifactWriter = (event: CapturedFailureEvent) => Promise<void>;
+export const DEFAULT_SELF_HEALING_ARTIFACTS_DIR = path.join('test-results', 'self-healing');
+export const SELF_HEAL_ARTIFACTS_DIR_ENV = 'SELF_HEAL_ARTIFACTS_DIR';
 
 export interface CaptureFailureEventInput {
   config: SelfHealingConfig;
@@ -68,13 +70,19 @@ function buildEventId(now: Date, randomSuffix: string): string {
 }
 
 export function createFileFailureArtifactWriter(
-  outputDirectory: string = path.join('test-results', 'self-healing'),
+  outputDirectory: string = DEFAULT_SELF_HEALING_ARTIFACTS_DIR,
 ): FailureArtifactWriter {
   return async (event: CapturedFailureEvent): Promise<void> => {
     await mkdir(outputDirectory, { recursive: true });
     const filePath = path.join(outputDirectory, `${event.eventId}.json`);
     await writeFile(filePath, `${JSON.stringify(event, null, 2)}\n`, 'utf8');
   };
+}
+
+export function resolveFailureArtifactOutputDirectory(
+  env: Readonly<Record<string, string | undefined>> = process.env,
+): string {
+  return env[SELF_HEAL_ARTIFACTS_DIR_ENV]?.trim() || DEFAULT_SELF_HEALING_ARTIFACTS_DIR;
 }
 
 export async function captureFailureEvent({
@@ -86,7 +94,7 @@ export async function captureFailureEvent({
   screenshotPath,
   privacyPolicy = DEFAULT_ARTIFACT_PRIVACY_POLICY,
   suggestions: inputSuggestions,
-  writer = createFileFailureArtifactWriter(),
+  writer,
   decorateEvent,
   correlation,
   env = process.env,
@@ -105,6 +113,8 @@ export async function captureFailureEvent({
     env,
   });
   const telemetry = getTelemetry();
+  const artifactWriter =
+    writer ?? createFileFailureArtifactWriter(resolveFailureArtifactOutputDirectory(env));
 
   return telemetry.runSpan({
     name: SPAN_NAMES.selfHealingCapture,
@@ -151,7 +161,7 @@ export async function captureFailureEvent({
         await decorateEvent(event);
       }
 
-      await writer(event);
+      await artifactWriter(event);
       span.setAttribute('auroraflow.self_heal.suggestion_count', suggestions.length);
       span.setAttribute('auroraflow.self_heal.artifact_written', true);
       telemetry.recordCounter(

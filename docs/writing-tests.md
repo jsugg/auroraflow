@@ -125,4 +125,4 @@ npm run slo:alerts -- --dashboard-json test-results/slo-dashboard.json \
 
 Add `--trend-output` when you want bounded JSONL history across runs.
 
-Run `npm run test:coverage` to enforce focused thresholds for critical self-healing, privacy, history, and trend modules. Thresholds live in `vitest.config.mts`; raise them only with corresponding tests, and do not weaken them to hide regressions.
+Run `npm run test:coverage` to enforce both critical-module thresholds and global `src/**` coverage. Critical thresholds cover self-healing, privacy, guarded validation, promotion/history, and trend modules; global coverage lives in `configs/vitest.coverage-global.mts`. Future risk-weighted floors should add targeted thresholds for high-risk modules instead of weakening existing critical or global gates.

@@ -3,11 +3,53 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 import { spawnSync } from 'node:child_process';
 import { describe, expect, it } from 'vitest';
+import {
+  expectTextExcludes,
+  expectTextIncludes,
+  expectInvariant,
+} from '../../../helpers/contractAssertions';
+import { getWorkflowJob, getWorkflowStep, readWorkflowModel } from '../../../helpers/workflowModel';
 
 const REPO_ROOT = process.cwd();
 
 function read(relativePath: string): string {
   return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
+}
+
+function parseMakeTargets(makefile: string): Set<string> {
+  const targets = new Set<string>();
+  for (const match of makefile.matchAll(/^([A-Za-z0-9_-]+):/gm)) {
+    if (match[1] !== undefined) {
+      targets.add(match[1]);
+    }
+  }
+  return targets;
+}
+
+function parseShellAssignments(script: string): ReadonlyMap<string, string> {
+  const assignments = new Map<string, string>();
+  for (const match of script.matchAll(/^([A-Z0-9_]+)="([^"]*)"$/gm)) {
+    const key = match[1];
+    const value = match[2];
+    if (key !== undefined && value !== undefined) {
+      assignments.set(key, value);
+    }
+  }
+  return assignments;
+}
+
+function extractSingleMatch(source: string, pattern: RegExp, invariant: string): string {
+  pattern.lastIndex = 0;
+  const match = pattern.exec(source);
+  const value = match?.[1];
+  expectInvariant(value !== undefined, invariant);
+  return value ?? '';
+}
+
+function extractPlaywrightTestTitles(source: string): readonly string[] {
+  return [...source.matchAll(/test\('([^']+)'/gu)].flatMap((match) =>
+    match[1] === undefined ? [] : [match[1]],
+  );
 }
 
 describe('smoke selection contract', () => {
@@ -16,9 +58,9 @@ describe('smoke selection contract', () => {
       scripts?: Record<string, string>;
     };
 
-    expect(packageJson.scripts?.['test:smoke']).toContain('--grep @smoke');
-    expect(packageJson.scripts?.['test:smoke']).toContain('--timeout=60000');
-    expect(packageJson.scripts?.['test:smoke']).toContain('--workers=1');
+    expect(packageJson.scripts?.['test:smoke']).toBe(
+      "npx playwright test --config=configs/playwright.config.ts --project='Google Chrome' --grep @smoke --timeout=60000 --workers=1",
+    );
   });
 
   it('bootstraps pinned repo-local actionlint for local and CI workflow linting', () => {
@@ -27,21 +69,36 @@ describe('smoke selection contract', () => {
     };
     const workflowLintScript = read('scripts/workflows-lint.mjs');
     const actionlintInstaller = read('scripts/install-actionlint.sh');
-    const qualityWorkflow = read('.github/workflows/quality.yml');
-    const makefile = read('Makefile');
+    const installerAssignments = parseShellAssignments(actionlintInstaller);
+    const qualityWorkflow = readWorkflowModel('.github/workflows/quality.yml');
+    const makeTargets = parseMakeTargets(read('Makefile'));
 
-    expect(packageJson.scripts?.['tools:actionlint']).toContain('scripts/install-actionlint.sh');
-    expect(packageJson.scripts?.['verify:tools']).toContain('tools:actionlint');
-    expect(packageJson.scripts?.['workflows:lint']).toContain('tools:actionlint');
-    expect(packageJson.scripts?.verify).toContain('verify:tools');
-    expect(workflowLintScript).toContain('.tools/bin/actionlint');
-    expect(actionlintInstaller).toContain('ACTIONLINT_VERSION="1.7.11"');
-    expect(actionlintInstaller).toContain(
-      '900919a84f2229bac68ca9cd4103ea297abc35e9689ebb842c6e34a3d1b01b0a',
+    expect(packageJson.scripts?.['tools:actionlint']).toBe('bash scripts/install-actionlint.sh');
+    expect(packageJson.scripts?.['verify:tools']).toBe('npm run tools:actionlint');
+    expect(packageJson.scripts?.['workflows:lint']).toBe(
+      'npm run tools:actionlint --silent && node scripts/workflows-lint.mjs',
     );
-    expect(qualityWorkflow).toContain('npm run tools:actionlint');
-    expect(makefile).toContain('tools:');
-    expect(makefile).toContain('observability-smoke:');
+    expect(packageJson.scripts?.verify?.split(/\s+&&\s+/)[0]).toBe('npm run verify:tools');
+    expect(
+      extractSingleMatch(
+        workflowLintScript,
+        /const REPO_LOCAL_ACTIONLINT = path\.resolve\('([^']+)'\);/u,
+        'Workflow linter must prefer pinned repo-local actionlint binary.',
+      ),
+    ).toBe('.tools/bin/actionlint');
+    expect(installerAssignments.get('ACTIONLINT_VERSION')).toBe('1.7.11');
+    expect(
+      extractSingleMatch(
+        actionlintInstaller,
+        /actionlint_1\.7\.11_linux_amd64\.tar\.gz\) expected_sha256="([a-f0-9]{64})"/u,
+        'Actionlint bootstrap must verify reviewed Linux amd64 binary checksum.',
+      ),
+    ).toBe('900919a84f2229bac68ca9cd4103ea297abc35e9689ebb842c6e34a3d1b01b0a');
+    expect(
+      getWorkflowStep(getWorkflowJob(qualityWorkflow, 'repository-gates'), 'Install actionlint')
+        .run,
+    ).toBe('npm run tools:actionlint');
+    expect([...makeTargets]).toEqual(expect.arrayContaining(['tools', 'observability-smoke']));
   });
 
   it('reports actionable native actionlint setup when fallback is disabled', () => {
@@ -64,13 +121,22 @@ describe('smoke selection contract', () => {
       const output = `${result.stdout}\n${result.stderr}`;
 
       expect(result.status).toBe(1);
-      expect(result.stderr).toContain('Native actionlint was not found.');
-      expect(result.stderr).toContain('npm run tools:actionlint');
-      expect(output).not.toContain('RuntimeError: unreachable');
+      expectTextIncludes(result.stderr, {
+        text: 'Native actionlint was not found.',
+        rationale: 'Workflow lint fallback error must explain missing native actionlint.',
+      });
+      expectTextIncludes(result.stderr, {
+        text: 'npm run tools:actionlint',
+        rationale: 'Workflow lint fallback error must give actionable bootstrap command.',
+      });
+      expectTextExcludes(output, {
+        text: 'RuntimeError: unreachable',
+        rationale: 'Workflow lint fallback must not expose WASM runtime panic to maintainers.',
+      });
     } finally {
       rmSync(tempRepo, { recursive: true, force: true });
     }
-  });
+  }, 20_000);
 
   it('keeps deterministic example e2e tests tagged for smoke runs', () => {
     const exampleSpecs = [
@@ -82,7 +148,10 @@ describe('smoke selection contract', () => {
     ] as const;
 
     for (const spec of exampleSpecs) {
-      expect(read(spec)).toMatch(/test\('@smoke\s+/);
+      expect(
+        extractPlaywrightTestTitles(read(spec)).every((title) => title.startsWith('@smoke ')),
+        `${spec} must keep deterministic examples discoverable by smoke grep.`,
+      ).toBe(true);
     }
   });
 
@@ -90,16 +159,31 @@ describe('smoke selection contract', () => {
     const accessibilitySpec = read('tests/suites/e2e/examples/accessibility.spec.ts');
     const accessibilityAssertions = read('tests/suites/e2e/examples/accessibilityAssertions.ts');
 
-    expect(accessibilitySpec).toContain('expectNoAccessibilityViolations(page)');
-    expect(accessibilitySpec).toContain(
-      '@smoke quickstart fixture has no detectable accessibility',
-    );
-    expect(accessibilitySpec).toContain(
-      '@smoke reliability fixture has no detectable accessibility',
-    );
-    expect(accessibilityAssertions).toContain('@axe-core/playwright');
-    expect(accessibilityAssertions).toContain(".include('main')");
-    expect(read('examples/reliability/fixtures/reliability-app.html')).toContain('<main>');
+    expect(extractPlaywrightTestTitles(accessibilitySpec)).toEqual([
+      '@smoke quickstart fixture has no detectable accessibility violations',
+      '@smoke reliability fixture has no detectable accessibility violations',
+    ]);
+    expect([
+      ...accessibilitySpec.matchAll(/expectNoAccessibilityViolations\(page\)/gu),
+    ]).toHaveLength(2);
+    expect(
+      extractSingleMatch(
+        accessibilityAssertions,
+        /import AxeBuilder from '([^']+)';/u,
+        'Accessibility helper must use Playwright axe integration.',
+      ),
+    ).toBe('@axe-core/playwright');
+    expect(
+      extractSingleMatch(
+        accessibilityAssertions,
+        /\.include\('([^']+)'\)/u,
+        'Accessibility helper must scope scans to main landmark.',
+      ),
+    ).toBe('main');
+    expect(
+      read('examples/reliability/fixtures/reliability-app.html').includes('<main>'),
+      'Reliability fixture must expose main landmark for scoped accessibility checks.',
+    ).toBe(true);
   });
 
   it('keeps example coverage fixture-backed instead of live external-site backed', () => {
@@ -110,8 +194,17 @@ describe('smoke selection contract', () => {
     );
 
     expect(existsSync(legacyExternalSpecPath)).toBe(false);
-    expect(examplePageSpec).toContain('deterministic demo fixture');
-    expect(examplePageSpec).not.toContain('@external');
-    expect(examplePageSpec).not.toContain('playonsports.com');
+    expectTextIncludes(examplePageSpec, {
+      text: 'deterministic demo fixture',
+      rationale: 'Example page smoke coverage must use deterministic local fixture.',
+    });
+    expectTextExcludes(examplePageSpec, {
+      text: '@external',
+      rationale: 'Example page smoke coverage must not depend on external-site tests.',
+    });
+    expectTextExcludes(examplePageSpec, {
+      text: 'playonsports.com',
+      rationale: 'Example page smoke coverage must not hit legacy external domain.',
+    });
   });
 });

@@ -18,7 +18,7 @@ env:
 
 jobs:
   verify:
-    name: Verify (Node ${{ matrix.node-version }})
+    name: Node Compatibility (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
     strategy:
@@ -35,9 +35,28 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Run verification contract
+      - name: Run Node compatibility gates
+        run: npm run lint && npm run typecheck && npm test
+
+  repository-gates:
+    name: Repository Gates (Node 22)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - name: Setup Node.js
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install dependencies
+        run: npm ci
+      - name: Run repository gates
+        env:
+          AURORAFLOW_REDIS_INTEGRATION_REQUIRED: 'true'
         run: npm run verify
-      - name: Upload verify artifacts
+      - name: Upload repository gate artifacts
         if: always()
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:

@@ -1,10 +1,18 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { getWorkflowJob, getWorkflowStep, readWorkflowModel } from '../../../helpers/workflowModel';
+import {
+  expectEveryTextMatches,
+  expectInvariant,
+  expectTextIncludes,
+} from '../../../helpers/contractAssertions';
+import {
+  getWorkflowActionReferences,
+  getWorkflowJob,
+  getWorkflowStep,
+  readWorkflowModel,
+} from '../../../helpers/workflowModel';
 
-const RELEASE_WORKFLOW_PATH = path.join(process.cwd(), '.github/workflows/release.yml');
-const releaseWorkflow = readFileSync(RELEASE_WORKFLOW_PATH, 'utf8');
 const releaseWorkflowModel = readWorkflowModel('.github/workflows/release.yml');
 
 const RELEASE_PROCESS_DOC_PATH = path.join(process.cwd(), 'docs/operations/release-process.md');
@@ -12,11 +20,10 @@ const releaseProcessDoc = readFileSync(RELEASE_PROCESS_DOC_PATH, 'utf8');
 
 describe('release dry-run workflow contract', () => {
   it('triggers only on manual workflow_dispatch', () => {
-    expect(releaseWorkflow).toMatch(/\non:\n {2}workflow_dispatch:\n/);
-    expect(releaseWorkflow).not.toMatch(/\n\s+push:/);
-    expect(releaseWorkflow).not.toMatch(/\n\s+pull_request:/);
-    expect(releaseWorkflow).not.toMatch(/\n\s+schedule:/);
-    expect(releaseWorkflow).not.toMatch(/\n\s+release:\n/);
+    expect(
+      [...releaseWorkflowModel.triggers],
+      'Release dry-run workflow must only run after explicit maintainer dispatch.',
+    ).toEqual(['workflow_dispatch']);
   });
 
   it('declares least-privilege read-only permissions at workflow and job level', () => {
@@ -27,23 +34,44 @@ describe('release dry-run workflow contract', () => {
     expect(getWorkflowJob(releaseWorkflowModel, 'publish-gate').permissions.get('contents')).toBe(
       'read',
     );
-    expect(releaseWorkflow).not.toMatch(/^\s*[\w-]+:\s*write\s*$/m);
+    expectInvariant(
+      [
+        releaseWorkflowModel.permissions,
+        ...[...releaseWorkflowModel.jobs.values()].map((job) => job.permissions),
+      ].every((permissions) => ![...permissions.values()].includes('write')),
+      'Release dry-run workflow must not grant write permissions until publish path is implemented.',
+    );
   });
 
   it('never invokes npm publish and keeps packaging in dry-run mode', () => {
-    expect(releaseWorkflow).not.toContain('npm publish');
-    expect(releaseWorkflow).toContain('npm run pack:dry-run');
-    expect(releaseWorkflow).toContain('npm pack --dry-run --json');
+    const releaseJob = getWorkflowJob(releaseWorkflowModel, 'release-dry-run');
+    const runCommands = releaseJob.steps.flatMap((step) =>
+      step.run === undefined ? [] : [step.run],
+    );
+
+    expectInvariant(
+      runCommands.every((runCommand) => !runCommand.includes('npm publish')),
+      'Release dry-run workflow must not publish packages.',
+    );
+    const dryRunPackCommand = getWorkflowStep(releaseJob, 'Dry-run package tarball').run ?? '';
+    expectInvariant(
+      dryRunPackCommand.includes('npm run pack:dry-run'),
+      'Release workflow must keep npm package generation in dry-run mode.',
+    );
+    expectInvariant(
+      dryRunPackCommand.includes('npm pack --dry-run --json'),
+      'Release workflow must emit dry-run pack evidence without publishing.',
+    );
   });
 
   it('pins every action to an immutable SHA and disables credential persistence', () => {
-    const usesEntries = (releaseWorkflow.match(/uses:\s+\S+/g) ?? []).filter(
-      (usesEntry) => !usesEntry.startsWith('uses: ./'),
+    expectEveryTextMatches(
+      getWorkflowActionReferences(releaseWorkflowModel).filter(
+        (reference) => !reference.startsWith('./'),
+      ),
+      /^[^@]+@[a-f0-9]{40}$/,
+      'Release dry-run workflow must pin every external action to an immutable SHA.',
     );
-    expect(usesEntries.length).toBeGreaterThan(0);
-    for (const usesEntry of usesEntries) {
-      expect(usesEntry).toMatch(/@[a-f0-9]{40}$/);
-    }
     expect(
       getWorkflowStep(getWorkflowJob(releaseWorkflowModel, 'release-dry-run'), 'Checkout').with.get(
         'persist-credentials',
@@ -55,24 +83,31 @@ describe('release dry-run workflow contract', () => {
     const releaseJob = getWorkflowJob(releaseWorkflowModel, 'release-dry-run');
 
     expect(getWorkflowStep(releaseJob, 'Run quality gates').run).toBe('npm run verify');
-    expect(getWorkflowStep(releaseJob, 'Validate artifact schemas').run).toContain(
-      'npm run schemas:check 2>&1 | tee release-evidence/schema-validation.txt',
+    expectInvariant(
+      (getWorkflowStep(releaseJob, 'Validate artifact schemas').run ?? '').includes(
+        'npm run schemas:check 2>&1 | tee release-evidence/schema-validation.txt',
+      ),
+      'Release dry-run evidence must tee schema validation output into the evidence bundle.',
     );
     expect(getWorkflowStep(releaseJob, 'Build package').run).toBe('npm run build');
-    expect(getWorkflowStep(releaseJob, 'Dry-run package tarball').run).toContain(
-      'npm run pack:dry-run',
+    const sbomCommand =
+      getWorkflowStep(releaseJob, 'Generate SBOMs (runtime dependencies)').run ?? '';
+    expectInvariant(
+      sbomCommand.includes('npm sbom --omit dev --sbom-format spdx') &&
+        sbomCommand.includes('npm sbom --omit dev --sbom-format cyclonedx'),
+      'Release dry-run evidence must include SPDX and CycloneDX runtime SBOMs.',
     );
-    expect(getWorkflowStep(releaseJob, 'Generate SBOMs (runtime dependencies)').run).toContain(
-      'npm sbom --omit dev --sbom-format spdx',
+    expectInvariant(
+      (getWorkflowStep(releaseJob, 'Check npm provenance readiness').run ?? '').includes(
+        'release-evidence/provenance-readiness.txt',
+      ),
+      'Release dry-run evidence must record npm provenance readiness checks.',
     );
-    expect(getWorkflowStep(releaseJob, 'Generate SBOMs (runtime dependencies)').run).toContain(
-      'npm sbom --omit dev --sbom-format cyclonedx',
-    );
-    expect(getWorkflowStep(releaseJob, 'Check npm provenance readiness').run).toContain(
-      'release-evidence/provenance-readiness.txt',
-    );
-    expect(getWorkflowStep(releaseJob, 'Draft changelog from Conventional Commits').run).toContain(
-      'release-evidence/changelog-draft.md',
+    expectInvariant(
+      (getWorkflowStep(releaseJob, 'Draft changelog from Conventional Commits').run ?? '').includes(
+        'release-evidence/changelog-draft.md',
+      ),
+      'Release dry-run evidence must include a Conventional Commits changelog draft.',
     );
     expect(getWorkflowStep(releaseJob, 'Upload release evidence').with.get('name')).toBe(
       'release-dry-run-evidence',
@@ -84,7 +119,9 @@ describe('release dry-run workflow contract', () => {
 
     expect(publishGate.if).toBe("inputs.publish_confirmation != ''");
     expect(publishGate.environment).toBe('release');
-    expect(getWorkflowStep(publishGate, 'Refuse to publish').run).toContain('exit 1');
+    expect(getWorkflowStep(publishGate, 'Refuse to publish').run?.split('\n').at(-1)).toBe(
+      'exit 1',
+    );
   });
 });
 
@@ -104,13 +141,19 @@ describe('release process documentation contract', () => {
       'workflow_dispatch',
     ];
     for (const term of requiredPolicyTerms) {
-      expect(releaseProcessDoc).toContain(term);
+      expectTextIncludes(releaseProcessDoc, {
+        text: term,
+        rationale: 'Release process doc must preserve public release-safety policy wording.',
+      });
     }
   });
 
   it('states that publishing is disabled and gated by the protected release environment', () => {
-    expect(releaseProcessDoc).toContain('never publishes');
-    expect(releaseProcessDoc).toContain('`release` environment');
-    expect(releaseProcessDoc).toContain('publish_confirmation');
+    for (const text of ['never publishes', '`release` environment', 'publish_confirmation']) {
+      expectTextIncludes(releaseProcessDoc, {
+        text,
+        rationale: 'Release process doc must warn maintainers that publishing remains disabled.',
+      });
+    }
   });
 });

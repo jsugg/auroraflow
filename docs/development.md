@@ -84,8 +84,22 @@ npm run verify
 | `npm test` / `npm run test:unit` | Fast local | Unit tests only; no browser, Docker, Redis, or OTLP dependency. |
 | `npm run test:contracts` | Static/contract | Package, workflow, infrastructure, and docs contracts. |
 | `npm run test:integration` | Real integration | Redis/Testcontainers and OTLP export. |
+| `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` | Blocking real integration | Same Redis/OTLP integration suite, but Redis startup/connect failures fail instead of skip. |
+| `npm run test:coverage` | Coverage | Critical-module thresholds plus global `src/**` coverage. |
 | `npm run test:e2e` | Browser | Playwright browser projects. |
+| `npm run test:e2e:guarded` | Guarded browser proof | Parallel Chrome proof for guarded self-heal at the default gate. |
 | `npm run verify` | Full local gate | Static checks, unit, contracts, integration, schemas, ShellCheck, and workflow lint. |
+
+### CI gate topology
+
+| Gate | Cost tier | Runs | Responsibility |
+| --- | --- | --- | --- |
+| `Node Compatibility (Node 20/22/24)` | Fast matrix | Pull requests, `main`, scheduled, and manual quality workflow runs | `npm ci`, lint, typecheck, and unit tests only; no Docker, Redis, OTLP collector, or browser install. |
+| `Repository Gates (Node 22)` | Static + Docker integration | Pull requests, `main`, scheduled, and manual quality workflow runs | Format, contracts, Redis/OTLP integration with `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true`, schemas, ShellCheck, and workflow lint. |
+| `Coverage (Critical + Global)` | Coverage | Pull requests, `main`, scheduled, and manual quality workflow runs | Enforces critical-module thresholds and global `src/**` coverage once on Node 22. Risk-weighted coverage floors remain future QE-2 work. |
+| `Guarded Self-Heal Proof (Chrome)` | Guarded browser proof | Pull requests, `main`, scheduled, and manual quality workflow runs | Preserves Chrome proof for guarded self-heal at the shipped default confidence gate. |
+| `Risk-Triggered E2E (Chrome)` | Browser heavy | `main`, scheduled/manual runs, risky browser/runtime paths, or `full-e2e`/`risk:e2e` PR labels | Runs the full Chrome E2E project outside the Node compatibility matrix. |
+| Observability smoke jobs | Docker/remote optional | Path-triggered, `main`, scheduled, or manual runs depending on the job | Keeps collector/full-stack/remote export evidence separate from fast compatibility gates. |
 
 ### Browser suites
 
@@ -95,7 +109,7 @@ npm run test:examples
 npm run test:e2e
 ```
 
-The full E2E workflow shards across desktop and mobile browser projects on `main`, schedule, and manual dispatch. Pull-request smoke and examples lanes are path-filtered by workflow configuration.
+The full E2E workflow shards across desktop and mobile browser projects on `main`, schedule, and manual dispatch. The quality workflow also has a risk-triggered full Chrome E2E lane for risky browser/runtime paths or `full-e2e`/`risk:e2e` PR labels. Pull-request smoke and examples lanes remain path-filtered by workflow configuration.
 
 If a constrained local machine times out during accessibility smoke checks, reproduce with a larger Playwright timeout before changing source:
 
@@ -127,6 +141,8 @@ npm run infra:redis:logs
 npm run infra:redis:down
 ```
 
+Default local Redis behavior is skip-friendly: if Docker/Testcontainers cannot start Redis, the Redis integration spec reports an explicit skip so non-Redis contributors are not blocked. Required mode is blocking: `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` fails on Redis startup, connection, or evidence failures and is the CI/release mode used by `Repository Gates (Node 22)` and the release dry-run.
+
 Keep selector registry changes aligned with:
 
 - `src/data/selectors/selectorRegistry.ts`
@@ -150,7 +166,7 @@ SELF_HEAL_MODE=guarded npm run test:smoke
 npm run self-heal:governance
 ```
 
-Artifacts are written to `test-results/self-healing/*.json`; governance summaries are written to `test-results/self-healing-governance-summary.{json,md}`.
+Artifacts are written to `SELF_HEAL_ARTIFACTS_DIR` when set, otherwise `test-results/self-healing/*.json`; governance summaries are written to `test-results/self-healing-governance-summary.{json,md}`.
 
 When extending this area, keep these contracts intact:
 
