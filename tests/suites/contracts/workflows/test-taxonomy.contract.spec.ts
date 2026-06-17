@@ -225,7 +225,7 @@ describe('test script taxonomy contract', () => {
     expect(rows.get('`npm test` / `npm run test:unit`')).toEqual({
       costTier: 'Fast local',
       scope:
-        'Unit tests only; thread pool without per-file isolation; no browser, Docker, Redis, or OTLP dependency.',
+        'Unit tests only; thread pool without per-file isolation and 30s per-test timeout; no browser, Docker, Redis, or OTLP dependency.',
     });
     expect(rows.get('`npm run test:contracts`')?.scope).toBe(
       'Package, workflow, infrastructure, and docs contracts.',
