@@ -69,7 +69,8 @@
     "test:coverage:critical": "vitest run tests/suites/unit/framework/selfHealing/artifactPrivacy.spec.ts tests/suites/unit/framework/selfHealing/config.spec.ts tests/suites/unit/framework/selfHealing/guardedValidation.spec.ts tests/suites/unit/framework/selfHealing/historyRepository.spec.ts tests/suites/unit/framework/selfHealing/promotionWorkflow.spec.ts tests/suites/unit/framework/selfHealing/registryRuntime.spec.ts tests/suites/unit/framework/observability/trends.spec.ts --coverage",
     "test:coverage:global": "vitest run tests/suites/unit --config=configs/vitest.coverage-global.mts --coverage",
     "test:e2e:guarded": "npm run test:e2e -- --project='Google Chrome' --grep 'guarded self-heal' --workers=2",
-    "workflows:lint:check": "node scripts/workflows-lint.mjs"
+    "workflows:lint:check": "node scripts/workflows-lint.mjs",
+    "postverify": "node scripts/verify-stamp.mjs write"
   },
   "engines": {
     "node": ">=20 <25"
@@ -118,11 +119,12 @@
     "vitest": "^4.1.8"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}": [
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "eslint --fix",
       "prettier --write"
     ],
-    "*.{ts,tsx,js,mjs,cjs}": [
-      "eslint --fix"
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
     ],
     "*.sh": [
       "shellcheck"
