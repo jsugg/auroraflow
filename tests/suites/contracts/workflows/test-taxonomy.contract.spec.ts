@@ -92,7 +92,9 @@ function parseCommandTierRows(markdown: string): Map<string, CommandTierRow> {
 describe('test script taxonomy contract', () => {
   it('maps npm test to the unit-only fast path', () => {
     expect(scripts.test).toBe('npm run test:unit');
-    expect(scripts['test:unit']).toBe('vitest run tests/suites/unit --pool=threads --no-isolate');
+    expect(scripts['test:unit']).toBe(
+      'vitest run tests/suites/unit --pool=threads --no-isolate --testTimeout=30000',
+    );
   });
 
   it('keeps contracts separate from Redis and OTLP integration suites', () => {

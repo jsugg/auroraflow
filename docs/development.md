@@ -71,7 +71,7 @@ Run the repository verification target:
 npm run verify
 ```
 
-`npm test` is the unit-only fast path. It uses Vitest's thread pool without per-file isolation and must not require browsers, Docker, Redis, or an OTLP collector.
+`npm test` is the unit-only fast path. It uses Vitest's thread pool without per-file isolation and a 30s per-test timeout; it must not require browsers, Docker, Redis, or an OTLP collector.
 
 `npm run test:contracts` validates package, workflow, infrastructure, and documentation contracts without Redis/Testcontainers or browser setup.
 
@@ -81,7 +81,7 @@ npm run verify
 
 | Command | Cost tier | Scope |
 | --- | --- | --- |
-| `npm test` / `npm run test:unit` | Fast local | Unit tests only; thread pool without per-file isolation; no browser, Docker, Redis, or OTLP dependency. |
+| `npm test` / `npm run test:unit` | Fast local | Unit tests only; thread pool without per-file isolation and 30s per-test timeout; no browser, Docker, Redis, or OTLP dependency. |
 | `npm run test:contracts` | Static/contract | Package, workflow, infrastructure, and docs contracts. |
 | `npm run test:integration` | Real integration | Redis/Testcontainers and OTLP export. |
 | `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` | Blocking real integration | Same Redis/OTLP integration suite, but Redis startup/connect failures fail instead of skip. |

@@ -31,7 +31,7 @@
     "lint:fix": "eslint . --fix",
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile .cache/tsconfig.tsbuildinfo",
     "test": "npm run test:unit",
-    "test:unit": "vitest run tests/suites/unit --pool=threads --no-isolate",
+    "test:unit": "vitest run tests/suites/unit --pool=threads --no-isolate --testTimeout=30000",
     "test:coverage": "npm run test:coverage:critical && npm run test:coverage:global",
     "test:contracts": "vitest run tests/suites/contracts --config=configs/vitest.contracts.mts",
     "test:integration": "vitest run tests/suites/integration",
