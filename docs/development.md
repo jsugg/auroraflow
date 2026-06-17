@@ -71,17 +71,17 @@ Run the repository verification target:
 npm run verify
 ```
 
-`npm test` is the unit-only fast path. It must not require browsers, Docker, Redis, or an OTLP collector.
+`npm test` is the unit-only fast path. It uses Vitest's thread pool without per-file isolation and must not require browsers, Docker, Redis, or an OTLP collector.
 
 `npm run test:contracts` validates package, workflow, infrastructure, and documentation contracts without Redis/Testcontainers or browser setup.
 
-`npm run test:integration` is reserved for real integration coverage (Redis/Testcontainers and OTLP export). Use `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` when Redis evidence must block instead of skip.
+`npm run test:integration` is reserved for real integration coverage (Redis/Testcontainers and OTLP export). Use `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` when Redis evidence must block instead of skip. Set `AURORAFLOW_REDIS_INTEGRATION_EXTERNAL=true` with `AURORAFLOW_REDIS_*` connection settings to reuse an already-running Redis instead of starting the default Testcontainers Redis instance.
 
 `npm run verify` runs repo-local actionlint bootstrap, formatting, linting, typechecking, unit tests, contracts, Redis/OTLP integration, schema validation, ShellCheck, and workflow linting.
 
 | Command | Cost tier | Scope |
 | --- | --- | --- |
-| `npm test` / `npm run test:unit` | Fast local | Unit tests only; no browser, Docker, Redis, or OTLP dependency. |
+| `npm test` / `npm run test:unit` | Fast local | Unit tests only; thread pool without per-file isolation; no browser, Docker, Redis, or OTLP dependency. |
 | `npm run test:contracts` | Static/contract | Package, workflow, infrastructure, and docs contracts. |
 | `npm run test:integration` | Real integration | Redis/Testcontainers and OTLP export. |
 | `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` | Blocking real integration | Same Redis/OTLP integration suite, but Redis startup/connect failures fail instead of skip. |
@@ -141,7 +141,7 @@ npm run infra:redis:logs
 npm run infra:redis:down
 ```
 
-Default local Redis behavior is skip-friendly: if Docker/Testcontainers cannot start Redis, the Redis integration spec reports an explicit skip so non-Redis contributors are not blocked. Required mode is blocking: `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` fails on Redis startup, connection, or evidence failures and is the CI/release mode used by `Repository Gates (Node 22)` and the release dry-run.
+Default local Redis behavior is skip-friendly: if Docker/Testcontainers cannot start Redis, the Redis integration spec reports an explicit skip so non-Redis contributors are not blocked. Required mode is blocking: `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` fails on Redis startup, connection, or evidence failures and is the CI/release mode used by `Repository Gates (Node 22)` and the release dry-run. External mode is opt-in: `AURORAFLOW_REDIS_INTEGRATION_EXTERNAL=true AURORAFLOW_REDIS_HOST=127.0.0.1 AURORAFLOW_REDIS_PORT=6379 npm run test:integration` reuses an existing Redis with a per-run key prefix.
 
 Keep selector registry changes aligned with:
 

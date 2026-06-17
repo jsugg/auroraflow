@@ -16,14 +16,17 @@ interface IntegrationRuntime {
   container: StartedTestContainer | null;
   client: RedisClient | null;
   skipReason: string | null;
+  usesExternalRedis: boolean;
 }
 
 const runtime: IntegrationRuntime = {
   container: null,
   client: null,
   skipReason: null,
+  usesExternalRedis: false,
 };
 const REQUIRED_ENV = 'AURORAFLOW_REDIS_INTEGRATION_REQUIRED';
+const EXTERNAL_REDIS_ENV = 'AURORAFLOW_REDIS_INTEGRATION_EXTERNAL';
 const CONTAINER_STARTUP_TIMEOUT_MS = 45_000;
 const INTEGRATION_SETUP_TIMEOUT_MS = 120_000;
 const concurrentHistoryCandidate: RankedSelfHealingCandidate = {
@@ -55,21 +58,29 @@ function toErrorMessage(error: unknown): string {
 }
 
 function redisIntegrationRequired(): boolean {
-  return ['1', 'true', 'yes', 'on'].includes(
-    (process.env[REQUIRED_ENV] ?? '').trim().toLowerCase(),
-  );
+  return booleanEnv(REQUIRED_ENV);
+}
+
+function externalRedisIntegrationEnabled(): boolean {
+  return booleanEnv(EXTERNAL_REDIS_ENV);
+}
+
+function booleanEnv(key: string): boolean {
+  return ['1', 'true', 'yes', 'on'].includes((process.env[key] ?? '').trim().toLowerCase());
+}
+
+function redisUnavailableSource(): string {
+  return runtime.usesExternalRedis ? 'external Redis' : 'Docker/Testcontainers';
 }
 
 function requireClient(context: TestContext): RedisClient {
   if (runtime.skipReason || runtime.client === null) {
-    if (redisIntegrationRequired()) {
+    if (redisIntegrationRequired() || runtime.usesExternalRedis) {
       throw new Error(
         `Redis integration is required but unavailable: ${runtime.skipReason ?? 'unknown setup failure'}`,
       );
     }
-    context.skip(
-      `Docker/Testcontainers is unavailable in this environment. ${runtime.skipReason ?? ''}`.trim(),
-    );
+    context.skip(`${redisUnavailableSource()} is unavailable. ${runtime.skipReason ?? ''}`.trim());
   }
 
   if (runtime.client === null) {
@@ -79,26 +90,60 @@ function requireClient(context: TestContext): RedisClient {
   return runtime.client;
 }
 
+function defaultIntegrationKeyPrefix(): string {
+  return `auroraflow-int-${process.pid}-${Date.now().toString(36)}`;
+}
+
+function buildExternalRedisEnv(): Readonly<Record<string, string | undefined>> {
+  return {
+    ...process.env,
+    AURORAFLOW_REDIS_CONNECT_TIMEOUT_MS: process.env.AURORAFLOW_REDIS_CONNECT_TIMEOUT_MS ?? '5000',
+    AURORAFLOW_REDIS_MAX_RETRIES: process.env.AURORAFLOW_REDIS_MAX_RETRIES ?? '2',
+    AURORAFLOW_REDIS_BASE_BACKOFF_MS: process.env.AURORAFLOW_REDIS_BASE_BACKOFF_MS ?? '5',
+    AURORAFLOW_REDIS_MAX_BACKOFF_MS: process.env.AURORAFLOW_REDIS_MAX_BACKOFF_MS ?? '100',
+    AURORAFLOW_REDIS_KEY_PREFIX:
+      process.env.AURORAFLOW_REDIS_KEY_PREFIX ?? defaultIntegrationKeyPrefix(),
+  };
+}
+
+function buildContainerRedisEnv(
+  container: StartedTestContainer,
+): Readonly<Record<string, string | undefined>> {
+  return {
+    AURORAFLOW_REDIS_HOST: container.getHost(),
+    AURORAFLOW_REDIS_PORT: String(container.getMappedPort(6379)),
+    AURORAFLOW_REDIS_DB: '0',
+    AURORAFLOW_REDIS_CONNECT_TIMEOUT_MS: '5000',
+    AURORAFLOW_REDIS_MAX_RETRIES: '2',
+    AURORAFLOW_REDIS_BASE_BACKOFF_MS: '5',
+    AURORAFLOW_REDIS_MAX_BACKOFF_MS: '100',
+    AURORAFLOW_REDIS_KEY_PREFIX: defaultIntegrationKeyPrefix(),
+  };
+}
+
+async function cleanupRuntimeKeys(client: RedisClient): Promise<void> {
+  for (const key of await client.keys('*')) {
+    await client.del(key);
+  }
+}
+
 beforeAll(async () => {
+  runtime.usesExternalRedis = externalRedisIntegrationEnabled();
   try {
+    if (runtime.usesExternalRedis) {
+      runtime.client = new RedisClient({ env: buildExternalRedisEnv() });
+      await runtime.client.connect();
+      await runtime.client.ping();
+      return;
+    }
+
     runtime.container = await new GenericContainer('redis:7.2-alpine')
       .withExposedPorts(6379)
       .withWaitStrategy(Wait.forLogMessage('Ready to accept connections'))
       .withStartupTimeout(CONTAINER_STARTUP_TIMEOUT_MS)
       .start();
 
-    runtime.client = new RedisClient({
-      env: {
-        AURORAFLOW_REDIS_HOST: runtime.container.getHost(),
-        AURORAFLOW_REDIS_PORT: String(runtime.container.getMappedPort(6379)),
-        AURORAFLOW_REDIS_DB: '0',
-        AURORAFLOW_REDIS_CONNECT_TIMEOUT_MS: '5000',
-        AURORAFLOW_REDIS_MAX_RETRIES: '2',
-        AURORAFLOW_REDIS_BASE_BACKOFF_MS: '5',
-        AURORAFLOW_REDIS_MAX_BACKOFF_MS: '100',
-        AURORAFLOW_REDIS_KEY_PREFIX: 'auroraflow-int',
-      },
-    });
+    runtime.client = new RedisClient({ env: buildContainerRedisEnv(runtime.container) });
 
     await runtime.client.connect();
   } catch (error: unknown) {
@@ -111,9 +156,9 @@ beforeAll(async () => {
       await runtime.container.stop().catch(() => {});
       runtime.container = null;
     }
-    if (redisIntegrationRequired()) {
+    if (redisIntegrationRequired() || runtime.usesExternalRedis) {
       throw new Error(
-        `Redis integration is required but Docker/Testcontainers setup failed: ${runtime.skipReason}`,
+        `Redis integration is required but ${redisUnavailableSource()} setup failed: ${runtime.skipReason}`,
       );
     }
   }
@@ -121,6 +166,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   if (runtime.client !== null) {
+    await cleanupRuntimeKeys(runtime.client).catch(() => {});
     await runtime.client.disconnect();
     runtime.client = null;
   }
