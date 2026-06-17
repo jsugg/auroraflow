@@ -148,10 +148,10 @@ describe('smoke selection contract', () => {
     ] as const;
 
     for (const spec of exampleSpecs) {
-      expect(
+      expectInvariant(
         extractPlaywrightTestTitles(read(spec)).every((title) => title.startsWith('@smoke ')),
         `${spec} must keep deterministic examples discoverable by smoke grep.`,
-      ).toBe(true);
+      );
     }
   });
 
@@ -180,10 +180,10 @@ describe('smoke selection contract', () => {
         'Accessibility helper must scope scans to main landmark.',
       ),
     ).toBe('main');
-    expect(
-      read('examples/reliability/fixtures/reliability-app.html').includes('<main>'),
-      'Reliability fixture must expose main landmark for scoped accessibility checks.',
-    ).toBe(true);
+    expectTextIncludes(read('examples/reliability/fixtures/reliability-app.html'), {
+      text: '<main>',
+      rationale: 'Reliability fixture must expose main landmark for scoped accessibility checks.',
+    });
   });
 
   it('keeps example coverage fixture-backed instead of live external-site backed', () => {
@@ -193,7 +193,10 @@ describe('smoke selection contract', () => {
       'tests/suites/e2e/playonsports/example.spec.ts',
     );
 
-    expect(existsSync(legacyExternalSpecPath)).toBe(false);
+    expectInvariant(
+      !existsSync(legacyExternalSpecPath),
+      'Legacy external-site example spec must not be reintroduced.',
+    );
     expectTextIncludes(examplePageSpec, {
       text: 'deterministic demo fixture',
       rationale: 'Example page smoke coverage must use deterministic local fixture.',

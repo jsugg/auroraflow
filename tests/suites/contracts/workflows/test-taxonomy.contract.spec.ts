@@ -24,7 +24,11 @@ const packageJson = JSON.parse(
   readFileSync(path.join(REPO_ROOT, 'package.json'), 'utf8'),
 ) as PackageJson;
 const scripts = packageJson.scripts ?? {};
-const RAW_TEXT_MATCHER_PATTERN = /\.(?:not\.)?(?:toContain|toMatch)\(/u;
+const BRITTLE_ASSERTION_PATTERNS: readonly { readonly label: string; readonly pattern: RegExp }[] =
+  [
+    { label: 'raw text matcher', pattern: /\.(?:not\.)?(?:toContain|toMatch)\(/u },
+    { label: 'bare boolean matcher', pattern: /\.toBe\((?:true|false)\)/u },
+  ];
 
 function splitScriptSequence(scriptName: string): readonly string[] {
   const script = scripts[scriptName];
@@ -50,12 +54,13 @@ function listContractSpecPaths(
   });
 }
 
-function findRawTextMatcherOffenders(relativePath: string): readonly string[] {
+function findBrittleAssertionOffenders(relativePath: string): readonly string[] {
   return readRepoFile(relativePath)
     .split('\n')
-    .flatMap((line, index) =>
-      RAW_TEXT_MATCHER_PATTERN.test(line) ? [`${relativePath}:${index + 1}`] : [],
-    );
+    .flatMap((line, index) => {
+      const violation = BRITTLE_ASSERTION_PATTERNS.find(({ pattern }) => pattern.test(line));
+      return violation === undefined ? [] : [`${relativePath}:${index + 1} (${violation.label})`];
+    });
 }
 
 function parseCommandTierRows(markdown: string): Map<string, CommandTierRow> {
@@ -172,14 +177,14 @@ describe('test script taxonomy contract', () => {
     });
   });
 
-  it('routes contract text checks through rationale helpers', () => {
+  it('routes contract assertions through rationale helpers', () => {
     const offenders = listContractSpecPaths().flatMap((absolutePath) =>
-      findRawTextMatcherOffenders(path.relative(REPO_ROOT, absolutePath)),
+      findBrittleAssertionOffenders(path.relative(REPO_ROOT, absolutePath)),
     );
 
     expect(
       offenders,
-      'Contract specs must use semantic assertions or contractAssertions rationale helpers instead of raw text matchers.',
+      'Contract specs must report semantic invariants: use contractAssertions rationale helpers (expectInvariant/expectText*) or named semantic matchers, not raw text matchers or bare boolean .toBe assertions.',
     ).toEqual([]);
   });
 

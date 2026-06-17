@@ -1,6 +1,7 @@
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
+import { expectInvariant } from '../../../helpers/contractAssertions';
 import { getComposeService, readComposeModel } from '../../../helpers/composeModel';
 
 const REPO_ROOT = process.cwd();
@@ -22,7 +23,10 @@ function parseShellEnvAssignments(command: string): ReadonlyMap<string, string> 
 
 describe('docker compose infrastructure contract', () => {
   it('defines a Redis service with healthcheck and persistent volume', () => {
-    expect(existsSync(DOCKER_COMPOSE_PATH)).toBe(true);
+    expectInvariant(
+      existsSync(DOCKER_COMPOSE_PATH),
+      'docker-compose.yml must exist for local Redis infrastructure.',
+    );
 
     const compose = readComposeModel('docker-compose.yml');
     const redis = getComposeService(compose, 'redis');
@@ -31,7 +35,10 @@ describe('docker compose infrastructure contract', () => {
     expect(redis.ports).toEqual(['6379:6379']);
     expect(redis.healthcheck?.test).toEqual(['CMD', 'redis-cli', 'ping']);
     expect(redis.volumes).toEqual(['redis-data:/data']);
-    expect(compose.volumes.has('redis-data')).toBe(true);
+    expectInvariant(
+      compose.volumes.has('redis-data'),
+      'Compose must declare the redis-data persistent volume.',
+    );
     expect(redis.restart).toBe('unless-stopped');
   });
 
@@ -63,14 +70,20 @@ describe('docker compose infrastructure contract', () => {
         ['OTEL_EXPORTER_OTLP_ENDPOINT', 'http://localhost:4318'],
       ]),
     );
-    expect(scripts['observability:smoke']?.endsWith('npm run observability:ci:smoke')).toBe(true);
+    expectInvariant(
+      scripts['observability:smoke']?.endsWith('npm run observability:ci:smoke') ?? false,
+      'observability:smoke script must end by running the CI smoke entrypoint.',
+    );
     expect(scripts['test:integration:local']).toBe(
       'npm run infra:redis:up && npm run test:integration',
     );
   });
 
   it('defines the local observability stack services and health checks', () => {
-    expect(existsSync(OBSERVABILITY_COMPOSE_PATH)).toBe(true);
+    expectInvariant(
+      existsSync(OBSERVABILITY_COMPOSE_PATH),
+      'docker-compose.observability.yml must exist for the local observability stack.',
+    );
 
     const compose = readComposeModel('docker-compose.observability.yml');
     const requiredServices = [
@@ -84,10 +97,10 @@ describe('docker compose infrastructure contract', () => {
     ] as const;
 
     for (const serviceName of requiredServices) {
-      expect(
+      expectInvariant(
         compose.services.has(serviceName),
         `Compose stack must define ${serviceName} service.`,
-      ).toBe(true);
+      );
     }
 
     expect(getComposeService(compose, 'otel-collector').ports).toEqual(
@@ -96,12 +109,12 @@ describe('docker compose infrastructure contract', () => {
     expect(getComposeService(compose, 'grafana').ports).toEqual(['127.0.0.1:3000:3000']);
     expect(getComposeService(compose, 'jaeger').ports).toEqual(['127.0.0.1:16686:16686']);
     expect(getComposeService(compose, 'kibana').ports).toEqual(['127.0.0.1:5601:5601']);
-    expect(
+    expectInvariant(
       requiredServices.every(
         (serviceName) => getComposeService(compose, serviceName).healthcheck !== undefined,
       ),
       'Every local observability service must define a healthcheck.',
-    ).toBe(true);
+    );
     expect(getComposeService(compose, 'otel-collector').volumes).toEqual(
       expect.arrayContaining([
         './observability/otel-collector/config.yaml:/etc/otelcol-contrib/config.yaml:ro',
