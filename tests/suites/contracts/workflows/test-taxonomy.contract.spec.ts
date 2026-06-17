@@ -92,7 +92,7 @@ function parseCommandTierRows(markdown: string): Map<string, CommandTierRow> {
 describe('test script taxonomy contract', () => {
   it('maps npm test to the unit-only fast path', () => {
     expect(scripts.test).toBe('npm run test:unit');
-    expect(scripts['test:unit']).toBe('vitest run tests/suites/unit');
+    expect(scripts['test:unit']).toBe('vitest run tests/suites/unit --pool=threads --no-isolate');
   });
 
   it('keeps contracts separate from Redis and OTLP integration suites', () => {
@@ -147,7 +147,7 @@ describe('test script taxonomy contract', () => {
       'npm run test:integration',
       'npm run schemas:check',
       'npm run shellcheck',
-      'npm run workflows:lint',
+      'npm run workflows:lint:check',
     ]);
   });
 
@@ -222,7 +222,8 @@ describe('test script taxonomy contract', () => {
 
     expect(rows.get('`npm test` / `npm run test:unit`')).toEqual({
       costTier: 'Fast local',
-      scope: 'Unit tests only; no browser, Docker, Redis, or OTLP dependency.',
+      scope:
+        'Unit tests only; thread pool without per-file isolation; no browser, Docker, Redis, or OTLP dependency.',
     });
     expect(rows.get('`npm run test:contracts`')?.scope).toBe(
       'Package, workflow, infrastructure, and docs contracts.',
