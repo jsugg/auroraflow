@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { expectInvariant } from '../../../helpers/contractAssertions';
+import { expectInvariant, expectTextIncludes } from '../../../helpers/contractAssertions';
 import { getWorkflowJob, getWorkflowStep, readWorkflowModel } from '../../../helpers/workflowModel';
 
 const ciWorkflow = readWorkflowModel('.github/workflows/ci.yml');
@@ -37,6 +37,10 @@ describe('ci.yml browser provisioning contract', () => {
     ).toBe(
       "${{ runner.os }}-playwright-${{ matrix.install_args }}-${{ hashFiles('package-lock.json') }}",
     );
+    expect(
+      cacheStep.with.get('restore-keys'),
+      'Browser cache must fall back to an install_args-scoped prefix so dependency bumps reuse browsers instead of cold-downloading.',
+    ).toBe('${{ runner.os }}-playwright-${{ matrix.install_args }}-');
   });
 
   it('always installs the required browser even when cache is restored', () => {
@@ -45,13 +49,20 @@ describe('ci.yml browser provisioning contract', () => {
       'Ensure required Playwright browser is installed',
     );
 
+    const installRun = installStep.run ?? '';
+
     expectInvariant(
       installStep.if === undefined,
       'Browser install step must not be cache-gated; restored caches can still miss executables.',
     );
-    expect(
-      installStep.run,
-      'Browser install step must install the matrix-selected browser explicitly.',
-    ).toBe('npx playwright install --with-deps ${{ matrix.install_args }}');
+    expectTextIncludes(installRun, {
+      text: 'timeout 300 npx playwright install --with-deps ${{ matrix.install_args }}',
+      rationale:
+        'Browser install must run the matrix-selected browser under a bounded per-attempt timeout so network hangs fail fast instead of consuming the job budget.',
+    });
+    expectTextIncludes(installRun, {
+      text: 'for attempt in 1 2 3',
+      rationale: 'Browser install must retry to absorb transient registry/apt failures.',
+    });
   });
 });

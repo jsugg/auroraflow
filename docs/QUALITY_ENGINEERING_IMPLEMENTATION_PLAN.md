@@ -356,6 +356,7 @@ Do not weaken these to make future work easier.
   2. Add PR label/path-triggered full E2E workflow option.
   3. Ensure quarantined tests remain visible in reports.
   4. Keep default PR fast.
+  5. Revisit the always-on-`main` risk E2E policy: `risk-e2e` currently runs full Chrome E2E on every `main` push (`github.ref == 'refs/heads/main'`), so docs/test-only merges still pay for — and can be flaked by — browser provisioning. Decide whether to scope it on `main` to the `run_risk_e2e` path filter (cheaper, less flake exposure) or keep it as an always-on post-merge safety net. Browser-install timeout/retry and cache `restore-keys` hardening already landed alongside `AUR-QE-107`; this remaining item is the gate-policy decision.
 - **Validation commands:**
   - `npm run workflows:lint`
   - `npm run flakiness:report` against fixture report data

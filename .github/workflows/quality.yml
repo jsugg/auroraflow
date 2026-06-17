@@ -210,6 +210,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-guarded-chrome-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-guarded-chrome-
 
       - name: Ensure Playwright Chrome is installed
         run: npx playwright install chrome
@@ -231,7 +233,7 @@ jobs:
     name: Risk-Triggered E2E (Chrome)
     runs-on: ubuntu-latest
     needs: [preflight, verify, repository-gates]
-    timeout-minutes: 12
+    timeout-minutes: 20
     permissions:
       contents: read
     env:
@@ -259,10 +261,21 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-risk-chrome-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-risk-chrome-
 
       - name: Ensure Playwright Chrome is installed
         if: env.SHOULD_RUN_RISK_E2E == 'true'
-        run: npx playwright install --with-deps chrome
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 300 npx playwright install --with-deps chrome; then
+              exit 0
+            fi
+            echo "::warning::Playwright browser install attempt ${attempt} failed or timed out; retrying"
+            sleep $((attempt * 15))
+          done
+          echo "::error::Playwright browser install failed after 3 attempts"
+          exit 1
 
       - name: Run full Chrome E2E suite
         if: env.SHOULD_RUN_RISK_E2E == 'true'
@@ -655,6 +668,8 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-chrome-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-chrome-
 
       - name: Ensure Playwright browser (Chrome) is installed
         if: env.SHOULD_RUN_SMOKE == 'true'
