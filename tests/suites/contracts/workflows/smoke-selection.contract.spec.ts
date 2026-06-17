@@ -75,6 +75,7 @@ describe('smoke selection contract', () => {
 
     expect(packageJson.scripts?.['tools:actionlint']).toBe('bash scripts/install-actionlint.sh');
     expect(packageJson.scripts?.['verify:tools']).toBe('npm run tools:actionlint');
+    expect(packageJson.scripts?.['workflows:lint:check']).toBe('node scripts/workflows-lint.mjs');
     expect(packageJson.scripts?.['workflows:lint']).toBe(
       'npm run tools:actionlint --silent && node scripts/workflows-lint.mjs',
     );
