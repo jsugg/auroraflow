@@ -85,9 +85,20 @@ jobs:
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-peer-${{ matrix.lane }}-${{ matrix.version_spec }}
+          restore-keys: |
+            ${{ runner.os }}-playwright-peer-${{ matrix.lane }}-
 
       - name: Install Playwright Chrome
-        run: npx playwright install --with-deps chrome
+        run: |
+          for attempt in 1 2 3; do
+            if timeout 300 npx playwright install --with-deps chrome; then
+              exit 0
+            fi
+            echo "::warning::Playwright browser install attempt ${attempt} failed or timed out; retrying"
+            sleep $((attempt * 15))
+          done
+          echo "::error::Playwright browser install failed after 3 attempts"
+          exit 1
 
       - name: Run Chrome smoke suite
         run: npm run test:smoke

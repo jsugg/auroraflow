@@ -44,9 +44,21 @@ describe('Playwright peer matrix workflow', () => {
       [...workflow.triggers].sort(),
       'Peer matrix must stay off pull_request and run only by schedule, manual dispatch, or release workflow_call.',
     ).toEqual(['schedule', 'workflow_call', 'workflow_dispatch']);
-    expect(getWorkflowStep(peerMatrixJob, 'Install Playwright Chrome').run).toBe(
-      'npx playwright install --with-deps chrome',
-    );
+    const peerInstallRun = getWorkflowStep(peerMatrixJob, 'Install Playwright Chrome').run ?? '';
+    expectTextIncludes(peerInstallRun, {
+      text: 'timeout 300 npx playwright install --with-deps chrome',
+      rationale:
+        'Peer matrix must install Chrome under a bounded per-attempt timeout so network hangs fail fast instead of consuming the job budget.',
+    });
+    expectTextIncludes(peerInstallRun, {
+      text: 'for attempt in 1 2 3',
+      rationale:
+        'Peer matrix browser install must retry to absorb transient registry/apt failures.',
+    });
+    expect(
+      getWorkflowStep(peerMatrixJob, 'Cache Playwright Chrome').with.get('restore-keys'),
+      'Peer matrix browser cache must fall back to a lane-scoped prefix so unrelated changes reuse Chrome instead of cold-downloading.',
+    ).toBe('${{ runner.os }}-playwright-peer-${{ matrix.lane }}-');
     expect(getWorkflowStep(peerMatrixJob, 'Run Chrome smoke suite').run).toBe('npm run test:smoke');
   });
 

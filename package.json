@@ -26,12 +26,12 @@
     "prepack": "npm run build",
     "pack:dry-run": "npm pack --dry-run",
     "format": "prettier . --write",
-    "format:check": "prettier . --check",
-    "lint": "eslint .",
+    "format:check": "prettier . --check --cache --cache-location .cache/prettier",
+    "lint": "eslint . --cache --cache-location .cache/eslint",
     "lint:fix": "eslint . --fix",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile .cache/tsconfig.tsbuildinfo",
     "test": "npm run test:unit",
-    "test:unit": "vitest run tests/suites/unit",
+    "test:unit": "vitest run tests/suites/unit --pool=threads --no-isolate --testTimeout=30000",
     "test:coverage": "npm run test:coverage:critical && npm run test:coverage:global",
     "test:contracts": "vitest run tests/suites/contracts --config=configs/vitest.contracts.mts",
     "test:integration": "vitest run tests/suites/integration",
@@ -57,18 +57,20 @@
     "flakiness:report": "node -r ts-node/register scripts/flakiness-report.ts",
     "slo:dashboard": "node -r ts-node/register scripts/slo-dashboard.ts",
     "slo:alerts": "node -r ts-node/register scripts/slo-alerts.ts",
-    "schemas:check": "node -r ts-node/register scripts/schemas-check.ts",
+    "schemas:check": "node scripts/run-schemas-check.mjs",
     "tools:actionlint": "bash scripts/install-actionlint.sh",
     "verify:tools": "npm run tools:actionlint",
     "workflows:lint": "npm run tools:actionlint --silent && node scripts/workflows-lint.mjs",
     "workflows:security": "pipx run zizmor .github/workflows",
     "shellcheck": "PATH=\"$HOME/.local/bin:$PATH\" shellcheck scripts/*.sh",
     "security:check": "npm run workflows:security && npm audit --audit-level=high",
-    "verify": "npm run verify:tools && npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run test:contracts && npm run test:integration && npm run schemas:check && npm run shellcheck && npm run workflows:lint",
+    "verify": "npm run verify:tools && npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run test:contracts && npm run test:integration && npm run schemas:check && npm run shellcheck && npm run workflows:lint:check",
     "verify:smoke": "npm run verify && npm run test:smoke",
     "test:coverage:critical": "vitest run tests/suites/unit/framework/selfHealing/artifactPrivacy.spec.ts tests/suites/unit/framework/selfHealing/config.spec.ts tests/suites/unit/framework/selfHealing/guardedValidation.spec.ts tests/suites/unit/framework/selfHealing/historyRepository.spec.ts tests/suites/unit/framework/selfHealing/promotionWorkflow.spec.ts tests/suites/unit/framework/selfHealing/registryRuntime.spec.ts tests/suites/unit/framework/observability/trends.spec.ts --coverage",
     "test:coverage:global": "vitest run tests/suites/unit --config=configs/vitest.coverage-global.mts --coverage",
-    "test:e2e:guarded": "npm run test:e2e -- --project='Google Chrome' --grep 'guarded self-heal' --workers=2"
+    "test:e2e:guarded": "npm run test:e2e -- --project='Google Chrome' --grep 'guarded self-heal' --workers=2",
+    "workflows:lint:check": "node scripts/workflows-lint.mjs",
+    "postverify": "node scripts/verify-stamp.mjs write"
   },
   "engines": {
     "node": ">=20 <25"
@@ -117,11 +119,12 @@
     "vitest": "^4.1.8"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,mjs,cjs,json,md,yml,yaml}": [
+    "*.{ts,tsx,js,mjs,cjs}": [
+      "eslint --fix",
       "prettier --write"
     ],
-    "*.{ts,tsx,js,mjs,cjs}": [
-      "eslint --fix"
+    "*.{json,md,yml,yaml}": [
+      "prettier --write"
     ],
     "*.sh": [
       "shellcheck"

@@ -146,9 +146,21 @@ describe('quality workflow Node compatibility contract', () => {
         rationale: 'Risk E2E gate must respect paths plus explicit maintainer labels.',
       });
     }
-    expect(getWorkflowStep(riskE2eJob, 'Ensure Playwright Chrome is installed').run).toBe(
-      'npx playwright install --with-deps chrome',
-    );
+    const riskInstallRun =
+      getWorkflowStep(riskE2eJob, 'Ensure Playwright Chrome is installed').run ?? '';
+    expectTextIncludes(riskInstallRun, {
+      text: 'timeout 300 npx playwright install --with-deps chrome',
+      rationale:
+        'Risk E2E must install Chrome under a bounded per-attempt timeout so network hangs fail fast instead of consuming the job budget.',
+    });
+    expectTextIncludes(riskInstallRun, {
+      text: 'for attempt in 1 2 3',
+      rationale: 'Risk E2E browser install must retry to absorb transient registry/apt failures.',
+    });
+    expect(
+      getWorkflowStep(riskE2eJob, 'Cache Playwright Chrome').with.get('restore-keys'),
+      'Risk E2E browser cache must fall back to a prefix so dependency bumps reuse Chrome instead of cold-downloading.',
+    ).toBe('${{ runner.os }}-playwright-risk-chrome-');
     expect(getWorkflowStep(riskE2eJob, 'Run full Chrome E2E suite').run).toBe(
       "npm run test:e2e -- --project='Google Chrome'",
     );
