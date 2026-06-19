@@ -1,0 +1,90 @@
+{
+  "tool": "auroraflow-mutation-baseline",
+  "schemaVersion": "1.0.0",
+  "summary": {
+    "total": 11,
+    "killed": 11,
+    "survived": 0,
+    "inapplicable": 0,
+    "killRate": 1
+  },
+  "mutations": [
+    {
+      "id": "cas-expected-version-lower-bound",
+      "area": "redisCas",
+      "file": "src/utils/redisClient.ts",
+      "description": "Accept a non-positive expected version (< 1 becomes < 0).",
+      "status": "killed"
+    },
+    {
+      "id": "cas-reply-shape-guard",
+      "area": "redisCas",
+      "file": "src/utils/redisClient.ts",
+      "description": "Weaken the compare-and-set reply length guard (!== 2 becomes < 2).",
+      "status": "killed"
+    },
+    {
+      "id": "cas-written-flag",
+      "area": "redisCas",
+      "file": "src/utils/redisClient.ts",
+      "description": "Break the written-flag parse (|| becomes &&, never written).",
+      "status": "killed"
+    },
+    {
+      "id": "config-bounded-int-clamp",
+      "area": "config",
+      "file": "src/framework/selfHealing/config.ts",
+      "description": "Stop clamping bounded integers at the hard maximum.",
+      "status": "killed"
+    },
+    {
+      "id": "config-bounded-int-lower-bound",
+      "area": "config",
+      "file": "src/framework/selfHealing/config.ts",
+      "description": "Accept bounded integers below 1 (broken lower bound).",
+      "status": "killed"
+    },
+    {
+      "id": "config-min-confidence-upper-bound",
+      "area": "config",
+      "file": "src/framework/selfHealing/config.ts",
+      "description": "Accept min confidence above 1 (broken upper bound).",
+      "status": "killed"
+    },
+    {
+      "id": "guarded-confidence-gate-strict",
+      "area": "guardedValidation",
+      "file": "src/framework/selfHealing/guardedValidation.ts",
+      "description": "Exclude candidates exactly at the confidence gate (>= becomes >).",
+      "status": "killed"
+    },
+    {
+      "id": "retry-integer-lower-bound",
+      "area": "retry",
+      "file": "src/helpers/helpers.ts",
+      "description": "Reject the minimum-valid integer option (< becomes <=).",
+      "status": "killed"
+    },
+    {
+      "id": "retry-terminal-attempt-off-by-one",
+      "area": "retry",
+      "file": "src/helpers/helpers.ts",
+      "description": "Skip the terminal retry failure branch (off-by-one on last attempt).",
+      "status": "killed"
+    },
+    {
+      "id": "scoring-off-by-one-limit",
+      "area": "scoring",
+      "file": "src/framework/selfHealing/candidateScoring.ts",
+      "description": "Return one more candidate than the bounded maximum.",
+      "status": "killed"
+    },
+    {
+      "id": "scoring-reverse-priority",
+      "area": "scoring",
+      "file": "src/framework/selfHealing/candidateScoring.ts",
+      "description": "Reverse candidate ordering (score ascending instead of descending).",
+      "status": "killed"
+    }
+  ]
+}

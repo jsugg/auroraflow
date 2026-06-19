@@ -20,6 +20,12 @@ export default tseslint.config(
     },
   },
   {
+    files: ['scripts/self-healing-script-store.ts'],
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
     files: ['**/*.{js,mjs}'],
     languageOptions: {
       globals: {
@@ -45,9 +51,14 @@ export default tseslint.config(
     languageOptions: {
       sourceType: 'commonjs',
       globals: {
+        Buffer: 'readonly',
         module: 'readonly',
+        process: 'readonly',
         require: 'readonly',
       },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
     },
   },
   eslintConfigPrettier,
