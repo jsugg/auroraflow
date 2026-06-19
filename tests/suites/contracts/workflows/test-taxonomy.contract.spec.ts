@@ -10,6 +10,8 @@ import {
 } from '../../../helpers/contractAssertions';
 
 const REPO_ROOT = process.cwd();
+const MISSING_SUITE_COMMAND_TIMEOUT_MS = 45_000;
+const MISSING_SUITE_CONTRACT_TIMEOUT_MS = 60_000;
 
 interface PackageJson {
   readonly scripts?: Readonly<Record<string, string>>;
@@ -190,33 +192,63 @@ describe('test script taxonomy contract', () => {
     ).toEqual([]);
   });
 
-  it('fails loudly when a suite path is missing', () => {
-    const missingSuitePath = 'tests/suites/__missing-suite-for-contract__';
-    const result = spawnSync(
-      process.execPath,
-      [
-        path.join(REPO_ROOT, 'node_modules/vitest/vitest.mjs'),
-        'run',
-        missingSuitePath,
-        '--config',
-        'vitest.config.mts',
-      ],
-      {
-        cwd: REPO_ROOT,
-        encoding: 'utf8',
-        env: { ...process.env, FORCE_COLOR: '0' },
-        timeout: 15_000,
-      },
-    );
-    const output = `${result.stdout}\n${result.stderr}`;
+  it('documents the semantic contract policy for contributors and coding agents', () => {
+    const policyDocuments = [
+      ['docs/development.md', readRepoFile('docs/development.md')],
+      ['AGENTS.md', readRepoFile('AGENTS.md')],
+    ] as const;
 
-    expect(result.error).toBeUndefined();
-    expect(result.status).not.toBe(0);
-    expectTextMatches(output, {
-      pattern: /No test files found/,
-      rationale: 'Missing suite paths must fail with Vitest no-test diagnostics.',
-    });
-  }, 20_000);
+    for (const [documentPath, content] of policyDocuments) {
+      expectTextIncludes(content, {
+        text: 'raw toContain/toMatch and bare boolean toBe(true)/toBe(false) stay banned',
+        rationale: `${documentPath} must preserve the AUR-QE-107 matcher ban.`,
+      });
+      expectTextIncludes(content, {
+        text: 'Use parsed workflow/JSON/Compose models where practical',
+        rationale: `${documentPath} must preserve the semantic-first model guidance.`,
+      });
+      expectTextIncludes(content, {
+        text: 'tests/helpers/contractAssertions.ts',
+        rationale: `${documentPath} must route protected wording checks through rationale helpers.`,
+      });
+      expectTextIncludes(content, {
+        text: 'tests/suites/contracts/workflows/test-taxonomy.contract.spec.ts',
+        rationale: `${documentPath} must tell agents not to weaken the enforcement contract.`,
+      });
+    }
+  });
+
+  it(
+    'fails loudly when a suite path is missing',
+    () => {
+      const missingSuitePath = 'tests/suites/__missing-suite-for-contract__';
+      const result = spawnSync(
+        process.execPath,
+        [
+          path.join(REPO_ROOT, 'node_modules/vitest/vitest.mjs'),
+          'run',
+          missingSuitePath,
+          '--config',
+          'vitest.config.mts',
+        ],
+        {
+          cwd: REPO_ROOT,
+          encoding: 'utf8',
+          env: { ...process.env, FORCE_COLOR: '0' },
+          timeout: MISSING_SUITE_COMMAND_TIMEOUT_MS,
+        },
+      );
+      const output = `${result.stdout}\n${result.stderr}`;
+
+      expect(result.error).toBeUndefined();
+      expect(result.status).not.toBe(0);
+      expectTextMatches(output, {
+        pattern: /No test files found/,
+        rationale: 'Missing suite paths must fail with Vitest no-test diagnostics.',
+      });
+    },
+    MISSING_SUITE_CONTRACT_TIMEOUT_MS,
+  );
 
   it('documents command cost tiers from implemented scripts', () => {
     const developmentGuide = readRepoFile('docs/development.md');
@@ -250,7 +282,7 @@ describe('test script taxonomy contract', () => {
       'Node Compatibility (Node 20/22/24)',
       'Repository Gates (Node 22)',
       'Risk-Triggered E2E (Chrome)',
-      'Risk-weighted coverage floors remain future QE-2 work.',
+      'risk-weighted per-file floors for high-risk modules once on Node 22 (AUR-QE-109).',
       'Default local Redis behavior is skip-friendly',
     ]) {
       expectTextIncludes(developmentGuide, {
