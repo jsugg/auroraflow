@@ -63,7 +63,7 @@ jobs:
         run: npm ci
 
       - name: Run npm audit (high+)
-        run: npm run security:check
+        run: npm run security:audit
 
   codeql:
     name: CodeQL
@@ -126,16 +126,53 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version: '3.12'
-
-      - name: Install zizmor
-        run: python -m pip install --upgrade pip zizmor
-
       - name: Analyze workflows with zizmor
-        run: zizmor .github/workflows
+        run: npm run security:workflows
+
+  secret-scan-effect-proof:
+    name: Secret Scan Effect Proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Commit synthetic secret fixture
+        run: |
+          mkdir -p .tmp/security-secret-proof
+          {
+            printf 'aws_access_key_id = AKIA%s\n' 'IOSFODNN7EXAMPLE'
+            printf 'aws_secret_access_key = %s%s\n' 'wJalrXUtnFEMI/K7MDENG+bPxRfiCY' 'EXAMPLEKEY'
+          } > .tmp/security-secret-proof/credentials
+          git config user.email "security-proof@example.invalid"
+          git config user.name "Security Proof"
+          git add -f .tmp/security-secret-proof/credentials
+          git commit -m "synthetic secret scan proof"
+
+      - name: Run gitleaks against synthetic secret
+        id: synthetic-gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
+        continue-on-error: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: 'false'
+          GITLEAKS_ENABLE_SUMMARY: 'false'
+          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'false'
+
+      - name: Assert synthetic secret was detected
+        env:
+          SYNTHETIC_GITLEAKS_OUTCOME: ${{ steps.synthetic-gitleaks.outcome }}
+        run: |
+          if [ "$SYNTHETIC_GITLEAKS_OUTCOME" != "failure" ]; then
+            echo "Synthetic gitleaks proof did not fail on planted secret; scanner may be disabled or misconfigured."
+            exit 1
+          fi
+          echo "Synthetic gitleaks proof failed on planted secret as expected."
 
   security-gate:
     name: Security Gate
@@ -146,6 +183,7 @@ jobs:
       - npm-audit
       - codeql
       - secret-scan
+      - secret-scan-effect-proof
       - workflow-security
     permissions:
       contents: read
@@ -157,6 +195,7 @@ jobs:
           NPM_AUDIT_RESULT: ${{ needs.npm-audit.result }}
           CODEQL_RESULT: ${{ needs.codeql.result }}
           SECRET_SCAN_RESULT: ${{ needs.secret-scan.result }}
+          SECRET_SCAN_EFFECT_PROOF_RESULT: ${{ needs.secret-scan-effect-proof.result }}
           WORKFLOW_SECURITY_RESULT: ${{ needs.workflow-security.result }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ] && [ "$DEPENDENCY_REVIEW_RESULT" != "success" ]; then
@@ -169,6 +208,10 @@ jobs:
           fi
           if [ "$SECRET_SCAN_RESULT" != "success" ]; then
             echo "Secret scan failed: $SECRET_SCAN_RESULT"
+            exit 1
+          fi
+          if [ "$SECRET_SCAN_EFFECT_PROOF_RESULT" != "success" ]; then
+            echo "Secret scan effect proof failed: $SECRET_SCAN_EFFECT_PROOF_RESULT"
             exit 1
           fi
           if [ "$WORKFLOW_SECURITY_RESULT" != "success" ]; then
