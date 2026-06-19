@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { parseLegacyLocatorString, type CandidateLocator } from './candidateLocator';
 import type { SelfHealingCandidateSeed } from './candidateTypes';
 import type { SelectorRegistryEntry } from './registryContracts';
 import {
@@ -236,6 +237,7 @@ function toRankedCandidate({
   history,
   registryRecordId,
   registryRecordVersion,
+  candidateLocator,
 }: {
   pageObjectName: string;
   actionType: SelfHealingActionType;
@@ -250,8 +252,9 @@ function toRankedCandidate({
   history?: SelectorCandidateHistory;
   registryRecordId?: string;
   registryRecordVersion?: number;
+  candidateLocator?: CandidateLocator;
 }): RankedSelfHealingCandidate {
-  const candidate = {
+  const candidate: RankedSelfHealingCandidate = {
     id: buildSelfHealingCandidateId({
       pageObjectName,
       actionType,
@@ -269,6 +272,9 @@ function toRankedCandidate({
     registryRecordId,
     registryRecordVersion,
   };
+  if (candidateLocator) {
+    candidate.candidateLocator = candidateLocator;
+  }
   return applyHistory(candidate, history);
 }
 
@@ -310,6 +316,7 @@ export function rankSelfHealingCandidates({
       rationale: suggestion.rationale,
       signals: suggestion.signals,
       evidence: heuristicEvidenceFor(suggestion),
+      candidateLocator: suggestion.candidateLocator,
       history: candidateHistories?.get(
         buildSelfHealingCandidateId({
           pageObjectName,
@@ -337,6 +344,7 @@ export function rankSelfHealingCandidates({
       rationale: seed.rationale,
       signals: scored.signals,
       evidence: seed.evidence,
+      candidateLocator: seed.candidateLocator,
       history: candidateHistories?.get(
         buildSelfHealingCandidateId({
           pageObjectName,
@@ -371,6 +379,7 @@ export function rankSelfHealingCandidates({
       rationale: `Registry selector ${entry.id} version ${entry.version} matched the failed action context.`,
       signals: scored.signals,
       evidence: registryEvidenceFor(entry),
+      candidateLocator: parseLegacyLocatorString(entry.locator) ?? undefined,
       history: candidateHistories?.get(
         buildSelfHealingCandidateId({
           pageObjectName,

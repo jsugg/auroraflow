@@ -53,6 +53,19 @@ The self-healing engine rows are experimental because candidate scoring calibrat
 | `retry`                 | runtime | stable |
 | `wait`                  | runtime | stable |
 
+### Runtime context
+
+The runtime dependency container (`AUR-IMPL-021`, `DID-09`) is experimental because the page-action pipeline (`AUR-IMPL-022`) and lifecycle helper (`AUR-IMPL-023`) are expected to extend it with additional ports. `createAuroraFlowContext()` with no options preserves the env-backed default behavior, so existing constructors keep working without depending on these exports. `PageFactory.getPage()` remains the stable page-only constructor path; context-aware factory creation must opt in through a registered `PageObjectProvider`.
+
+| Export                     | Kind    | Tier         |
+| -------------------------- | ------- | ------------ |
+| `createAuroraFlowContext`  | runtime | experimental |
+| `AuroraFlowClock`          | type    | experimental |
+| `AuroraFlowContext`        | type    | experimental |
+| `AuroraFlowContextOptions` | type    | experimental |
+| `AuroraFlowLoggerFactory`  | type    | experimental |
+| `PageObjectProvider`       | type    | experimental |
+
 ### Logging
 
 | Export                       | Kind    | Tier   |
@@ -193,6 +206,21 @@ The self-healing engine rows are experimental because candidate scoring calibrat
 | `evaluateGuardedSuggestionsDryRun`  | runtime | experimental |
 | `resolveLocatorExpression`          | runtime | experimental |
 | `GuardedValidationInput`            | type    | experimental |
+
+### Structured candidate model
+
+The discriminated `CandidateLocator` model (`AUR-IMPL-020`) is experimental: the guarded path resolves these structurally without parsing display strings, and the shape may be reshaped as locator-first APIs (`AUR-IMPL-027`) land.
+
+| Export                             | Kind    | Tier         |
+| ---------------------------------- | ------- | ------------ |
+| `CANDIDATE_LOCATOR_SCHEMA_VERSION` | runtime | experimental |
+| `describeCandidateLocator`         | runtime | experimental |
+| `parseCandidateLocator`            | runtime | experimental |
+| `parseLegacyLocatorString`         | runtime | experimental |
+| `resolveCandidateLocator`          | runtime | experimental |
+| `CandidateLocator`                 | type    | experimental |
+| `CandidateLocatorKind`             | type    | experimental |
+| `CandidateLocatorName`             | type    | experimental |
 
 ### Self-healing artifact contracts
 

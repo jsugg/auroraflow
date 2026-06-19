@@ -1,4 +1,5 @@
 import type { Locator, Page } from 'playwright';
+import { parseLegacyLocatorString, resolveCandidateLocator } from './candidateLocator';
 import type {
   GuardedValidationCandidate,
   GuardedValidationPolicyDecision,
@@ -37,81 +38,16 @@ function toBoundedCandidateLimit(rawValue: number | undefined): number {
   return Math.max(1, Math.floor(rawValue));
 }
 
-function resolveNameOption(rawValue: string): string | RegExp {
-  const regexMatch = rawValue.match(/^\/(.+)\/([a-z]*)$/i);
-  if (regexMatch) {
-    return new RegExp(regexMatch[1], regexMatch[2]);
-  }
-  const quotedValue = parseQuotedStringLiteral(rawValue);
-  return quotedValue ?? rawValue.replace(/^['"`]|['"`]$/g, '');
-}
-
-function parseQuotedStringLiteral(rawValue: string): string | null {
-  const trimmedValue = rawValue.trim();
-  if (trimmedValue.length < 2) {
-    return null;
-  }
-
-  const quote = trimmedValue[0];
-  if (quote !== "'" && quote !== '"' && quote !== '`') {
-    return null;
-  }
-  if (trimmedValue[trimmedValue.length - 1] !== quote) {
-    return null;
-  }
-
-  // TODO(AUR-IMPL-020): Remove legacy string-DSL quote recovery after structured candidates land.
-  return trimmedValue
-    .slice(1, -1)
-    .replace(/\\\\/g, '\\')
-    .replace(/\\(['"`])/g, '$1');
-}
-
-function parsePageStringArgument(expression: string, methodName: string): string | null {
-  const prefix = `page.${methodName}(`;
-  if (!expression.startsWith(prefix) || !expression.endsWith(')')) {
-    return null;
-  }
-  return parseQuotedStringLiteral(expression.slice(prefix.length, -1));
-}
-
+/**
+ * Legacy string read path: resolves a pre-1.0.0 Playwright-like locator string by
+ * converting it to the structured model and resolving that. The structured
+ * guarded path ({@link resolveCandidateLocator}) never calls this; it exists so
+ * legacy artifacts and arbitrary `original` selectors still resolve. Returns
+ * `null` when the expression is not a supported shape.
+ */
 export function resolveLocatorExpression(page: Page, expression: string): Locator | null {
-  const trimmedExpression = expression.trim();
-
-  const testIdValue = parsePageStringArgument(trimmedExpression, 'getByTestId');
-  if (testIdValue !== null) {
-    return page.getByTestId(testIdValue);
-  }
-
-  const textValue = parsePageStringArgument(trimmedExpression, 'getByText');
-  if (textValue !== null) {
-    return page.getByText(textValue);
-  }
-
-  const labelValue = parsePageStringArgument(trimmedExpression, 'getByLabel');
-  if (labelValue !== null) {
-    return page.getByLabel(labelValue);
-  }
-
-  const roleMatch = trimmedExpression.match(
-    /^page\.getByRole\((['"`])([^'"`]+)\1(?:,\s*\{\s*name:\s*(.+)\s*\})?\)$/,
-  );
-  if (roleMatch?.[2]) {
-    const role = roleMatch[2] as Parameters<Page['getByRole']>[0];
-    const rawNameOption = roleMatch[3];
-    if (!rawNameOption) {
-      return page.getByRole(role);
-    }
-    const name = resolveNameOption(rawNameOption.trim());
-    return page.getByRole(role, { name });
-  }
-
-  const locatorValue = parsePageStringArgument(trimmedExpression, 'locator');
-  if (locatorValue !== null) {
-    return page.locator(locatorValue);
-  }
-
-  return null;
+  const parsed = parseLegacyLocatorString(expression);
+  return parsed === null ? null : resolveCandidateLocator(page, parsed);
 }
 
 function bySuggestionPriority(left: SelfHealingSuggestion, right: SelfHealingSuggestion): number {
@@ -297,26 +233,32 @@ async function evaluateGuardedSuggestionsDryRunInner({
         visible: false,
         status: 'below_confidence_threshold',
         message: `Score ${suggestion.score.toFixed(3)} is below min confidence ${minConfidence.toFixed(3)}.`,
-      });
-      continue;
-    }
-
-    const locator = resolveLocatorExpression(page, suggestion.locator);
-    if (!locator) {
-      candidates.push({
-        locator: suggestion.locator,
-        strategy: suggestion.strategy,
-        score: suggestion.score,
-        confidenceEligible: true,
-        matchedElements: 0,
-        visible: false,
-        status: 'unsupported_locator_expression',
-        message: 'Unsupported locator expression for guarded validation.',
+        candidateLocator: suggestion.candidateLocator,
       });
       continue;
     }
 
     try {
+      // New guarded path: structured candidates resolve without parsing strings.
+      // Only legacy/arbitrary candidates fall back to the legacy string read path.
+      const locator = suggestion.candidateLocator
+        ? resolveCandidateLocator(page, suggestion.candidateLocator)
+        : resolveLocatorExpression(page, suggestion.locator);
+      if (!locator) {
+        candidates.push({
+          locator: suggestion.locator,
+          strategy: suggestion.strategy,
+          score: suggestion.score,
+          confidenceEligible: true,
+          matchedElements: 0,
+          visible: false,
+          status: 'unsupported_locator_expression',
+          message: 'Unsupported locator expression for guarded validation.',
+          candidateLocator: suggestion.candidateLocator,
+        });
+        continue;
+      }
+
       const matchedElements = await locator.count();
       const visible =
         matchedElements > 0
@@ -339,6 +281,7 @@ async function evaluateGuardedSuggestionsDryRunInner({
         matchedElements,
         visible,
         status: matchedElements === 0 ? 'no_matches' : visible ? 'accepted' : 'not_visible',
+        candidateLocator: suggestion.candidateLocator,
       });
     } catch (error: unknown) {
       candidates.push({
@@ -350,6 +293,7 @@ async function evaluateGuardedSuggestionsDryRunInner({
         visible: false,
         status: 'evaluation_error',
         message: error instanceof Error ? error.message : 'Unknown guarded validation error.',
+        candidateLocator: suggestion.candidateLocator,
       });
     }
   }

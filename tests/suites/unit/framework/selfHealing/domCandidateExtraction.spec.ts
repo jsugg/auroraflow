@@ -69,6 +69,39 @@ describe('extractDomCandidateSeeds', () => {
     ).toBe(true);
   });
 
+  it('attaches structured candidate locators to each DOM seed (AUR-IMPL-020)', () => {
+    const candidates = extractDomCandidateSeeds({
+      snapshot,
+      actionType: 'click',
+      maxTextLength: 120,
+    });
+    const byLocator = new Map(
+      candidates.map((candidate) => [candidate.locator, candidate.candidateLocator]),
+    );
+
+    expect(byLocator.get("page.getByTestId('submit-order')")).toEqual({
+      schemaVersion: '1.0.0',
+      kind: 'testId',
+      value: 'submit-order',
+    });
+    expect(byLocator.get("page.getByRole('button', { name: 'Submit order' })")).toEqual({
+      schemaVersion: '1.0.0',
+      kind: 'role',
+      role: 'button',
+      name: { kind: 'string', value: 'Submit order' },
+    });
+    expect(byLocator.get("page.getByText('Submit order')")).toEqual({
+      schemaVersion: '1.0.0',
+      kind: 'text',
+      value: 'Submit order',
+    });
+    expect(byLocator.get("page.locator('button#submit')")).toEqual({
+      schemaVersion: '1.0.0',
+      kind: 'css',
+      selector: 'button#submit',
+    });
+  });
+
   it('emits quoted role, label, text, and CSS locators parseable until AUR-IMPL-020', () => {
     const quotedSnapshot: DomSnapshot = {
       ...snapshot,

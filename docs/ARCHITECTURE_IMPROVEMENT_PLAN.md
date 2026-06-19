@@ -863,7 +863,7 @@ Target internal module boundaries:
 Runtime context model:
 
 - Existing env defaults remain.
-- Consumers can pass an `AuroraFlowContext` to page objects/factory/fixture.
+- Consumers can pass an `AuroraFlowContext` directly to page objects, to explicit `PageFactory` providers, or through the fixture; `PageFactory.getPage()` must not infer or inject context through arbitrary constructor argument positions.
 - Context owns logger, telemetry, registry runtime, self-healing config, artifact writer, screenshot policy, clock/random, and disposal.
 - `getTelemetry()` and `getRedisClient()` stay for compatibility but become default-context adapters.
 
@@ -1139,7 +1139,8 @@ Caption: target keeps `PageObjectBase` public while moving mutable infrastructur
 - Issue IDs: `AUR-ARCH-011`, `010`, `006`.
 - Problem: env/singletons prevent isolation.
 - Target behavior: context injection with env-backed default.
-- Proposed design: context object owns logger, telemetry, registry runtime, self-healing config, artifact writer, privacy policy, clock/random, lifecycle disposables; `PageFactory` can receive context; `PageObjectBase` constructor overload remains compatible.
+- Proposed design: context object owns logger, telemetry, registry runtime, self-healing config, artifact writer, privacy policy, clock/random, lifecycle disposables; `PageFactory` can receive context for explicit registered providers; `PageFactory.getPage()` remains page-only so consumer-owned constructor arguments such as URLs, fixtures, and options are never hijacked by infrastructure injection; `PageObjectBase` constructor overload remains compatible.
+- Decision/rationale (2026-06-19): constructor position is a page-object domain contract, not an infrastructure dependency-injection channel. Provider registration is the approved factory seam for context-aware or non-standard construction because it preserves domain constructor ownership, avoids reflection/`constructor.length` heuristics, and gives the future Playwright fixture a clear place to bind runtime context.
 - Simpler alternative: more env vars. Rejected: increases global bleed.
 - Areas: runtime module, page factory/base, telemetry/Redis adapters.
 - Tests: two contexts with different minConfidence/logger/telemetry in one process.

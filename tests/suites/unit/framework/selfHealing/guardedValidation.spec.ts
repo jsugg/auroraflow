@@ -10,6 +10,7 @@ import {
   evaluateGuardedSuggestionsDryRun,
   resolveLocatorExpression,
 } from '../../../../../src/framework/selfHealing/guardedValidation';
+import { textLocator } from '../../../../../src/framework/selfHealing/candidateLocator';
 import type { SelfHealingSuggestion } from '../../../../../src/framework/selfHealing/types';
 import { CapturingTelemetry } from '../observability/capturingTelemetry';
 
@@ -298,6 +299,122 @@ describe('evaluateGuardedSuggestionsDryRun', () => {
       domainAllowed: false,
       evaluatedDomain: 'blocked.test',
       blockedReason: 'domain_not_allowed',
+    });
+  });
+});
+
+describe('structured candidate guarded path (AUR-IMPL-020)', () => {
+  afterEach(() => {
+    resetTelemetryForTests();
+  });
+
+  it('resolves a structured candidate without parsing its display string', async () => {
+    const acceptedLocatorMock = createLocatorMock({ count: 1, visible: true });
+    const pageMock = {
+      ...createGuardedPageMock({ count: 0, visible: false }),
+      getByText: vi.fn().mockReturnValue(acceptedLocatorMock),
+    };
+    // The display string is deliberately not a parseable page expression: if the
+    // guarded path tried to parse it, resolution would fail. It succeeds only
+    // because the structured candidateLocator is resolved directly.
+    const suggestions: SelfHealingSuggestion[] = [
+      {
+        locator: 'opaque-display-string-not-parseable',
+        strategy: 'text',
+        score: 0.95,
+        rationale: 'structured',
+        signals: {
+          roleSignal: 1,
+          accessibleNameSignal: 1,
+          uniquenessSignal: 1,
+          historicalSignal: 1,
+          similaritySignal: 1,
+        },
+        candidateLocator: textLocator("It's saved"),
+      },
+    ];
+
+    const result = await evaluateGuardedSuggestionsDryRun({
+      page: pageMock as unknown as Page,
+      actionType: 'click',
+      minConfidence: 0.5,
+      suggestions,
+      currentUrl: 'https://example.test/page',
+      safetyPolicy: {
+        allowedActions: ['click'],
+        allowedDomains: [],
+      },
+    });
+
+    expect(pageMock.getByText).toHaveBeenCalledWith("It's saved");
+    expect(result.acceptedLocator).toBe('opaque-display-string-not-parseable');
+    expect(result.candidates[0]).toMatchObject({
+      status: 'accepted',
+      candidateLocator: { schemaVersion: '1.0.0', kind: 'text', value: "It's saved" },
+    });
+  });
+
+  it('falls back to the legacy string read path when no structured locator is present', async () => {
+    const pageMock = createGuardedPageMock();
+    const suggestions: SelfHealingSuggestion[] = [
+      createSuggestion("page.getByTestId('submit')", 0.95, 'testId'),
+    ];
+
+    const result = await evaluateGuardedSuggestionsDryRun({
+      page: pageMock as unknown as Page,
+      actionType: 'click',
+      minConfidence: 0.5,
+      suggestions,
+      currentUrl: 'https://example.test/page',
+      safetyPolicy: {
+        allowedActions: ['click'],
+        allowedDomains: [],
+      },
+    });
+
+    expect(pageMock.getByTestId).toHaveBeenCalledWith('submit');
+    expect(result.candidates[0]).toMatchObject({ status: 'accepted' });
+    expect(result.candidates[0]?.candidateLocator).toBeUndefined();
+  });
+
+  it('contains malformed structured locator errors to one candidate', async () => {
+    const pageMock = createGuardedPageMock();
+    const suggestions: SelfHealingSuggestion[] = [
+      {
+        ...createSuggestion('malformed-structured-regex', 0.95, 'roleName'),
+        candidateLocator: {
+          schemaVersion: '1.0.0',
+          kind: 'role',
+          role: 'button',
+          name: { kind: 'regex', source: 'save', flags: 'z' },
+        },
+      },
+    ];
+
+    const result = await evaluateGuardedSuggestionsDryRun({
+      page: pageMock as unknown as Page,
+      actionType: 'click',
+      minConfidence: 0.5,
+      suggestions,
+      currentUrl: 'https://example.test/page',
+      safetyPolicy: {
+        allowedActions: ['click'],
+        allowedDomains: [],
+      },
+    });
+
+    expect(pageMock.getByRole).not.toHaveBeenCalled();
+    expect(result.acceptedLocator).toBeUndefined();
+    expect(result.candidates[0]).toMatchObject({
+      locator: 'malformed-structured-regex',
+      status: 'evaluation_error',
+      message: expect.stringContaining('Invalid flags'),
+      candidateLocator: {
+        schemaVersion: '1.0.0',
+        kind: 'role',
+        role: 'button',
+        name: { kind: 'regex', source: 'save', flags: 'z' },
+      },
     });
   });
 });

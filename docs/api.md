@@ -22,7 +22,7 @@ abstract class PageObjectBase {
   protected logger: Logger;
   protected url: string;
 
-  constructor(page: Page, pageObjectName?: string);
+  constructor(page: Page, pageObjectName?: string, context?: AuroraFlowContext);
   protected initialize(): Promise<void>;
 
   navigateTo(url: string, options?: NavigationOptions): Promise<Response | null>;
@@ -79,12 +79,16 @@ interface ActionOptions {
 
 ```ts
 class PageFactory {
-  constructor(page: Page);
+  constructor(page: Page, context?: AuroraFlowContext);
   getPage<T extends PageObjectBase>(pageClass: PageObjectConstructor<T>): T;
+  registerPageProvider<T extends PageObjectBase>(
+    pageClass: PageObjectConstructor<T>,
+    provider: PageObjectProvider<T>,
+  ): this;
 }
 ```
 
-`PageFactory` creates and caches one instance per page-object constructor for the active Playwright `Page`.
+`PageFactory` creates and caches one instance per page-object constructor for the active Playwright `Page`. The stable `getPage()` path calls page-object constructors with the `Page` only; any second constructor argument remains page-object/domain owned. `registerPageProvider()` is the experimental opt-in seam for constructors that need the factory-owned `AuroraFlowContext` or additional domain arguments.
 
 ## Helpers
 
