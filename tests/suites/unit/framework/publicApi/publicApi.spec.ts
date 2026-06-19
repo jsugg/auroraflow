@@ -7,6 +7,7 @@ import {
   type ActionOptions,
   type NavigationOptions,
   type PageObjectConstructor,
+  type PageObjectProvider,
 } from '../../../../../src';
 
 class PublicApiPage extends PageObjectBase {
@@ -19,7 +20,10 @@ describe('Page Object public API', () => {
   it('exposes PageObjectBase and PageFactory from the public entrypoint', () => {
     const page = {} as Page;
     const pageConstructor: PageObjectConstructor<PublicApiPage> = PublicApiPage;
+    const pageProvider: PageObjectProvider<PublicApiPage> = (providedPage) =>
+      new PublicApiPage(providedPage);
     const factory = new PageFactory(page);
+    factory.registerPageProvider(pageConstructor, pageProvider);
 
     const pageObject = factory.getPage(pageConstructor);
 

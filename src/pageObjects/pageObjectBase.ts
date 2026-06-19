@@ -1,16 +1,16 @@
-import { performance } from 'node:perf_hooks';
 import type { ElementHandle, Page, Response } from 'playwright';
-import { Logger, createChildLogger } from '../utils/logger';
+import type { Logger } from '../utils/logger';
+import {
+  createAuroraFlowContext,
+  type AuroraFlowContext,
+} from '../framework/runtime/auroraFlowContext';
 import { analyzeSelfHealingFailure } from '../framework/selfHealing/analyzer';
-import { resolveSelfHealingConfig } from '../framework/selfHealing/config';
 import { captureFailureEvent } from '../framework/selfHealing/failureCapture';
 import {
   captureFailureScreenshot,
-  resolveArtifactPrivacyPolicy as resolveArtifactPrivacyPolicyFromEnvironment,
   type ArtifactPrivacyPolicy,
 } from '../framework/selfHealing/artifactPrivacy';
 import { persistSelfHealingRegistryTelemetry } from '../framework/selfHealing/registryPersistence';
-import { resolveSelfHealingRegistryRuntime } from '../framework/selfHealing/registryRuntime';
 import { generateRankedLocatorSuggestions } from '../framework/selfHealing/suggestionEngine';
 import {
   evaluateGuardedSuggestionsDryRun,
@@ -23,7 +23,6 @@ import type {
   SelfHealingConfig,
 } from '../framework/selfHealing/types';
 import type { SelfHealingRegistryRuntime } from '../framework/selfHealing/registryContracts';
-import { resolveCorrelationIdentifiers } from '../framework/observability/correlation';
 import {
   SPAN_NAMES,
   buildGuardedAutoHealMetricAttributes,
@@ -33,7 +32,7 @@ import {
   type PageActionMetricStatus,
 } from '../framework/observability/attributes';
 import { METRIC_NAMES } from '../framework/observability/metricNames';
-import { getTelemetry, type TelemetrySpan } from '../framework/observability/telemetry';
+import type { TelemetrySpan } from '../framework/observability/telemetry';
 
 export interface NavigationOptions {
   waitUntil?: 'load' | 'domcontentloaded' | 'networkidle';
@@ -142,16 +141,22 @@ export abstract class PageObjectBase {
   protected pageObjectName: string;
   protected runId: string;
   protected testId?: string;
+  protected readonly context: AuroraFlowContext;
   private initialized = false;
   private initializationPromise: Promise<void> | null = null;
 
-  constructor(page: Page, pageObjectName: string = new.target.name) {
+  constructor(
+    page: Page,
+    pageObjectName: string = new.target.name,
+    context: AuroraFlowContext = createAuroraFlowContext(),
+  ) {
     this.page = page;
     this.pageObjectName = pageObjectName;
-    const correlationIdentifiers = resolveCorrelationIdentifiers({});
+    this.context = context;
+    const correlationIdentifiers = context.resolveCorrelation();
     this.runId = correlationIdentifiers.runId;
     this.testId = correlationIdentifiers.testId;
-    this.logger = createChildLogger(pageObjectName, {
+    this.logger = context.createLogger(pageObjectName, {
       runId: this.runId,
       testId: this.testId,
     });
@@ -172,7 +177,7 @@ export abstract class PageObjectBase {
     guardedAutoHealAction?: GuardedAutoHealAction<T>,
     requiresInitialization: boolean = true,
   ): Promise<T> {
-    const telemetry = getTelemetry();
+    const telemetry = this.context.getTelemetry();
     return telemetry.runSpan({
       name: SPAN_NAMES.pageAction,
       attributes: buildPageActionSpanAttributes({
@@ -199,7 +204,7 @@ export abstract class PageObjectBase {
   protected resolveRegistryRuntime(
     config: SelfHealingConfig,
   ): SelfHealingRegistryRuntime | undefined {
-    return resolveSelfHealingRegistryRuntime(process.env, config);
+    return this.context.resolveRegistryRuntime(config);
   }
 
   private async safeActionWithTelemetry<T>({
@@ -219,8 +224,8 @@ export abstract class PageObjectBase {
     requiresInitialization: boolean;
     span: TelemetrySpan;
   }): Promise<T> {
-    const telemetry = getTelemetry();
-    const startedAt = performance.now();
+    const telemetry = this.context.getTelemetry();
+    const startedAt = this.context.clock.now();
     let actionStatus: PageActionMetricStatus = 'failed';
     let errorCode: string | undefined;
     let actionError: Error | undefined;
@@ -255,7 +260,7 @@ export abstract class PageObjectBase {
         );
       }
 
-      const selfHealingConfig = resolveSelfHealingConfig(process.env);
+      const selfHealingConfig = this.context.resolveSelfHealingConfig();
       span.setAttribute('auroraflow.self_heal.mode', selfHealingConfig.mode);
       const registryRuntime = this.resolveRegistryRuntime(selfHealingConfig);
       const rankedSuggestions = generateRankedLocatorSuggestions({
@@ -432,7 +437,7 @@ export abstract class PageObjectBase {
         error instanceof Error ? error : undefined,
       );
     } finally {
-      const durationMs = performance.now() - startedAt;
+      const durationMs = this.context.clock.now() - startedAt;
       span.setAttribute('auroraflow.action.succeeded', actionStatus !== 'failed');
       span.setAttribute('auroraflow.action.status', actionStatus);
       span.setAttribute('auroraflow.action.duration_ms', durationMs);
@@ -474,15 +479,13 @@ export abstract class PageObjectBase {
   }
 
   private buildFailureScreenshotPath(errorMessage: string): string {
-    const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+    const timestamp = this.context.clock.currentDate().toISOString().replace(/[:.]/g, '-');
     const sanitizedMessage = errorMessage.replace(/[^a-z0-9]/gi, '_');
     return `test-results/screenshots/${timestamp}_${sanitizedMessage}.png`;
   }
 
   protected resolveArtifactPrivacyPolicy(): ArtifactPrivacyPolicy {
-    return resolveArtifactPrivacyPolicyFromEnvironment(process.env, (diagnostic) =>
-      this.logger.warn(diagnostic),
-    );
+    return this.context.resolveArtifactPrivacyPolicy((diagnostic) => this.logger.warn(diagnostic));
   }
 
   private async ensureInitialized(): Promise<void> {

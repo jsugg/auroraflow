@@ -6,8 +6,20 @@ export {
   type ActionOptions,
   type NavigationOptions,
 } from './pageObjects/pageObjectBase';
-export { PageFactory, type PageObjectConstructor } from './helpers/pageFactory';
+export {
+  PageFactory,
+  type PageObjectConstructor,
+  type PageObjectProvider,
+} from './helpers/pageFactory';
 export { retry, wait } from './helpers/helpers';
+
+export {
+  createAuroraFlowContext,
+  type AuroraFlowClock,
+  type AuroraFlowContext,
+  type AuroraFlowContextOptions,
+  type AuroraFlowLoggerFactory,
+} from './framework/runtime/auroraFlowContext';
 
 export {
   LoggerConfigError,
@@ -320,6 +332,17 @@ export {
   resolveLocatorExpression,
   type GuardedValidationInput,
 } from './framework/selfHealing/guardedValidation';
+
+export {
+  CANDIDATE_LOCATOR_SCHEMA_VERSION,
+  describeCandidateLocator,
+  parseCandidateLocator,
+  parseLegacyLocatorString,
+  resolveCandidateLocator,
+  type CandidateLocator,
+  type CandidateLocatorKind,
+  type CandidateLocatorName,
+} from './framework/selfHealing/candidateLocator';
 
 export type {
   CapturedFailureError,
