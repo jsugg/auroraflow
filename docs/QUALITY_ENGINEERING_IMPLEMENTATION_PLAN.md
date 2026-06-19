@@ -114,6 +114,7 @@ Do not weaken these to make future work easier.
 | `AUR-QE-113` | Implement lifecycle fixture cleanup tests | QE-2 | P1 | TQE-002, TQE-003 | `AUR-IMPL-023` | `auroraflow/playwright` tests |
 | `AUR-QE-114` | Add flake governance and PR risk E2E lane | QE-2 | P2 | TQE-013, TQE-017 | SLO owner decision | workflows/report scripts |
 | `AUR-QE-115` | Add CLI boundary tests for CI scripts | QE-2 | P1 | TQE-018 | none | `scripts/**`, new tests |
+| `AUR-QE-115-2` | Stabilize CLI boundary test process timing | QE-2 | P1 | TQE-018, TQE-017 | `AUR-QE-115` | `tests/suites/unit/scripts/**` |
 | `AUR-QE-116` | Add versioned artifact compatibility fixtures | QE-3 | P1 | TQE-014 | `AUR-IMPL-029` | fixtures/schemas/docs |
 | `AUR-QE-117` | Convert observability workflow grep checks to typed validators | QE-3 | P1 | TQE-016 | `AUR-IMPL-031` optional | scripts/workflows/contracts |
 | `AUR-QE-118` | Add failure-path and DOM snapshot performance baseline | QE-3 | P2 | TQE-005, TQE-017 | `AUR-IMPL-032` | benchmarks/tests/docs |
@@ -356,7 +357,6 @@ Do not weaken these to make future work easier.
   2. Add PR label/path-triggered full E2E workflow option.
   3. Ensure quarantined tests remain visible in reports.
   4. Keep default PR fast.
-  5. Revisit the always-on-`main` risk E2E policy: `risk-e2e` currently runs full Chrome E2E on every `main` push (`github.ref == 'refs/heads/main'`), so docs/test-only merges still pay for — and can be flaked by — browser provisioning. Decide whether to scope it on `main` to the `run_risk_e2e` path filter (cheaper, less flake exposure) or keep it as an always-on post-merge safety net. Browser-install timeout/retry and cache `restore-keys` hardening already landed alongside `AUR-QE-107`; this remaining item is the gate-policy decision.
 - **Validation commands:**
   - `npm run workflows:lint`
   - `npm run flakiness:report` against fixture report data
@@ -378,6 +378,23 @@ Do not weaken these to make future work easier.
   - `npm run typecheck`
 - **Acceptance criteria:**
   - Every workflow-invoked script has process-level success and failure coverage.
+
+### `AUR-QE-115-2 — Stabilize CLI boundary test process timing`
+
+- **Objective:** Keep `AUR-QE-115` process-boundary coverage in the fast unit lane without load-sensitive child-process timeouts.
+- **Implementation steps:**
+  1. Reproduce and measure the `workflowScriptsBoundary` timeout path under focused and full unit execution.
+  2. Remove concurrent cold TypeScript child-process starts where success/failure cases can run sequentially.
+  3. Preserve success and expected-failure process assertions.
+  4. Add timeout diagnostics that include elapsed time and captured output tails.
+- **Validation commands:**
+  - Targeted `workflowScriptsBoundary` spec
+  - `npm run test:unit`
+  - `npm run typecheck`
+- **Acceptance criteria:**
+  - `workflowScriptsBoundary` completes without per-process timeout under focused execution.
+  - Full unit suite completes without the previous transient `workflowScriptsBoundary` timeout.
+  - Timeout failures, if they recur, include enough diagnostics to distinguish startup cost, script hang, and assertion failure.
 
 ### `AUR-QE-116 — Add versioned artifact compatibility fixtures`
 
@@ -544,7 +561,7 @@ Execute AUR-QE-105. Add typed per-test artifact-root helpers for Playwright and 
 QE-01D (QE-1/2) — semantic contract assertions baseline:
 
 ```text
-AUR-QE-107 is complete. Keep future contract changes semantic-first: raw toContain/toMatch and bare boolean toBe(true)/toBe(false) stay banned in contract specs, workflow/JSON/Compose checks should use parsed models where practical, and any remaining public compatibility or safety wording checks must include an explicit rationale through tests/helpers/contractAssertions.ts.
+Ensure AUR-QE-107 is complete. Keep future contract changes semantic-first: raw toContain/toMatch and bare boolean toBe(true)/toBe(false) stay banned in contract specs, workflow/JSON/Compose checks should use parsed models where practical, and any remaining public compatibility or safety wording checks must include an explicit rationale through tests/helpers/contractAssertions.ts. Ensure that this decision is documented and that measures are taken so that a coding agent knows this decision must be honored.
 ```
 
 QE-02A (QE-2) — security and CLI effect boundaries:
@@ -553,7 +570,13 @@ QE-02A (QE-2) — security and CLI effect boundaries:
 Execute AUR-QE-108 and AUR-QE-115. Split security audit/workflow ownership, add representative effect-level security failure proof without weakening SHA-pinned workflow contracts, and add fast process-boundary tests for workflow-invoked scripts that assert exit code plus actionable stdout/stderr for success and expected-failure cases.
 ```
 
-QE-02B (QE-2) — risk-weighted coverage and assertion-strength baseline:
+QE-02A follow-up (QE-2) — CLI boundary timing stabilization:
+
+```text
+Execute AUR-QE-115-2. Keep the process-boundary coverage added by AUR-QE-115, but remove load-sensitive timing by measuring the timeout path, avoiding concurrent cold TypeScript child-process starts, preserving all success/failure assertions, and adding actionable timeout diagnostics. Prove the focused boundary spec and full unit suite no longer hit the previous workflowScriptsBoundary timeout.
+```
+
+QE-02B (QE-2) — risk-weighted coverage and assertion-strength baseline: \*
 
 ```text
 Execute AUR-QE-109 and AUR-QE-110. Add focused unit coverage and thresholds for the listed high-risk modules before raising floors, keep global coverage as an erosion guard, and establish a bounded mutation/property baseline for scoring/config/guarded validation/retry/Redis CAS. Do not add a new test dependency without explicit approval; use the smallest deterministic scheduled/manual baseline until runtime and tooling are accepted.
