@@ -7,6 +7,7 @@ export interface WorkflowStep {
   readonly run?: string;
   readonly uses?: string;
   readonly if?: string;
+  readonly continueOnError?: string;
   readonly env: ReadonlyMap<string, string>;
   readonly with: ReadonlyMap<string, string>;
   readonly raw: string;
@@ -167,6 +168,7 @@ function parseSteps(jobBlock: string): WorkflowStep[] {
       run: parseRun(stepBlock),
       uses: parseScalarMatch(stepBlock, /^ {8}uses:\s*(.+)$/m),
       if: parseScalarMatch(stepBlock, /^ {8}if:\s*(.+)$/m),
+      continueOnError: parseScalarMatch(stepBlock, /^ {8}continue-on-error:\s*(.+)$/m),
       env: parseNestedMap(stepBlock, 8, 'env', 10),
       with: parseNestedMap(stepBlock, 8, 'with', 10),
       raw: stepBlock,
