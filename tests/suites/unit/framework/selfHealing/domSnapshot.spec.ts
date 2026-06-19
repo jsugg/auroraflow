@@ -124,3 +124,82 @@ describe('domSnapshot utilities', () => {
     });
   });
 });
+
+describe('domSnapshot node-reachable helpers (AUR-QE-109)', () => {
+  it('redacts every sensitive attribute name pattern', () => {
+    for (const attributeName of [
+      'data-password',
+      'x-token',
+      'client-secret',
+      'api-key',
+      'authorization',
+      'cookie',
+      'session-id',
+    ]) {
+      expect(
+        redactDomAttributeValue({ attributeName, attributeValue: 'leak', tagName: 'div' }),
+      ).toBe('[redacted]');
+    }
+  });
+
+  it('passes through non-sensitive attributes and form values on non-input tags', () => {
+    expect(
+      redactDomAttributeValue({
+        attributeName: 'data-testid',
+        attributeValue: 'login',
+        tagName: 'button',
+      }),
+    ).toBe('login');
+    expect(
+      redactDomAttributeValue({
+        attributeName: 'value',
+        attributeValue: 'visible',
+        tagName: 'div',
+      }),
+    ).toBe('visible');
+  });
+
+  it('deduplicates and lowercases the attribute allow-list while dropping blanks', () => {
+    expect(normalizeAllowedAttributes(['  ', 'ID', 'id', ' Data-Test '])).toEqual([
+      'id',
+      'data-test',
+    ]);
+  });
+
+  it('returns collapsed text unchanged when within the length budget', () => {
+    expect(normalizeDomText('already short', 50)).toBe('already short');
+  });
+
+  it('defaults capturedAt, omits url, and applies the default privacy policy', async () => {
+    const evaluated = {
+      schemaVersion: '1.0.0',
+      capturedAt: '2026-06-05T12:00:00.000Z',
+      nodeCount: 0,
+      truncated: false,
+      elements: [],
+    } satisfies DomSnapshot;
+    const evaluate = vi
+      .fn<(_: unknown, input: unknown) => Promise<DomSnapshot>>()
+      .mockResolvedValue(evaluated);
+    const page = { evaluate } as unknown as Page;
+
+    await captureDomSnapshot(page, {
+      maxDomNodes: 0,
+      maxTextLength: 1,
+      allowedAttributes: ['id'],
+    });
+
+    expect(evaluate).toHaveBeenCalledWith(
+      expect.any(Function),
+      expect.objectContaining({
+        currentUrl: undefined,
+        maxDomNodes: 1,
+        maxTextLength: 1,
+        domTextMode: 'capture',
+      }),
+    );
+    const passedInput = evaluate.mock.calls[0]?.[1] as { capturedAt: string };
+    expect(typeof passedInput.capturedAt).toBe('string');
+    expect(passedInput.capturedAt.length).toBeGreaterThan(0);
+  });
+});
