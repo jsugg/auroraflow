@@ -89,6 +89,134 @@
         }
       }
     },
+    "candidateLocatorName": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["kind", "value"],
+          "properties": {
+            "kind": {
+              "const": "string"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["kind", "source"],
+          "properties": {
+            "kind": {
+              "const": "regex"
+            },
+            "source": {
+              "type": "string",
+              "minLength": 1
+            },
+            "flags": {
+              "type": "string",
+              "pattern": "^[dgimsuvy]*$"
+            }
+          }
+        }
+      ]
+    },
+    "candidateLocator": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["schemaVersion", "kind", "value"],
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "kind": {
+              "const": "testId"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["schemaVersion", "kind", "role"],
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "kind": {
+              "const": "role"
+            },
+            "role": {
+              "type": "string",
+              "minLength": 1
+            },
+            "name": {
+              "$ref": "#/$defs/candidateLocatorName"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["schemaVersion", "kind", "value"],
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "kind": {
+              "const": "label"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["schemaVersion", "kind", "value"],
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "kind": {
+              "const": "text"
+            },
+            "value": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["schemaVersion", "kind", "selector"],
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "kind": {
+              "const": "css"
+            },
+            "selector": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      ]
+    },
     "selfHealingSuggestion": {
       "type": "object",
       "additionalProperties": true,
@@ -109,6 +237,9 @@
         },
         "signals": {
           "$ref": "#/$defs/selfHealingSuggestionSignals"
+        },
+        "candidateLocator": {
+          "$ref": "#/$defs/candidateLocator"
         }
       }
     },
@@ -333,6 +464,9 @@
         },
         "history": {
           "$ref": "#/$defs/selectorCandidateHistorySummary"
+        },
+        "candidateLocator": {
+          "$ref": "#/$defs/candidateLocator"
         }
       }
     },
@@ -428,6 +562,9 @@
         },
         "message": {
           "type": "string"
+        },
+        "candidateLocator": {
+          "$ref": "#/$defs/candidateLocator"
         }
       }
     },

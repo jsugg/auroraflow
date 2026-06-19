@@ -4,6 +4,16 @@ import {
   SelfHealingSuggestionSignals,
   SelfHealingSuggestionStrategy,
 } from './types';
+import {
+  cssLocator,
+  describeCandidateLocator,
+  labelLocator,
+  regexName,
+  roleLocator,
+  testIdLocator,
+  textLocator,
+  type CandidateLocator,
+} from './candidateLocator';
 import { buildSelfHealingSuggestionMetricAttributes } from '../observability/attributes';
 import { METRIC_NAMES } from '../observability/metricNames';
 import { getTelemetry } from '../observability/telemetry';
@@ -21,21 +31,23 @@ export interface SuggestionEngineInput {
 
 const DEFAULT_MAX_CANDIDATES = 5;
 
-const GENERIC_ACTION_FALLBACK: Readonly<Record<SelfHealingActionType, string>> = Object.freeze({
-  navigate: "page.locator('main')",
-  click: "page.getByRole('button')",
-  type: "page.getByRole('textbox')",
-  read: "page.getByRole('status')",
-  wait: "page.locator('body')",
-  screenshot: "page.locator('body')",
-  close: "page.locator('body')",
-  unknown: "page.locator('body')",
-});
+const GENERIC_ACTION_FALLBACK: Readonly<Record<SelfHealingActionType, CandidateLocator>> =
+  Object.freeze({
+    navigate: cssLocator('main'),
+    click: roleLocator('button'),
+    type: roleLocator('textbox'),
+    read: roleLocator('status'),
+    wait: cssLocator('body'),
+    screenshot: cssLocator('body'),
+    close: cssLocator('body'),
+    unknown: cssLocator('body'),
+  });
 
 interface CandidateSeed {
   locator: string;
   strategy: SelfHealingSuggestionStrategy;
   rationale: string;
+  candidateLocator?: CandidateLocator;
 }
 
 function clamp(value: number): number {
@@ -169,6 +181,19 @@ function addSeed(targetSeeds: Map<string, CandidateSeed>, seed: CandidateSeed): 
   }
 }
 
+function addStructuredSeed(
+  targetSeeds: Map<string, CandidateSeed>,
+  candidateLocator: CandidateLocator,
+  strategy: SelfHealingSuggestionStrategy,
+  rationale: string,
+): void {
+  const display = describeCandidateLocator(candidateLocator);
+  if (display === null) {
+    return;
+  }
+  addSeed(targetSeeds, { locator: display, strategy, rationale, candidateLocator });
+}
+
 function createSeeds({
   actionType,
   failedTarget,
@@ -189,67 +214,75 @@ function createSeeds({
 
     const dataTestId = extractDataTestId(normalizedTarget);
     if (dataTestId) {
-      addSeed(seeds, {
-        locator: `page.getByTestId('${dataTestId}')`,
-        strategy: 'testId',
-        rationale: 'Data test IDs are usually resilient across UI refactors.',
-      });
+      addStructuredSeed(
+        seeds,
+        testIdLocator(dataTestId),
+        'testId',
+        'Data test IDs are usually resilient across UI refactors.',
+      );
     }
 
     if (normalizedTarget.startsWith('#')) {
       const idToken = normalizedTarget.slice(1);
       const searchToken = toSearchToken(idToken);
       if (searchToken) {
-        addSeed(seeds, {
-          locator: `page.getByTestId('${idToken}')`,
-          strategy: 'testId',
-          rationale: 'Converted id selector into test-id candidate.',
-        });
-        addSeed(seeds, {
-          locator: `page.getByRole('${role}', { name: /${searchToken}/i })`,
-          strategy: 'roleName',
-          rationale: 'Role + accessible name match is robust for interactive elements.',
-        });
-        addSeed(seeds, {
-          locator: `page.getByLabel('${idToken}')`,
-          strategy: 'ariaLabel',
-          rationale: 'Label-based selector can survive structural CSS changes.',
-        });
+        addStructuredSeed(
+          seeds,
+          testIdLocator(idToken),
+          'testId',
+          'Converted id selector into test-id candidate.',
+        );
+        addStructuredSeed(
+          seeds,
+          roleLocator(role, regexName(searchToken, 'i')),
+          'roleName',
+          'Role + accessible name match is robust for interactive elements.',
+        );
+        addStructuredSeed(
+          seeds,
+          labelLocator(idToken),
+          'ariaLabel',
+          'Label-based selector can survive structural CSS changes.',
+        );
       }
     }
 
     const textTarget = extractTextTarget(normalizedTarget);
     if (textTarget) {
       const textSearchToken = toSearchToken(textTarget);
-      addSeed(seeds, {
-        locator: `page.getByText('${textTarget}')`,
-        strategy: 'text',
-        rationale: 'Text selector fallback for visible content.',
-      });
+      addStructuredSeed(
+        seeds,
+        textLocator(textTarget),
+        'text',
+        'Text selector fallback for visible content.',
+      );
       if (textSearchToken) {
-        addSeed(seeds, {
-          locator: `page.getByRole('${role}', { name: /${textSearchToken}/i })`,
-          strategy: 'roleName',
-          rationale: 'Role + text-derived name candidate inferred from failing selector.',
-        });
+        addStructuredSeed(
+          seeds,
+          roleLocator(role, regexName(textSearchToken, 'i')),
+          'roleName',
+          'Role + text-derived name candidate inferred from failing selector.',
+        );
       }
     }
 
     const classMatch = normalizedTarget.match(/\.([a-zA-Z0-9_-]+)/);
     if (classMatch?.[1]) {
-      addSeed(seeds, {
-        locator: `page.locator('.${classMatch[1]}')`,
-        strategy: 'cssFallback',
-        rationale: 'Fallback to a simplified CSS class selector.',
-      });
+      addStructuredSeed(
+        seeds,
+        cssLocator(`.${classMatch[1]}`),
+        'cssFallback',
+        'Fallback to a simplified CSS class selector.',
+      );
     }
   }
 
-  addSeed(seeds, {
-    locator: GENERIC_ACTION_FALLBACK[actionType],
-    strategy: 'fallback',
-    rationale: 'Action-specific generic fallback used when no high-confidence candidate exists.',
-  });
+  addStructuredSeed(
+    seeds,
+    GENERIC_ACTION_FALLBACK[actionType],
+    'fallback',
+    'Action-specific generic fallback used when no high-confidence candidate exists.',
+  );
 
   return [...seeds.values()];
 }
@@ -271,13 +304,17 @@ export function generateRankedLocatorSuggestions({
       failedTarget,
       historicalSuccessByLocator,
     });
-    return {
+    const suggestion: SelfHealingSuggestion = {
       locator: seed.locator,
       strategy: seed.strategy,
       score: scored.score,
       rationale: seed.rationale,
       signals: scored.signals,
     };
+    if (seed.candidateLocator) {
+      suggestion.candidateLocator = seed.candidateLocator;
+    }
+    return suggestion;
   });
 
   suggestions.sort((left, right) => {

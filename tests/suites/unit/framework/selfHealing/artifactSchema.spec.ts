@@ -1,9 +1,40 @@
 import { describe, expect, it } from 'vitest';
 import {
   SelfHealingArtifactSchemaError,
+  parseCapturedFailureEvent,
   parseDomSnapshot,
   parseSelectorCandidateHistory,
 } from '../../../../../src/framework/selfHealing/artifactSchema';
+import {
+  parseCandidateLocator,
+  parseLegacyLocatorString,
+  textLocator,
+} from '../../../../../src/framework/selfHealing/candidateLocator';
+
+function baseFailureEvent(): Record<string, unknown> {
+  return {
+    artifactVersion: '1.0.0',
+    eventId: 'self-heal-1',
+    timestamp: '2026-06-05T12:00:00.000Z',
+    runId: 'run-1',
+    component: 'CheckoutPage',
+    errorCode: 'page_action_error',
+    mode: 'guarded',
+    minConfidence: 0.92,
+    safetyPolicy: { allowedActions: ['click'], allowedDomains: ['example.test'] },
+    pageObjectName: 'CheckoutPage',
+    action: { type: 'click', description: 'click submit' },
+    error: { name: 'TimeoutError', message: 'timed out' },
+  };
+}
+
+const suggestionSignals = {
+  roleSignal: 0.2,
+  accessibleNameSignal: 0.3,
+  uniquenessSignal: 0.4,
+  historicalSignal: 0,
+  similaritySignal: 0.8,
+};
 
 describe('self-healing artifact schema parsers', () => {
   it('parses a valid DOM snapshot without widening unknown JSON', () => {
@@ -63,5 +94,44 @@ describe('self-healing artifact schema parsers', () => {
       guardedApplySucceeded: 2,
       lastSeenAt: '2026-06-05T12:00:00.000Z',
     });
+  });
+
+  it('reads legacy failure events whose suggestions carry only string locators', () => {
+    const event = parseCapturedFailureEvent({
+      ...baseFailureEvent(),
+      suggestions: [
+        {
+          locator: 'page.getByText("It\'s saved")',
+          strategy: 'text',
+          score: 0.9,
+          rationale: 'legacy',
+          signals: suggestionSignals,
+        },
+      ],
+    });
+
+    const [suggestion] = event.suggestions;
+    expect(suggestion?.candidateLocator).toBeUndefined();
+    // Legacy string read path reconstructs the structured locator on demand.
+    expect(parseLegacyLocatorString(suggestion?.locator ?? '')).toEqual(textLocator("It's saved"));
+  });
+
+  it('reads new failure events whose suggestions carry structured locators', () => {
+    const event = parseCapturedFailureEvent({
+      ...baseFailureEvent(),
+      suggestions: [
+        {
+          locator: "page.getByText('It\\'s saved')",
+          strategy: 'text',
+          score: 0.9,
+          rationale: 'structured',
+          signals: suggestionSignals,
+          candidateLocator: { schemaVersion: '1.0.0', kind: 'text', value: "It's saved" },
+        },
+      ],
+    });
+
+    const [suggestion] = event.suggestions;
+    expect(parseCandidateLocator(suggestion?.candidateLocator)).toEqual(textLocator("It's saved"));
   });
 });

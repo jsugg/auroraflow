@@ -27,6 +27,7 @@ The command compiles all schema files and validates generated artifacts found un
 - Schema IDs and artifact versions currently use `1.0.0`.
 - Required fields describe the current generated artifact contracts.
 - Additive fields are allowed so artifact consumers can adopt new metadata without breaking old readers.
+- Self-healing suggestions may include optional `candidateLocator` objects with their own `schemaVersion`; legacy artifacts that only carry `locator` display strings remain readable through the compatibility path.
 - Type changes, removed required fields, or renamed fields require a new schema ID/version and migration notes.
 
 ## Runtime Status

@@ -1,5 +1,20 @@
+import {
+  cssLocator,
+  describeCandidateLocator,
+  labelLocator,
+  roleLocator,
+  stringName,
+  testIdLocator,
+  textLocator,
+  type CandidateLocator,
+} from './candidateLocator';
 import type { SelfHealingCandidateSeed } from './candidateTypes';
-import type { DomElementSummary, DomSnapshot, SelfHealingActionType } from './types';
+import type {
+  CandidateEvidence,
+  DomElementSummary,
+  DomSnapshot,
+  SelfHealingActionType,
+} from './types';
 
 export interface DomCandidateExtractionInput {
   snapshot: DomSnapshot;
@@ -20,22 +35,6 @@ const GENERIC_TEXT_VALUES: ReadonlySet<string> = new Set([
   'read',
   'text',
 ]);
-
-function toPlaywrightStringLiteral(value: string): string | null {
-  if (value.length === 0) {
-    return null;
-  }
-  if (!value.includes("'")) {
-    return `'${value}'`;
-  }
-  if (!value.includes('"')) {
-    return `"${value}"`;
-  }
-  if (!value.includes('`') && !value.includes('${')) {
-    return `\`${value}\``;
-  }
-  return null;
-}
 
 function normalizeText(value: string | undefined, maxLength: number): string | null {
   if (!value) {
@@ -93,13 +92,26 @@ function locatorCountsBy(
   return counts;
 }
 
-function addSeed(
+function addStructuredSeed(
   seeds: Map<string, SelfHealingCandidateSeed>,
-  seed: SelfHealingCandidateSeed,
+  candidateLocator: CandidateLocator,
+  meta: {
+    strategy: SelfHealingCandidateSeed['strategy'];
+    rationale: string;
+    evidence: CandidateEvidence;
+  },
 ): void {
-  if (!seeds.has(seed.locator)) {
-    seeds.set(seed.locator, seed);
+  const display = describeCandidateLocator(candidateLocator);
+  if (display === null || seeds.has(display)) {
+    return;
   }
+  seeds.set(display, {
+    locator: display,
+    candidateLocator,
+    strategy: meta.strategy,
+    rationale: meta.rationale,
+    evidence: meta.evidence,
+  });
 }
 
 export function extractDomCandidateSeeds({
@@ -131,13 +143,11 @@ export function extractDomCandidateSeeds({
   for (const element of visibleElements) {
     for (const attributeName of TEST_ID_ATTRIBUTES) {
       const testIdValue = element.attributes[attributeName];
-      const literal = testIdValue ? toPlaywrightStringLiteral(testIdValue) : null;
-      if (!literal) {
+      if (!testIdValue) {
         continue;
       }
       const testIdKey = `${attributeName}:${testIdValue}`;
-      addSeed(seeds, {
-        locator: `page.getByTestId(${literal})`,
+      addStructuredSeed(seeds, testIdLocator(testIdValue), {
         strategy: 'testId',
         rationale: `DOM snapshot exposed a stable ${attributeName} attribute.`,
         evidence: {
@@ -155,24 +165,20 @@ export function extractDomCandidateSeeds({
     const accessibleName = normalizeText(element.accessibleName, maxTextLength);
     const role = element.role;
     if (role && accessibleName && isRoleCompatible(actionType, role)) {
-      const literal = toPlaywrightStringLiteral(accessibleName);
-      if (literal) {
-        const roleNameKey = `${role}:${accessibleName.toLowerCase()}`;
-        addSeed(seeds, {
-          locator: `page.getByRole('${role}', { name: ${literal} })`,
-          strategy: 'roleName',
-          rationale: 'DOM snapshot linked the element to a role and accessible name.',
-          evidence: {
-            elementId: element.id,
-            source: 'dom',
-            uniqueInSnapshot: roleNameCounts.get(roleNameKey) === 1,
-            visible: element.visible,
-            accessibleName: accessibleName ?? undefined,
-            role,
-            matchedAttributes: ['role', 'accessibleName'],
-          },
-        });
-      }
+      const roleNameKey = `${role}:${accessibleName.toLowerCase()}`;
+      addStructuredSeed(seeds, roleLocator(role, stringName(accessibleName)), {
+        strategy: 'roleName',
+        rationale: 'DOM snapshot linked the element to a role and accessible name.',
+        evidence: {
+          elementId: element.id,
+          source: 'dom',
+          uniqueInSnapshot: roleNameCounts.get(roleNameKey) === 1,
+          visible: element.visible,
+          accessibleName: accessibleName ?? undefined,
+          role,
+          matchedAttributes: ['role', 'accessibleName'],
+        },
+      });
     }
 
     if (
@@ -181,56 +187,46 @@ export function extractDomCandidateSeeds({
         element.tagName === 'input' ||
         element.tagName === 'textarea')
     ) {
-      const literal = toPlaywrightStringLiteral(accessibleName);
-      if (literal) {
-        addSeed(seeds, {
-          locator: `page.getByLabel(${literal})`,
-          strategy: 'ariaLabel',
-          rationale: 'DOM snapshot found label-compatible accessible name evidence.',
-          evidence: {
-            elementId: element.id,
-            source: 'dom',
-            uniqueInSnapshot: true,
-            visible: element.visible,
-            accessibleName: accessibleName ?? undefined,
-            role,
-            matchedAttributes: element.attributes['aria-label'] ? ['aria-label'] : ['label'],
-          },
-        });
-      }
+      addStructuredSeed(seeds, labelLocator(accessibleName), {
+        strategy: 'ariaLabel',
+        rationale: 'DOM snapshot found label-compatible accessible name evidence.',
+        evidence: {
+          elementId: element.id,
+          source: 'dom',
+          uniqueInSnapshot: true,
+          visible: element.visible,
+          accessibleName: accessibleName ?? undefined,
+          role,
+          matchedAttributes: element.attributes['aria-label'] ? ['aria-label'] : ['label'],
+        },
+      });
     }
 
     const text = normalizeText(element.text, maxTextLength);
     if (text && isTextCandidateAllowed(actionType, text)) {
-      const literal = toPlaywrightStringLiteral(text);
-      if (literal) {
-        addSeed(seeds, {
-          locator: `page.getByText(${literal})`,
-          strategy: 'text',
-          rationale: 'DOM snapshot found short visible text for the failed action.',
-          evidence: {
-            elementId: element.id,
-            source: 'dom',
-            uniqueInSnapshot: textCounts.get(text.toLowerCase()) === 1,
-            visible: element.visible,
-            accessibleName: accessibleName ?? undefined,
-            role,
-            matchedAttributes: ['text'],
-          },
-        });
-      }
+      addStructuredSeed(seeds, textLocator(text), {
+        strategy: 'text',
+        rationale: 'DOM snapshot found short visible text for the failed action.',
+        evidence: {
+          elementId: element.id,
+          source: 'dom',
+          uniqueInSnapshot: textCounts.get(text.toLowerCase()) === 1,
+          visible: element.visible,
+          accessibleName: accessibleName ?? undefined,
+          role,
+          matchedAttributes: ['text'],
+        },
+      });
     }
 
-    const cssLiteral = element.cssPath ? toPlaywrightStringLiteral(element.cssPath) : null;
-    if (cssLiteral) {
-      addSeed(seeds, {
-        locator: `page.locator(${cssLiteral})`,
+    if (element.cssPath) {
+      addStructuredSeed(seeds, cssLocator(element.cssPath), {
         strategy: 'cssFallback',
         rationale: 'DOM snapshot supplied a bounded stable CSS fallback path.',
         evidence: {
           elementId: element.id,
           source: 'dom',
-          uniqueInSnapshot: cssPathCounts.get(element.cssPath ?? '') === 1,
+          uniqueInSnapshot: cssPathCounts.get(element.cssPath) === 1,
           visible: element.visible,
           accessibleName: accessibleName ?? undefined,
           role,
