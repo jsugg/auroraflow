@@ -142,37 +142,33 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Commit synthetic secret fixture
+      - name: Install pinned gitleaks
         run: |
+          set -euo pipefail
+          version=8.30.1
+          sha256=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" -o /tmp/gitleaks.tar.gz
+          printf '%s  /tmp/gitleaks.tar.gz\n' "${sha256}" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          /tmp/gitleaks version
+
+      - name: Assert the secret scanner detects a planted credential
+        run: |
+          set -uo pipefail
           mkdir -p .tmp/security-secret-proof
-          {
-            printf 'aws_access_key_id = AKIA%s\n' 'IOSFODNN7EXAMPLE'
-            printf 'aws_secret_access_key = %s%s\n' 'wJalrXUtnFEMI/K7MDENG+bPxRfiCY' 'EXAMPLEKEY'
-          } > .tmp/security-secret-proof/credentials
-          git config user.email "security-proof@example.invalid"
-          git config user.name "Security Proof"
-          git add -f .tmp/security-secret-proof/credentials
-          git commit -m "synthetic secret scan proof"
-
-      - name: Run gitleaks against synthetic secret
-        id: synthetic-gitleaks
-        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITLEAKS_ENABLE_COMMENTS: 'false'
-          GITLEAKS_ENABLE_SUMMARY: 'false'
-          GITLEAKS_ENABLE_UPLOAD_ARTIFACT: 'false'
-
-      - name: Assert synthetic secret was detected
-        env:
-          SYNTHETIC_GITLEAKS_OUTCOME: ${{ steps.synthetic-gitleaks.outcome }}
-        run: |
-          if [ "$SYNTHETIC_GITLEAKS_OUTCOME" != "failure" ]; then
-            echo "Synthetic gitleaks proof did not fail on planted secret; scanner may be disabled or misconfigured."
+          # Synthetic, non-allowlisted fake token; never a real credential. The AWS
+          # documentation example key is allowlisted by gitleaks, so it cannot prove
+          # detection; a filesystem scan also avoids gitleaks-action's PR-range limit.
+          printf 'github_pat = ghp_%s\n' 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8' \
+            > .tmp/security-secret-proof/credentials
+          code=0
+          /tmp/gitleaks detect --no-git --source .tmp/security-secret-proof --redact -v || code=$?
+          rm -rf .tmp/security-secret-proof
+          if [ "$code" -eq 0 ]; then
+            echo "Secret scanner did not flag the planted credential; the gate may be ineffective."
             exit 1
           fi
-          echo "Synthetic gitleaks proof failed on planted secret as expected."
+          echo "Secret scanner flagged the planted credential as expected (gitleaks exit ${code})."
 
   security-gate:
     name: Security Gate

@@ -116,30 +116,46 @@ describe('security workflow secret scanning contract', () => {
 
   it('proves gitleaks catches a synthetic secret without weakening the pinned scan job', () => {
     const effectProofJob = getWorkflowJob(securityWorkflow, 'secret-scan-effect-proof');
-    const fixtureStep = getWorkflowStep(effectProofJob, 'Commit synthetic secret fixture');
-    const syntheticScanStep = getWorkflowStep(
+    const installStep = getWorkflowStep(effectProofJob, 'Install pinned gitleaks');
+    const assertionStep = getWorkflowStep(
       effectProofJob,
-      'Run gitleaks against synthetic secret',
+      'Assert the secret scanner detects a planted credential',
     );
-    const assertionStep = getWorkflowStep(effectProofJob, 'Assert synthetic secret was detected');
 
     expect(effectProofJob.name).toBe('Secret Scan Effect Proof');
-    expect(syntheticScanStep.id).toBe('synthetic-gitleaks');
-    expect(syntheticScanStep.uses).toBe(
-      getWorkflowStep(getWorkflowJob(securityWorkflow, 'secret-scan'), 'Run gitleaks scan').uses,
+
+    const installRun = installStep.run ?? '';
+    expectInvariant(
+      installRun.includes('gitleaks/gitleaks/releases/download/') &&
+        /version=\d+\.\d+\.\d+/.test(installRun),
+      'Effect proof must install gitleaks from a version-pinned release asset.',
     );
-    expect(syntheticScanStep.continueOnError).toBe('true');
-    expect(syntheticScanStep.env.get('GITLEAKS_ENABLE_UPLOAD_ARTIFACT')).toBe('false');
-    expect(assertionStep.env.get('SYNTHETIC_GITLEAKS_OUTCOME')).toBe(
-      '${{ steps.synthetic-gitleaks.outcome }}',
+    expectTextIncludes(installRun, {
+      text: 'sha256sum -c',
+      rationale: 'Effect proof must verify the downloaded gitleaks against a pinned checksum.',
+    });
+
+    const assertionRun = assertionStep.run ?? '';
+    expectInvariant(
+      assertionRun.includes('--no-git'),
+      'Effect proof must scan the planted file directly, not a PR commit range that omits it.',
     );
-    expectTextIncludes(fixtureStep.run ?? '', {
-      text: 'git commit -m "synthetic secret scan proof"',
-      rationale: 'Synthetic proof must place the planted secret into local git history.',
+    expectInvariant(
+      assertionRun.includes('ghp_'),
+      'Effect proof must plant a non-allowlisted synthetic token the scanner will flag.',
+    );
+    expectTextIncludes(assertionRun, {
+      text: 'the gate may be ineffective',
+      rationale: 'Effect proof must fail with an actionable scanner-ineffective message.',
     });
-    expectTextIncludes(assertionStep.run ?? '', {
-      text: 'Synthetic gitleaks proof did not fail on planted secret; scanner may be disabled or misconfigured.',
-      rationale: 'Synthetic proof must fail with an actionable scanner misconfiguration message.',
-    });
+
+    const realScanStep = getWorkflowStep(
+      getWorkflowJob(securityWorkflow, 'secret-scan'),
+      'Run gitleaks scan',
+    );
+    expectInvariant(
+      (realScanStep.uses ?? '').startsWith('gitleaks/gitleaks-action@'),
+      'The enforced secret-scan job must keep using the pinned gitleaks action.',
+    );
   });
 });
