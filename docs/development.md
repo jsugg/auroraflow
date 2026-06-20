@@ -79,6 +79,15 @@ npm run verify
 
 `npm run verify` runs repo-local actionlint bootstrap, formatting, linting, typechecking, unit tests, contracts, Redis/OTLP integration, schema validation, ShellCheck, and workflow linting.
 
+### Contract assertion policy (`AUR-QE-107`)
+
+Contract specs are semantic-first:
+
+- raw toContain/toMatch and bare boolean toBe(true)/toBe(false) stay banned in `tests/suites/contracts/**`.
+- Use parsed workflow/JSON/Compose models where practical instead of asserting raw YAML, Markdown, or JSON text.
+- Public compatibility or safety wording checks are allowed only when they protect user-facing contracts; route them through `tests/helpers/contractAssertions.ts` with explicit rationale.
+- `tests/suites/contracts/workflows/test-taxonomy.contract.spec.ts` enforces the matcher ban, and root `AGENTS.md` repeats the rule for coding agents.
+
 | Command | Cost tier | Scope |
 | --- | --- | --- |
 | `npm test` / `npm run test:unit` | Fast local | Unit tests only; thread pool without per-file isolation and 30s per-test timeout; no browser, Docker, Redis, or OTLP dependency. |
@@ -89,6 +98,17 @@ npm run verify
 | `npm run test:e2e` | Browser | Playwright browser projects. |
 | `npm run test:e2e:guarded` | Guarded browser proof | Parallel Chrome proof for guarded self-heal at the default gate. |
 | `npm run verify` | Full local gate | Static checks, unit, contracts, integration, schemas, ShellCheck, and workflow lint. |
+| `npm run test:mutation` / `test:mutation:check` | Scheduled/manual | Scoped mutation baseline for calibration-critical code; not part of `verify`. See [mutation & property baseline](quality/mutation-property-baseline.md). |
+
+### Risk-weighted coverage floors
+
+`npm run test:coverage` enforces per-file floors for high-risk modules in addition to the global erosion guard (AUR-QE-109). Floors live in `configs/vitest.coverage-global.mts` and sit just below measured coverage, so a failure means real erosion, not noise. Covered surfaces include the OpenTelemetry adapter, the Redis client and selector store, and the promotion workflow.
+
+`src/framework/selfHealing/domSnapshot.ts` carries a documented exemption: ~90% of it runs inside `page.evaluate` (browser context), which node coverage cannot reach and which the guarded Chrome proof exercises instead. Its node-reachable privacy/normalization helpers are unit-tested; the line/statement floor guards that surface only. Structured-candidate coverage lives in the node-side candidate locator, DOM extraction, and guarded-validation suites.
+
+### Mutation & property baseline
+
+Calibration-critical code (scoring, config, guarded validation, retry, Redis CAS) has a scoped mutation/property baseline that measures assertion catch-rate, not just execution. Property tests run inside `npm run test:unit` with fixed seeds and are reproducible from the seed; the mutation baseline runs manually or on a schedule via `npm run test:mutation` (warning-only) and `npm run test:mutation:check` (no-regression). No new test dependency is used. See [mutation & property baseline](quality/mutation-property-baseline.md).
 
 ### CI gate topology
 
@@ -96,7 +116,7 @@ npm run verify
 | --- | --- | --- | --- |
 | `Node Compatibility (Node 20/22/24)` | Fast matrix | Pull requests, `main`, scheduled, and manual quality workflow runs | `npm ci`, lint, typecheck, and unit tests only; no Docker, Redis, OTLP collector, or browser install. |
 | `Repository Gates (Node 22)` | Static + Docker integration | Pull requests, `main`, scheduled, and manual quality workflow runs | Format, contracts, Redis/OTLP integration with `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true`, schemas, ShellCheck, and workflow lint. |
-| `Coverage (Critical + Global)` | Coverage | Pull requests, `main`, scheduled, and manual quality workflow runs | Enforces critical-module thresholds and global `src/**` coverage once on Node 22. Risk-weighted coverage floors remain future QE-2 work. |
+| `Coverage (Critical + Global)` | Coverage | Pull requests, `main`, scheduled, and manual quality workflow runs | Enforces critical-module thresholds, global `src/**` coverage, and risk-weighted per-file floors for high-risk modules once on Node 22 (AUR-QE-109). |
 | `Guarded Self-Heal Proof (Chrome)` | Guarded browser proof | Pull requests, `main`, scheduled, and manual quality workflow runs | Preserves Chrome proof for guarded self-heal at the shipped default confidence gate. |
 | `Risk-Triggered E2E (Chrome)` | Browser heavy | `main`, scheduled/manual runs, risky browser/runtime paths, or `full-e2e`/`risk:e2e` PR labels | Runs the full Chrome E2E project outside the Node compatibility matrix. |
 | Observability smoke jobs | Docker/remote optional | Path-triggered, `main`, scheduled, or manual runs depending on the job | Keeps collector/full-stack/remote export evidence separate from fast compatibility gates. |
@@ -166,7 +186,7 @@ SELF_HEAL_MODE=guarded npm run test:smoke
 npm run self-heal:governance
 ```
 
-Artifacts are written to `SELF_HEAL_ARTIFACTS_DIR` when set, otherwise `test-results/self-healing/*.json`; governance summaries are written to `test-results/self-healing-governance-summary.{json,md}`.
+Artifacts are written to `SELF_HEAL_ARTIFACTS_DIR` when set, otherwise `test-results/self-healing/*.json`; governance summaries are written to `test-results/self-healing-governance-summary.{json,md}`. Promotion and registry-cleanup CLIs default to Redis. Use `AURORAFLOW_SELF_HEALING_SCRIPT_STORE=memory` only for deterministic local/process-boundary checks where non-durable state is expected.
 
 When extending this area, keep these contracts intact:
 
@@ -207,10 +227,14 @@ CI installs native `actionlint` before running `npm run verify`. For the closest
 ```bash
 npm run workflows:lint
 npm run shellcheck
-npm run security:check
+npm run security:audit
+npm run security:workflows
+npm run security:all
 ```
 
-Security workflows cover dependency review on pull requests, high-severity npm audit on non-PR events, CodeQL on non-PR events, gitleaks, workflow security scanning, and a final security gate.
+`npm run security:audit` owns high-severity npm audit only. `npm run security:workflows` owns zizmor workflow analysis only. `npm run security:all` combines both local security checks; `npm run security:check` remains a compatibility alias.
+
+Security workflows cover dependency review on pull requests, high-severity npm audit on non-PR events, CodeQL on non-PR events, gitleaks, a synthetic gitleaks failure proof, workflow security scanning, and a final security gate.
 
 ## Release process
 

@@ -1,7 +1,6 @@
 import { cleanupExpiredSelfHealingRegistryRecords } from './self-healing-registry-cleanup';
-import { createRedisSelectorStore } from '../src/data/selectors/redisSelectorStore';
+import { createSelfHealingScriptStoreHandle } from './self-healing-script-store';
 import { SelfHealingPromotionWorkflow } from '../src/framework/selfHealing/promotionWorkflow';
-import { getRedisClient } from '../src/utils/redisClient';
 
 type CommandName = 'approve' | 'cleanup' | 'list' | 'reject' | 'rollback';
 
@@ -94,66 +93,70 @@ function resolveReviewer(flags: Readonly<Record<string, string | boolean>>): str
 
 export async function runSelfHealingPromotions(argv = process.argv.slice(2)): Promise<number> {
   const { command, flags } = parseArgs(argv);
-  const store = createRedisSelectorStore(getRedisClient());
+  const handle = createSelfHealingScriptStoreHandle();
   const namespace = readStringFlag(flags, 'namespace');
 
-  if (command === 'cleanup') {
-    const summary = await cleanupExpiredSelfHealingRegistryRecords({
-      store,
+  try {
+    if (command === 'cleanup') {
+      const summary = await cleanupExpiredSelfHealingRegistryRecords({
+        store: handle.store,
+        activeNamespace: namespace,
+        limit: readPositiveIntegerFlag(flags, 'limit', 1000),
+      });
+      console.log(JSON.stringify(summary, null, 2));
+      return 0;
+    }
+
+    const workflow = new SelfHealingPromotionWorkflow({
+      store: handle.store,
       activeNamespace: namespace,
-      limit: readPositiveIntegerFlag(flags, 'limit', 1000),
     });
-    console.log(JSON.stringify(summary, null, 2));
-    return 0;
-  }
 
-  const workflow = new SelfHealingPromotionWorkflow({
-    store,
-    activeNamespace: namespace,
-  });
+    if (command === 'list') {
+      const result = await workflow.list({
+        selectorId: readStringFlag(flags, 'selector-id'),
+        candidateId: readStringFlag(flags, 'candidate-id'),
+        includeAcknowledged: readBooleanFlag(flags, 'all', false),
+        limit: readPositiveIntegerFlag(flags, 'limit', 100),
+      });
+      console.log(JSON.stringify(result, null, 2));
+      return 0;
+    }
 
-  if (command === 'list') {
-    const result = await workflow.list({
-      selectorId: readStringFlag(flags, 'selector-id'),
-      candidateId: readStringFlag(flags, 'candidate-id'),
-      includeAcknowledged: readBooleanFlag(flags, 'all', false),
-      limit: readPositiveIntegerFlag(flags, 'limit', 100),
-    });
-    console.log(JSON.stringify(result, null, 2));
-    return 0;
-  }
+    const identifier = {
+      eventId: readStringFlag(flags, 'event-id'),
+      promotionId: readStringFlag(flags, 'promotion-id'),
+    };
 
-  const identifier = {
-    eventId: readStringFlag(flags, 'event-id'),
-    promotionId: readStringFlag(flags, 'promotion-id'),
-  };
+    if (command === 'approve') {
+      const result = await workflow.approve({
+        ...identifier,
+        reviewer: resolveReviewer(flags),
+      });
+      console.log(JSON.stringify(result, null, 2));
+      return result.status === 'conflict' ? 2 : 0;
+    }
 
-  if (command === 'approve') {
-    const result = await workflow.approve({
+    if (command === 'reject') {
+      const result = await workflow.reject({
+        ...identifier,
+        reviewer: resolveReviewer(flags),
+        reason: readStringFlag(flags, 'reason') ?? '',
+      });
+      console.log(JSON.stringify(result, null, 2));
+      return 0;
+    }
+
+    const result = await workflow.rollback({
       ...identifier,
       reviewer: resolveReviewer(flags),
+      reason: readStringFlag(flags, 'reason'),
     });
     console.log(JSON.stringify(result, null, 2));
     return result.status === 'conflict' ? 2 : 0;
+  } finally {
+    await handle.close().catch(() => {});
   }
-
-  if (command === 'reject') {
-    const result = await workflow.reject({
-      ...identifier,
-      reviewer: resolveReviewer(flags),
-      reason: readStringFlag(flags, 'reason') ?? '',
-    });
-    console.log(JSON.stringify(result, null, 2));
-    return 0;
-  }
-
-  const result = await workflow.rollback({
-    ...identifier,
-    reviewer: resolveReviewer(flags),
-    reason: readStringFlag(flags, 'reason'),
-  });
-  console.log(JSON.stringify(result, null, 2));
-  return result.status === 'conflict' ? 2 : 0;
 }
 
 if (require.main === module) {

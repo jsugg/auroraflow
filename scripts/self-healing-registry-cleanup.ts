@@ -3,8 +3,7 @@ import {
   buildSelectorRegistryNamespaces,
   type SelectorStore,
 } from '../src/data/selectors/selectorRegistry';
-import { createRedisSelectorStore } from '../src/data/selectors/redisSelectorStore';
-import { RedisClient } from '../src/utils/redisClient';
+import { createSelfHealingScriptStoreHandle } from './self-healing-script-store';
 
 export interface SelfHealingRegistryCleanupOptions {
   store: SelectorStore;
@@ -136,18 +135,19 @@ export async function cleanupExpiredSelfHealingRegistryRecords({
 }
 
 async function main(): Promise<void> {
-  const client = new RedisClient();
+  const activeNamespace =
+    process.env.SELF_HEAL_REGISTRY_NAMESPACE ?? DEFAULT_SELECTOR_REGISTRY_NAMESPACES.active;
+  const limit = parsePositiveInteger(process.env.SELF_HEAL_REGISTRY_CLEANUP_LIMIT, 1_000);
+  const handle = createSelfHealingScriptStoreHandle();
   try {
-    await client.connect();
     const summary = await cleanupExpiredSelfHealingRegistryRecords({
-      store: createRedisSelectorStore(client),
-      activeNamespace:
-        process.env.SELF_HEAL_REGISTRY_NAMESPACE ?? DEFAULT_SELECTOR_REGISTRY_NAMESPACES.active,
-      limit: parsePositiveInteger(process.env.SELF_HEAL_REGISTRY_CLEANUP_LIMIT, 1_000),
+      store: handle.store,
+      activeNamespace,
+      limit,
     });
     console.log(JSON.stringify(summary, null, 2));
   } finally {
-    await client.disconnect().catch(() => {});
+    await handle.close().catch(() => {});
   }
 }
 

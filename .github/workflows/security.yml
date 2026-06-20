@@ -63,7 +63,7 @@ jobs:
         run: npm ci
 
       - name: Run npm audit (high+)
-        run: npm run security:check
+        run: npm run security:audit
 
   codeql:
     name: CodeQL
@@ -126,16 +126,49 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Python
-        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6.2.0
-        with:
-          python-version: '3.12'
-
-      - name: Install zizmor
-        run: python -m pip install --upgrade pip zizmor
-
       - name: Analyze workflows with zizmor
-        run: zizmor .github/workflows
+        run: npm run security:workflows
+
+  secret-scan-effect-proof:
+    name: Secret Scan Effect Proof
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install pinned gitleaks
+        run: |
+          set -euo pipefail
+          version=8.30.1
+          sha256=551f6fc83ea457d62a0d98237cbad105af8d557003051f41f3e7ca7b3f2470eb
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v${version}/gitleaks_${version}_linux_x64.tar.gz" -o /tmp/gitleaks.tar.gz
+          printf '%s  /tmp/gitleaks.tar.gz\n' "${sha256}" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tar.gz -C /tmp gitleaks
+          /tmp/gitleaks version
+
+      - name: Assert the secret scanner detects a planted credential
+        run: |
+          set -uo pipefail
+          mkdir -p .tmp/security-secret-proof
+          # Synthetic, non-allowlisted fake token; never a real credential. The AWS
+          # documentation example key is allowlisted by gitleaks, so it cannot prove
+          # detection; a filesystem scan also avoids gitleaks-action's PR-range limit.
+          printf 'github_pat = ghp_%s\n' 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6Q7r8' \
+            > .tmp/security-secret-proof/credentials
+          code=0
+          /tmp/gitleaks detect --no-git --source .tmp/security-secret-proof --redact -v || code=$?
+          rm -rf .tmp/security-secret-proof
+          if [ "$code" -eq 0 ]; then
+            echo "Secret scanner did not flag the planted credential; the gate may be ineffective."
+            exit 1
+          fi
+          echo "Secret scanner flagged the planted credential as expected (gitleaks exit ${code})."
 
   security-gate:
     name: Security Gate
@@ -146,6 +179,7 @@ jobs:
       - npm-audit
       - codeql
       - secret-scan
+      - secret-scan-effect-proof
       - workflow-security
     permissions:
       contents: read
@@ -157,6 +191,7 @@ jobs:
           NPM_AUDIT_RESULT: ${{ needs.npm-audit.result }}
           CODEQL_RESULT: ${{ needs.codeql.result }}
           SECRET_SCAN_RESULT: ${{ needs.secret-scan.result }}
+          SECRET_SCAN_EFFECT_PROOF_RESULT: ${{ needs.secret-scan-effect-proof.result }}
           WORKFLOW_SECURITY_RESULT: ${{ needs.workflow-security.result }}
         run: |
           if [ "${{ github.event_name }}" = "pull_request" ] && [ "$DEPENDENCY_REVIEW_RESULT" != "success" ]; then
@@ -169,6 +204,10 @@ jobs:
           fi
           if [ "$SECRET_SCAN_RESULT" != "success" ]; then
             echo "Secret scan failed: $SECRET_SCAN_RESULT"
+            exit 1
+          fi
+          if [ "$SECRET_SCAN_EFFECT_PROOF_RESULT" != "success" ]; then
+            echo "Secret scan effect proof failed: $SECRET_SCAN_EFFECT_PROOF_RESULT"
             exit 1
           fi
           if [ "$WORKFLOW_SECURITY_RESULT" != "success" ]; then

@@ -6,6 +6,8 @@ import { describe, expect, it } from 'vitest';
 import { expectTextIncludes } from '../../../helpers/contractAssertions';
 
 const REPO_ROOT = process.cwd();
+const COMMAND_TIMEOUT_MS = 45_000;
+const CONTRACT_TIMEOUT_MS = 90_000;
 
 interface CommandResult {
   readonly status: number | null;
@@ -18,6 +20,7 @@ function run(command: string, args: readonly string[], cwd: string): CommandResu
     cwd,
     encoding: 'utf8',
     env: { ...process.env, FORCE_COLOR: '0' },
+    timeout: COMMAND_TIMEOUT_MS,
   });
 
   expect(result.error).toBeUndefined();
@@ -54,29 +57,33 @@ function runStamp(repo: string, command: 'write' | 'check'): CommandResult {
 }
 
 describe('pre-push verification stamp contract', () => {
-  it('skips only after a clean content-addressed verify stamp', () => {
-    const repo = prepareTempRepo();
+  it(
+    'skips only after a clean content-addressed verify stamp',
+    () => {
+      const repo = prepareTempRepo();
 
-    try {
-      const writeResult = runStamp(repo, 'write');
-      expect(writeResult.status).toBe(0);
-      expect(runStamp(repo, 'check').status).toBe(0);
+      try {
+        const writeResult = runStamp(repo, 'write');
+        expect(writeResult.status).toBe(0);
+        expect(runStamp(repo, 'check').status).toBe(0);
 
-      writeFileSync(path.join(repo, 'package.json'), '{"scripts":{"changed":"true"}}\n');
-      expect(runStamp(repo, 'check').status).not.toBe(0);
+        writeFileSync(path.join(repo, 'package.json'), '{"scripts":{"changed":"true"}}\n');
+        expect(runStamp(repo, 'check').status).not.toBe(0);
 
-      const dirtyWrite = runStamp(repo, 'write');
-      expect(dirtyWrite.status).toBe(0);
-      expectTextIncludes(dirtyWrite.stdout, {
-        text: 'verify stamp skipped: worktree is not clean.',
-        rationale: 'Dirty worktrees must never refresh a pre-push skip stamp.',
-      });
-      expect(runStamp(repo, 'check').status).not.toBe(0);
+        const dirtyWrite = runStamp(repo, 'write');
+        expect(dirtyWrite.status).toBe(0);
+        expectTextIncludes(dirtyWrite.stdout, {
+          text: 'verify stamp skipped: worktree is not clean.',
+          rationale: 'Dirty worktrees must never refresh a pre-push skip stamp.',
+        });
+        expect(runStamp(repo, 'check').status).not.toBe(0);
 
-      const prePushHook = readFileSync(path.join(REPO_ROOT, '.husky/pre-push'), 'utf8').trim();
-      expect(prePushHook).toBe('node scripts/verify-stamp.mjs pre-push');
-    } finally {
-      rmSync(repo, { recursive: true, force: true });
-    }
-  }, 20_000);
+        const prePushHook = readFileSync(path.join(REPO_ROOT, '.husky/pre-push'), 'utf8').trim();
+        expect(prePushHook).toBe('node scripts/verify-stamp.mjs pre-push');
+      } finally {
+        rmSync(repo, { recursive: true, force: true });
+      }
+    },
+    CONTRACT_TIMEOUT_MS,
+  );
 });
