@@ -1,4 +1,4 @@
-import type { Locator, Page } from 'playwright';
+import type { FrameLocator, Locator, Page } from 'playwright';
 import { SelfHealingArtifactSchemaError } from './artifactSchema';
 
 /**
@@ -10,7 +10,7 @@ import { SelfHealingArtifactSchemaError } from './artifactSchema';
 export const CANDIDATE_LOCATOR_SCHEMA_VERSION = '1.0.0' as const;
 
 /** Discriminator for the locator strategies the framework can resolve structurally. */
-export type CandidateLocatorKind = 'testId' | 'role' | 'label' | 'text' | 'css';
+export type CandidateLocatorKind = 'testId' | 'role' | 'label' | 'text' | 'css' | 'frame';
 
 /**
  * Accessible-name matcher for a role candidate. The structured form keeps the raw
@@ -53,6 +53,12 @@ export type CandidateLocator =
       readonly schemaVersion: typeof CANDIDATE_LOCATOR_SCHEMA_VERSION;
       readonly kind: 'css';
       readonly selector: string;
+    }
+  | {
+      readonly schemaVersion: typeof CANDIDATE_LOCATOR_SCHEMA_VERSION;
+      readonly kind: 'frame';
+      readonly frameSelector: string;
+      readonly inner: CandidateLocator;
     };
 
 /** Builds a `getByTestId` candidate from a raw test-id value. */
@@ -80,6 +86,21 @@ export function textLocator(value: string): CandidateLocator {
 /** Builds a CSS `page.locator` candidate from a raw selector. */
 export function cssLocator(selector: string): CandidateLocator {
   return { schemaVersion: CANDIDATE_LOCATOR_SCHEMA_VERSION, kind: 'css', selector };
+}
+
+/**
+ * Wraps an inner candidate inside `page.frameLocator(frameSelector)` (`AUR-QE-112`).
+ * Lets the structured guarded path resolve and auto-apply candidates that live in a
+ * same-origin iframe without the guarded path ever parsing a display string. `inner`
+ * may itself be a frame candidate, so nested frames compose.
+ */
+export function frameLocator(frameSelector: string, inner: CandidateLocator): CandidateLocator {
+  return {
+    schemaVersion: CANDIDATE_LOCATOR_SCHEMA_VERSION,
+    kind: 'frame',
+    frameSelector,
+    inner,
+  };
 }
 
 /** Wraps a raw string into a string accessible-name matcher. */
@@ -140,6 +161,17 @@ export function describeCandidateLocator(locator: CandidateLocator): string | nu
       const literal = quoteLiteral(locator.selector);
       return literal === null ? null : `page.locator(${literal})`;
     }
+    case 'frame': {
+      const frameLiteral = quoteLiteral(locator.frameSelector);
+      if (frameLiteral === null) {
+        return null;
+      }
+      const innerDisplay = describeCandidateLocator(locator.inner);
+      // The inner display always begins with `page.`; splice it onto the frame root.
+      return innerDisplay === null
+        ? null
+        : `page.frameLocator(${frameLiteral})${innerDisplay.slice('page'.length)}`;
+    }
     case 'role': {
       if (locator.name === undefined) {
         return `page.getByRole('${locator.role}')`;
@@ -157,25 +189,43 @@ export function describeCandidateLocator(locator: CandidateLocator): string | nu
  * quote- and apostrophe-bearing names round-trip exactly.
  */
 export function resolveCandidateLocator(page: Page, locator: CandidateLocator): Locator {
+  return resolveCandidateLocatorAgainst(page, locator);
+}
+
+/**
+ * Resolves a structured locator against either a {@link Page} or a
+ * {@link FrameLocator}. A `frame` candidate enters its iframe via
+ * `root.frameLocator(...)` and resolves its inner candidate against that frame,
+ * so same-origin iframe candidates resolve structurally and nested frames compose.
+ */
+function resolveCandidateLocatorAgainst(
+  root: Page | FrameLocator,
+  locator: CandidateLocator,
+): Locator {
   switch (locator.kind) {
     case 'testId':
-      return page.getByTestId(locator.value);
+      return root.getByTestId(locator.value);
     case 'label':
-      return page.getByLabel(locator.value);
+      return root.getByLabel(locator.value);
     case 'text':
-      return page.getByText(locator.value);
+      return root.getByText(locator.value);
     case 'css':
-      return page.locator(locator.selector);
+      return root.locator(locator.selector);
+    case 'frame':
+      return resolveCandidateLocatorAgainst(
+        root.frameLocator(locator.frameSelector),
+        locator.inner,
+      );
     case 'role': {
       const role = locator.role as Parameters<Page['getByRole']>[0];
       if (locator.name === undefined) {
-        return page.getByRole(role);
+        return root.getByRole(role);
       }
       const name =
         locator.name.kind === 'regex'
           ? new RegExp(locator.name.source, locator.name.flags)
           : locator.name.value;
-      return page.getByRole(role, { name });
+      return root.getByRole(role, { name });
     }
   }
 }
@@ -220,6 +270,59 @@ function parseNameOption(rawValue: string): CandidateLocatorName {
 }
 
 /**
+ * Reads a single leading quoted string literal and returns its unescaped value plus
+ * the remaining text after the closing quote. Unlike {@link parseQuotedStringLiteral}
+ * the literal does not have to span the whole input, which lets the frame read path
+ * split `page.frameLocator('<sel>').<inner>` at the frame selector boundary.
+ */
+function readLeadingQuotedLiteral(input: string): { value: string; rest: string } | null {
+  const quote = input[0];
+  if (quote !== "'" && quote !== '"' && quote !== '`') {
+    return null;
+  }
+
+  let value = '';
+  for (let index = 1; index < input.length; index += 1) {
+    const char = input[index];
+    if (char === '\\') {
+      const next = input[index + 1];
+      if (next !== undefined) {
+        value += next;
+        index += 1;
+        continue;
+      }
+    }
+    if (char === quote) {
+      return { value, rest: input.slice(index + 1) };
+    }
+    value += char;
+  }
+
+  return null;
+}
+
+/**
+ * Legacy string read path for `page.frameLocator('<sel>').<inner>` (`AUR-QE-112`).
+ * Reads the frame selector, then reparses the inner expression as a top-level
+ * `page.<inner>` so the existing leaf parsers and nested frames are reused. Returns
+ * `null` when the frame selector or inner expression is not a supported shape.
+ */
+function parseFrameLocatorExpression(expression: string): CandidateLocator | null {
+  const prefix = 'page.frameLocator(';
+  if (!expression.startsWith(prefix)) {
+    return null;
+  }
+
+  const literal = readLeadingQuotedLiteral(expression.slice(prefix.length));
+  if (literal === null || literal.value.length === 0 || !literal.rest.startsWith(').')) {
+    return null;
+  }
+
+  const inner = parseLegacyLocatorString(`page.${literal.rest.slice(2)}`);
+  return inner === null ? null : frameLocator(literal.value, inner);
+}
+
+/**
  * Legacy string read path (`AUR-IMPL-020`): converts a pre-1.0.0 Playwright-like
  * locator string into the structured model, or `null` when the expression is not
  * one of the supported `page.getBy*`/`page.locator` shapes. This is the only
@@ -228,6 +331,10 @@ function parseNameOption(rawValue: string): CandidateLocatorName {
  */
 export function parseLegacyLocatorString(expression: string): CandidateLocator | null {
   const trimmedExpression = expression.trim();
+
+  if (trimmedExpression.startsWith('page.frameLocator(')) {
+    return parseFrameLocatorExpression(trimmedExpression);
+  }
 
   const testIdValue = parsePageStringArgument(trimmedExpression, 'getByTestId');
   if (testIdValue !== null) {
@@ -344,9 +451,13 @@ export function parseCandidateLocator(raw: unknown): CandidateLocator {
         ? roleLocator(role)
         : roleLocator(role, parseCandidateLocatorName(record.name));
     }
+    case 'frame': {
+      const frameSelector = readRequiredString(record, 'frameSelector', 'candidateLocator');
+      return frameLocator(frameSelector, parseCandidateLocator(record.inner));
+    }
     default:
       throw new SelfHealingArtifactSchemaError(
-        'candidateLocator.kind must be testId, role, label, text, or css.',
+        'candidateLocator.kind must be testId, role, label, text, css, or frame.',
       );
   }
 }

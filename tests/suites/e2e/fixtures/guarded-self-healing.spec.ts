@@ -320,15 +320,13 @@ test('guarded self-heal recovers open shadow DOM fixture by effect', async ({ pa
   await expect(page.locator('#shadow-status')).toHaveText('Shadow order submitted');
 });
 
-// KNOWN LIMITATION: guarded validation resolves candidate locators via
-// resolveLocatorExpression (src/framework/selfHealing/guardedValidation.ts),
-// which supports getByTestId/getByText/getByLabel/getByRole/locator but NOT
-// page.frameLocator(...). A cross-iframe candidate can therefore never be
-// accepted or auto-applied today, so this scenario cannot pass against the
-// current framework. Tracked by the structured-candidate work (AUR-IMPL-020).
-// Kept as a fixme so the gap is visible and re-enabled when frame-aware
-// candidates land — not deleted, and not patched in src under this test-only scope.
-test.fixme('guarded self-heal recovers same-origin iframe fixture by effect', async ({ page }) => {
+// Frame-aware structured candidates (AUR-QE-112) let guarded validation resolve a
+// `page.frameLocator(...).getByTestId(...)` registry candidate structurally: the
+// registry locator string is converted to a structured frame candidate at read
+// time (candidateScoring -> parseLegacyLocatorString), so both the guarded dry-run
+// and the auto-apply enter the same-origin iframe without parsing display strings.
+// Previously skipped as a known limitation; now a first-class recovery proof.
+test('guarded self-heal recovers same-origin iframe fixture by effect', async ({ page }) => {
   const env = createGuardedEnv(currentArtifactScope());
   await runGuardedClick({
     env,

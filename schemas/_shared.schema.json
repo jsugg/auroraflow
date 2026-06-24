@@ -214,6 +214,26 @@
               "minLength": 1
             }
           }
+        },
+        {
+          "type": "object",
+          "additionalProperties": true,
+          "required": ["schemaVersion", "kind", "frameSelector", "inner"],
+          "properties": {
+            "schemaVersion": {
+              "const": "1.0.0"
+            },
+            "kind": {
+              "const": "frame"
+            },
+            "frameSelector": {
+              "type": "string",
+              "minLength": 1
+            },
+            "inner": {
+              "$ref": "#/$defs/candidateLocator"
+            }
+          }
         }
       ]
     },
