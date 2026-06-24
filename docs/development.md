@@ -254,7 +254,7 @@ Documentation should remain precise and source-backed:
 
 - Prefer "implemented", "available", or "enabled by" only for behavior present in source.
 - Prefer "planned", "reference", or "roadmap" for future services, deployments, or automation.
-- Lifecycle docs must keep `closeAuroraFlow(context?)` and `auroraflow/playwright` labeled as planned until `AUR-IMPL-023` source and tests land.
+- Lifecycle docs describe `closeAuroraFlow(context?)` and `auroraflow/playwright` as shipped in `AUR-IMPL-023`; keep their idempotent-cleanup and consumer-owned-Playwright guarantees source-backed.
 - Link to the source-owning architecture or operations document when a README section would otherwise become too detailed.
 - Keep production observability wording clear: local assets and reference manifests are not environment ownership.
 

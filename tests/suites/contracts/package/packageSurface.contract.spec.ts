@@ -60,6 +60,7 @@ describe('package surface contract', () => {
     );
     expect(packageJson.peerDependencies).toEqual({
       playwright: '>=1.59 <2',
+      '@playwright/test': '>=1.59 <2',
     });
   });
 });

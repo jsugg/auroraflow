@@ -84,7 +84,7 @@ describe('documentation surface contract', () => {
     }
   });
 
-  it('documents lifecycle and fixture contract without claiming Phase 2 implementation', () => {
+  it('documents the implemented lifecycle and fixture contract', () => {
     const lifecycle = readRepoFile('docs/operations/lifecycle.md');
     const api = readRepoFile('docs/api.md');
     const development = readRepoFile('docs/development.md');
@@ -105,23 +105,25 @@ describe('documentation surface contract', () => {
     ]) {
       expectTextIncludes(docs, {
         text: requiredTerm,
-        rationale: 'Lifecycle docs must preserve planned public lifecycle API contract.',
+        rationale: 'Lifecycle docs must preserve the public lifecycle API contract.',
       });
     }
 
-    for (const text of [
-      'design contract for `AUR-IMPL-013`',
-      'implementation remains a Phase 2 task',
-    ]) {
-      expectTextIncludes(lifecycle, {
-        text,
-        rationale: 'Lifecycle docs must not imply Phase 2 runtime implementation has shipped.',
+    expectTextIncludes(lifecycle, {
+      text: 'implemented under `AUR-IMPL-023`',
+      rationale:
+        'Lifecycle docs must record that the Phase 2 lifecycle helper and fixture shipped.',
+    });
+    expectTextIncludes(development, {
+      text: 'shipped in `AUR-IMPL-023`',
+      rationale: 'Development docs must mark the lifecycle fixture surface as shipped.',
+    });
+    for (const staleText of ['implementation remains a Phase 2 task', 'labeled as planned until']) {
+      expectTextExcludes(`${lifecycle}\n${development}`, {
+        text: staleText,
+        rationale: 'Lifecycle docs must not keep planned-only wording after AUR-IMPL-023 shipped.',
       });
     }
-    expectTextIncludes(development, {
-      text: 'labeled as planned until `AUR-IMPL-023`',
-      rationale: 'Development docs must label lifecycle fixture surface as planned.',
-    });
   });
 
   it('keeps current maturity claims aligned with implemented promotion workflows', () => {
