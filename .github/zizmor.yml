@@ -1,0 +1,14 @@
+# zizmor workflow-analyzer configuration.
+# Docs: https://docs.zizmor.sh/configuration/
+#
+# zizmor is version-pinned in package.json (`security:workflows`) so the gate is
+# reproducible; any suppression below is a deliberate, documented exception rather
+# than a blanket relaxation.
+rules:
+  adhoc-packages:
+    ignore:
+      # The Playwright peer matrix exists to prove cross-version compatibility, so it
+      # deliberately installs arbitrary Playwright versions outside the lockfile
+      # (`npm install --no-save --package-lock=false ...`). That ad-hoc install is the
+      # job's entire purpose, so this audit is expected for this workflow only.
+      - playwright-peer-matrix.yml

@@ -51,6 +51,9 @@ jobs:
         if: matrix.version_spec != ''
         env:
           PLAYWRIGHT_VERSION_SPEC: ${{ matrix.version_spec }}
+        # Installing arbitrary Playwright versions outside the lockfile is this job's whole
+        # purpose (cross-version peer compatibility); zizmor's adhoc-packages audit is
+        # expected here and allowlisted for this file in .github/zizmor.yml.
         run: npm install --no-save --package-lock=false --ignore-scripts "playwright@${PLAYWRIGHT_VERSION_SPEC}" "playwright-core@${PLAYWRIGHT_VERSION_SPEC}" "@playwright/test@${PLAYWRIGHT_VERSION_SPEC}"
 
       - name: Verify installed Playwright version
