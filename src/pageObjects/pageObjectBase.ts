@@ -5,7 +5,10 @@ import {
   type AuroraFlowContext,
 } from '../framework/runtime/auroraFlowContext';
 import { analyzeSelfHealingFailure } from '../framework/selfHealing/analyzer';
-import { captureFailureEvent } from '../framework/selfHealing/failureCapture';
+import {
+  captureFailureEvent,
+  createFileFailureArtifactWriter,
+} from '../framework/selfHealing/failureCapture';
 import {
   captureFailureScreenshot,
   type ArtifactPrivacyPolicy,
@@ -372,6 +375,9 @@ export abstract class PageObjectBase {
 
       await captureFailureEvent({
         config: selfHealingConfig,
+        // Route artifacts to the context-owned root so two contexts isolate
+        // their output without reading or mutating `SELF_HEAL_ARTIFACTS_DIR`.
+        writer: createFileFailureArtifactWriter(this.context.resolveArtifactRoot()),
         pageObjectName: this.pageObjectName,
         currentUrl,
         screenshotPath,

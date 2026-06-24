@@ -1,17 +1,17 @@
 import type { Page } from 'playwright';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { buildPageActionMetricAttributes } from '../../../../../src/framework/observability/attributes';
 import { METRIC_NAMES } from '../../../../../src/framework/observability/metricNames';
 import {
-  resetTelemetryForTests,
-  setTelemetryForTests,
-} from '../../../../../src/framework/observability/telemetry';
+  createAuroraFlowContext,
+  type AuroraFlowContext,
+} from '../../../../../src/framework/runtime/auroraFlowContext';
 import { PageObjectBase } from '../../../../../src/pageObjects/pageObjectBase';
 import { CapturingTelemetry, type CapturedAttributes } from '../observability/capturingTelemetry';
 
 class TestPageObject extends PageObjectBase {
-  constructor(page: Page) {
-    super(page, 'TelemetryPageObject');
+  constructor(page: Page, context: AuroraFlowContext) {
+    super(page, 'TelemetryPageObject', context);
   }
 
   public clickVisible(selector: string): Promise<void> {
@@ -47,18 +47,18 @@ describe('PageObjectBase telemetry integration', () => {
   let pageObject: TestPageObject;
 
   beforeEach(() => {
-    process.env.AURORAFLOW_RUN_ID = 'run-1';
-    process.env.AURORAFLOW_TEST_ID = 'test-1';
     telemetry = new CapturingTelemetry();
-    setTelemetryForTests(telemetry);
     pageMock = createPageMock();
-    pageObject = new TestPageObject(pageMock as unknown as Page);
-  });
-
-  afterEach(() => {
-    delete process.env.AURORAFLOW_RUN_ID;
-    delete process.env.AURORAFLOW_TEST_ID;
-    resetTelemetryForTests();
+    // The injected context owns telemetry and correlation, so the facade never
+    // reads `process.env` or the telemetry singleton — keeping the spec
+    // parallel-safe with no ambient state to set or restore.
+    pageObject = new TestPageObject(
+      pageMock as unknown as Page,
+      createAuroraFlowContext({
+        telemetry,
+        correlation: { runId: 'run-1', testId: 'test-1' },
+      }),
+    );
   });
 
   it('records selector-safe spans and metrics for successful actions', async () => {

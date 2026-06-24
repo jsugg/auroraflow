@@ -18,8 +18,22 @@ import { CapturingTelemetry } from '../observability/capturingTelemetry';
 import {
   cleanupSelfHealingArtifactScope,
   createVitestSelfHealingArtifactScope,
+  readSelfHealingArtifactFor,
+  readSelfHealingArtifacts,
   type SelfHealingArtifactScope,
 } from '../../../../helpers/selfHealingArtifacts';
+
+// Adversarial ambient environment. An isolated context must prefer its explicit
+// options over every one of these values and must never fall through to it — so
+// this is passed as the context `env` instead of mutating `process.env`, which
+// keeps the spec parallel-safe.
+const DECOY_ENV = Object.freeze({
+  SELF_HEAL_MODE: 'off',
+  SELF_HEAL_MIN_CONFIDENCE: '0.01',
+  SELF_HEAL_ARTIFACTS_DIR: '/auroraflow-decoy/should-never-be-written',
+  AURORAFLOW_RUN_ID: 'env-run',
+  AURORAFLOW_TEST_ID: 'env-test',
+});
 
 class ContextPage extends PageObjectBase {
   constructor(page: Page, context?: AuroraFlowContext) {
@@ -63,11 +77,13 @@ function buildConfig(env: Readonly<Record<string, string | undefined>>): SelfHea
   return resolveSelfHealingConfig({ SELF_HEAL_SAT_ENABLED: 'false', ...env });
 }
 
-// AUR-IMPL-021 owns the page-object facade's telemetry resolution: the
-// page-action span and its counters. Downstream self-healing subsystems
-// (suggestion engine, guarded validation, failure capture) still record to the
-// telemetry module singleton until the AUR-IMPL-022 action pipeline threads the
-// context through them, so isolation is asserted on the facade surface only.
+// The facade resolves telemetry and the artifact root from the context, so both
+// the page-action span/counters and the failure-artifact output directory are
+// isolated per context. The downstream self-healing subsystems (suggestion
+// engine, guarded validation, failure capture) still record telemetry to the
+// module singleton until the AUR-IMPL-022 action pipeline threads the context
+// through them — so telemetry isolation is asserted on the facade surface only,
+// while artifact-root isolation is asserted directly on the written artifacts.
 const PAGE_ACTION_COUNTER_NAMES = new Set<string>([
   METRIC_NAMES.pageActionsTotal,
   METRIC_NAMES.pageActionFailuresTotal,
@@ -82,49 +98,68 @@ function pageActionCounters(telemetry: CapturingTelemetry) {
 }
 
 describe('AuroraFlowContext two-context isolation', () => {
-  let scope: SelfHealingArtifactScope | undefined;
+  let scopeA: SelfHealingArtifactScope | undefined;
+  let scopeB: SelfHealingArtifactScope | undefined;
   let globalTelemetry: CapturingTelemetry;
 
+  // Each context writes failure artifacts to its own injected root, so a separate
+  // scope per context proves artifact-root isolation directly.
+  function scopes(): { a: SelfHealingArtifactScope; b: SelfHealingArtifactScope } {
+    if (scopeA === undefined || scopeB === undefined) {
+      throw new Error('Artifact scopes were not initialized for this test.');
+    }
+    return { a: scopeA, b: scopeB };
+  }
+
   beforeEach(async () => {
-    scope = await createVitestSelfHealingArtifactScope({ prefix: 'auroraflow-context-isolation' });
-    // Only the artifact output directory is env-backed in this task; scope it to
-    // a temp dir so suggest/guarded failures do not write into the repo.
-    process.env.SELF_HEAL_ARTIFACTS_DIR = scope.artifactsDir;
-    // Decoys: an isolated context must ignore process env and the telemetry
-    // singleton entirely.
-    process.env.SELF_HEAL_MODE = 'off';
-    process.env.AURORAFLOW_RUN_ID = 'env-run';
+    scopeA = await createVitestSelfHealingArtifactScope({
+      prefix: 'auroraflow-context-isolation-a',
+      runId: 'run-A',
+      testId: 'test-A',
+    });
+    scopeB = await createVitestSelfHealingArtifactScope({
+      prefix: 'auroraflow-context-isolation-b',
+      runId: 'run-B',
+      testId: 'test-B',
+    });
+    // Singleton decoy: an isolated context must never read the telemetry module
+    // singleton. This is a module seam, not `process.env`, so it stays
+    // parallel-safe.
     globalTelemetry = new CapturingTelemetry();
     setTelemetryForTests(globalTelemetry);
   });
 
   afterEach(async () => {
-    delete process.env.SELF_HEAL_ARTIFACTS_DIR;
-    delete process.env.SELF_HEAL_MODE;
-    delete process.env.AURORAFLOW_RUN_ID;
     resetTelemetryForTests();
-    await cleanupSelfHealingArtifactScope(scope);
-    scope = undefined;
+    await cleanupSelfHealingArtifactScope(scopeA);
+    await cleanupSelfHealingArtifactScope(scopeB);
+    scopeA = undefined;
+    scopeB = undefined;
   });
 
   it('routes telemetry, self-healing config, and correlation per context without env or singleton bleed', async () => {
+    const { a, b } = scopes();
     const telemetryA = new CapturingTelemetry();
     const telemetryB = new CapturingTelemetry();
     const contextA = createAuroraFlowContext({
+      env: DECOY_ENV,
       telemetry: telemetryA,
       selfHealingConfig: buildConfig({
         SELF_HEAL_MODE: 'suggest',
         SELF_HEAL_MIN_CONFIDENCE: '0.5',
       }),
-      correlation: { runId: 'run-A', testId: 'test-A' },
+      correlation: { runId: a.runId, testId: a.testId },
+      artifactRoot: a.artifactsDir,
     });
     const contextB = createAuroraFlowContext({
+      env: DECOY_ENV,
       telemetry: telemetryB,
       selfHealingConfig: buildConfig({
         SELF_HEAL_MODE: 'guarded',
         SELF_HEAL_MIN_CONFIDENCE: '0.99',
       }),
-      correlation: { runId: 'run-B', testId: 'test-B' },
+      correlation: { runId: b.runId, testId: b.testId },
+      artifactRoot: b.artifactsDir,
     });
 
     const pageMockA = createPageMock();
@@ -152,12 +187,12 @@ describe('AuroraFlowContext two-context isolation', () => {
     expect(pageActionCounters(globalTelemetry)).toHaveLength(0);
 
     // Self-healing config isolation: each span reflects its context's mode, not
-    // the `SELF_HEAL_MODE=off` decoy in process.env.
+    // the `SELF_HEAL_MODE=off` value in the adversarial DECOY_ENV.
     expect(telemetryA.spans[0].attributes['auroraflow.self_heal.mode']).toBe('suggest');
     expect(telemetryB.spans[0].attributes['auroraflow.self_heal.mode']).toBe('guarded');
 
     // Correlation isolation: each span carries its context's run/test id, not the
-    // `AURORAFLOW_RUN_ID=env-run` decoy.
+    // `AURORAFLOW_RUN_ID=env-run` value in the adversarial DECOY_ENV.
     expect(telemetryA.spans[0].attributes['auroraflow.run_id']).toBe('run-A');
     expect(telemetryA.spans[0].attributes['auroraflow.test_id']).toBe('test-A');
     expect(telemetryB.spans[0].attributes['auroraflow.run_id']).toBe('run-B');
@@ -173,11 +208,16 @@ describe('AuroraFlowContext two-context isolation', () => {
   });
 
   it('threads the context through registered PageFactory providers', async () => {
+    const { a } = scopes();
     const telemetry = new CapturingTelemetry();
     const context = createAuroraFlowContext({
+      env: DECOY_ENV,
       telemetry,
       selfHealingConfig: buildConfig({ SELF_HEAL_MODE: 'suggest' }),
       correlation: { runId: 'factory-run', testId: 'factory-test' },
+      // The factory test does not read artifacts; route them to a temp root so
+      // the write never falls back to the in-repo default directory.
+      artifactRoot: a.artifactsDir,
     });
     const pageMock = createPageMock();
     pageMock.fill.mockRejectedValueOnce(new Error('factory fill failed'));
@@ -197,5 +237,45 @@ describe('AuroraFlowContext two-context isolation', () => {
     expect(telemetry.spans[0].attributes['auroraflow.run_id']).toBe('factory-run');
     expect(telemetry.spans[0].attributes['auroraflow.self_heal.mode']).toBe('suggest');
     expect(pageActionSpans(globalTelemetry)).toHaveLength(0);
+  });
+
+  it('writes each context failure artifact to its own injected root', async () => {
+    const { a, b } = scopes();
+    const contextA = createAuroraFlowContext({
+      env: DECOY_ENV,
+      telemetry: new CapturingTelemetry(),
+      selfHealingConfig: buildConfig({ SELF_HEAL_MODE: 'suggest' }),
+      correlation: { runId: a.runId, testId: a.testId },
+      artifactRoot: a.artifactsDir,
+    });
+    const contextB = createAuroraFlowContext({
+      env: DECOY_ENV,
+      telemetry: new CapturingTelemetry(),
+      selfHealingConfig: buildConfig({ SELF_HEAL_MODE: 'suggest' }),
+      correlation: { runId: b.runId, testId: b.testId },
+      artifactRoot: b.artifactsDir,
+    });
+
+    const pageMockA = createPageMock();
+    const pageMockB = createPageMock();
+    pageMockA.fill.mockRejectedValueOnce(new Error('fill failed A'));
+    pageMockB.fill.mockRejectedValueOnce(new Error('fill failed B'));
+
+    await expect(
+      new ContextPage(pageMockA as unknown as Page, contextA).type('#a', 'x'),
+    ).rejects.toThrow('Error typing in selector #a: fill failed A');
+    await expect(
+      new ContextPage(pageMockB as unknown as Page, contextB).type('#b', 'y'),
+    ).rejects.toThrow('Error typing in selector #b: fill failed B');
+
+    // Each context's artifact is written to its own injected root and keyed by
+    // that context's correlation — never to the decoy SELF_HEAL_ARTIFACTS_DIR.
+    const artifactA = await readSelfHealingArtifactFor<{ runId: string; testId?: string }>(a);
+    const artifactB = await readSelfHealingArtifactFor<{ runId: string; testId?: string }>(b);
+    expect(artifactA.runId).toBe('run-A');
+    expect(artifactB.runId).toBe('run-B');
+    // Cross-root isolation: neither root captured the other context's artifact.
+    expect(await readSelfHealingArtifacts(a)).toHaveLength(1);
+    expect(await readSelfHealingArtifacts(b)).toHaveLength(1);
   });
 });

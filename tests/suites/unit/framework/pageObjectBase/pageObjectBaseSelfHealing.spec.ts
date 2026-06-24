@@ -5,6 +5,16 @@ import {
   resetTelemetryForTests,
   setTelemetryForTests,
 } from '../../../../../src/framework/observability/telemetry';
+import {
+  createAuroraFlowContext,
+  type AuroraFlowContext,
+} from '../../../../../src/framework/runtime/auroraFlowContext';
+import { resolveSelfHealingConfig } from '../../../../../src/framework/selfHealing/config';
+import {
+  DEFAULT_ARTIFACT_PRIVACY_POLICY,
+  SENSITIVE_ARTIFACT_PRIVACY_POLICY,
+  type ArtifactPrivacyPolicy,
+} from '../../../../../src/framework/selfHealing/artifactPrivacy';
 import type { SelfHealingRegistryRuntime } from '../../../../../src/framework/selfHealing/registryContracts';
 import { PageObjectBase } from '../../../../../src/pageObjects/pageObjectBase';
 import { CapturingTelemetry } from '../observability/capturingTelemetry';
@@ -13,7 +23,6 @@ import {
   createSyntheticSecretDomSnapshot,
 } from '../../../../fixtures/privacy/syntheticSecrets';
 import {
-  applySelfHealingArtifactScopeEnv,
   cleanupSelfHealingArtifactScope,
   createVitestSelfHealingArtifactScope,
   readSelfHealingArtifactFor,
@@ -21,19 +30,12 @@ import {
 } from '../../../../helpers/selfHealingArtifacts';
 
 class TestPageObject extends PageObjectBase {
-  constructor(
-    page: Page,
-    private readonly registryRuntime?: SelfHealingRegistryRuntime,
-  ) {
-    super(page, 'TestPageObject');
+  constructor(page: Page, context: AuroraFlowContext) {
+    super(page, 'TestPageObject', context);
   }
 
   public clickVisible(selector: string): Promise<void> {
     return this.clickWhenVisible(selector);
-  }
-
-  protected override resolveRegistryRuntime(): SelfHealingRegistryRuntime | undefined {
-    return this.registryRuntime;
   }
 }
 
@@ -121,39 +123,56 @@ describe('PageObjectBase self-healing integration', () => {
     return readSelfHealingArtifactFor<T>(currentArtifactScope());
   }
 
+  // Builds an isolated context for the active artifact scope: self-healing
+  // config, correlation, privacy policy, registry runtime, and artifact root are
+  // all injected, so a test never reads or writes `process.env`. The telemetry
+  // sink is registered on both the context (page-action facade) and the module
+  // singleton, because the downstream capture and registry-persistence
+  // subsystems still record through the singleton until AUR-IMPL-022 threads the
+  // context through them.
+  function setupSelfHealing(
+    options: {
+      configEnv?: Readonly<Record<string, string | undefined>>;
+      privacyPolicy?: ArtifactPrivacyPolicy;
+      registryRuntime?: SelfHealingRegistryRuntime;
+    } = {},
+  ): { telemetry: CapturingTelemetry; context: AuroraFlowContext } {
+    const scope = currentArtifactScope();
+    const telemetry = new CapturingTelemetry();
+    setTelemetryForTests(telemetry);
+    const context = createAuroraFlowContext({
+      telemetry,
+      selfHealingConfig: resolveSelfHealingConfig({
+        SELF_HEAL_MODE: 'suggest',
+        SELF_HEAL_MIN_CONFIDENCE: '0.95',
+        ...options.configEnv,
+      }),
+      correlation: { runId: scope.runId, testId: scope.testId },
+      artifactRoot: scope.artifactsDir,
+      artifactPrivacyPolicy: options.privacyPolicy ?? DEFAULT_ARTIFACT_PRIVACY_POLICY,
+      resolveRegistryRuntime: () => options.registryRuntime,
+    });
+    return { telemetry, context };
+  }
+
   beforeEach(async () => {
     artifactScope = await createVitestSelfHealingArtifactScope({
       prefix: 'page-object-base-self-healing',
       runId: 'local-run',
       testId: 'spec-1',
     });
-    applySelfHealingArtifactScopeEnv(artifactScope);
-    process.env.SELF_HEAL_MODE = 'suggest';
-    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.95';
-    delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
-    delete process.env.SELF_HEAL_ALLOWED_DOMAINS;
-    delete process.env.SELF_HEAL_REGISTRY_MODE;
-    delete process.env.AURORAFLOW_ARTIFACT_PRIVACY_PRESET;
     pageMock = createPageMock();
-    pageObject = new TestPageObject(pageMock as unknown as Page);
   });
 
   afterEach(async () => {
-    delete process.env.AURORAFLOW_RUN_ID;
-    delete process.env.AURORAFLOW_TEST_ID;
-    delete process.env.SELF_HEAL_MODE;
-    delete process.env.SELF_HEAL_MIN_CONFIDENCE;
-    delete process.env.SELF_HEAL_ALLOWED_ACTIONS;
-    delete process.env.SELF_HEAL_ALLOWED_DOMAINS;
-    delete process.env.SELF_HEAL_REGISTRY_MODE;
-    delete process.env.AURORAFLOW_ARTIFACT_PRIVACY_PRESET;
-    delete process.env.SELF_HEAL_ARTIFACTS_DIR;
     resetTelemetryForTests();
     await cleanupSelfHealingArtifactScope(artifactScope);
     artifactScope = undefined;
   });
 
   it('captures structured failure context for failed type action', async () => {
+    const { context } = setupSelfHealing();
+    pageObject = new TestPageObject(pageMock as unknown as Page, context);
     pageMock.fill.mockRejectedValueOnce(new Error('fill failed'));
 
     await expect(pageObject.type('#username', 'alice')).rejects.toThrow(
@@ -197,9 +216,10 @@ describe('PageObjectBase self-healing integration', () => {
   });
 
   it('uses the sensitive preset without leaking synthetic DOM secrets', async () => {
-    const telemetry = new CapturingTelemetry();
-    setTelemetryForTests(telemetry);
-    process.env.AURORAFLOW_ARTIFACT_PRIVACY_PRESET = 'sensitive';
+    const { telemetry, context } = setupSelfHealing({
+      privacyPolicy: SENSITIVE_ARTIFACT_PRIVACY_POLICY,
+    });
+    pageObject = new TestPageObject(pageMock as unknown as Page, context);
     pageMock.evaluate.mockResolvedValueOnce(createSyntheticSecretDomSnapshot());
     pageMock.fill.mockRejectedValueOnce(new Error('fill failed'));
 
@@ -217,10 +237,15 @@ describe('PageObjectBase self-healing integration', () => {
   });
 
   it('captures guarded dry-run validation metadata when mode is guarded', async () => {
-    process.env.SELF_HEAL_MODE = 'guarded';
-    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
-    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'type,click';
-    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'example.test';
+    const { context } = setupSelfHealing({
+      configEnv: {
+        SELF_HEAL_MODE: 'guarded',
+        SELF_HEAL_MIN_CONFIDENCE: '0.3',
+        SELF_HEAL_ALLOWED_ACTIONS: 'type,click',
+        SELF_HEAL_ALLOWED_DOMAINS: 'example.test',
+      },
+    });
+    pageObject = new TestPageObject(pageMock as unknown as Page, context);
     pageMock.fill.mockRejectedValueOnce(new Error('fill failed'));
 
     await expect(pageObject.type('#username', 'alice')).resolves.toBeNull();
@@ -274,12 +299,15 @@ describe('PageObjectBase self-healing integration', () => {
   });
 
   it('auto-applies accepted guarded click candidates and records success in artifact', async () => {
-    const telemetry = new CapturingTelemetry();
-    setTelemetryForTests(telemetry);
-    process.env.SELF_HEAL_MODE = 'guarded';
-    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
-    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
-    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'example.test';
+    const { telemetry, context } = setupSelfHealing({
+      configEnv: {
+        SELF_HEAL_MODE: 'guarded',
+        SELF_HEAL_MIN_CONFIDENCE: '0.3',
+        SELF_HEAL_ALLOWED_ACTIONS: 'click,type',
+        SELF_HEAL_ALLOWED_DOMAINS: 'example.test',
+      },
+    });
+    pageObject = new TestPageObject(pageMock as unknown as Page, context);
     pageMock.click.mockRejectedValueOnce(new Error('click failed'));
 
     await expect(pageObject.click('#submit')).resolves.toBeNull();
@@ -315,8 +343,6 @@ describe('PageObjectBase self-healing integration', () => {
   });
 
   it('uses SAT-ranked registry candidates for guarded validation and retry', async () => {
-    const telemetry = new CapturingTelemetry();
-    setTelemetryForTests(telemetry);
     const registryLocator = "page.getByTestId('submit-order')";
     const runtime: SelfHealingRegistryRuntime = {
       selectors: {
@@ -342,11 +368,16 @@ describe('PageObjectBase self-healing integration', () => {
       },
       required: false,
     };
-    pageObject = new TestPageObject(pageMock as unknown as Page, runtime);
-    process.env.SELF_HEAL_MODE = 'guarded';
-    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
-    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
-    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'example.test';
+    const { telemetry, context } = setupSelfHealing({
+      configEnv: {
+        SELF_HEAL_MODE: 'guarded',
+        SELF_HEAL_MIN_CONFIDENCE: '0.3',
+        SELF_HEAL_ALLOWED_ACTIONS: 'click,type',
+        SELF_HEAL_ALLOWED_DOMAINS: 'example.test',
+      },
+      registryRuntime: runtime,
+    });
+    pageObject = new TestPageObject(pageMock as unknown as Page, context);
     pageMock.click.mockRejectedValueOnce(new Error('click failed'));
 
     await expect(
@@ -397,8 +428,6 @@ describe('PageObjectBase self-healing integration', () => {
   });
 
   it('persists write-pending registry telemetry into artifacts after guarded success', async () => {
-    const telemetry = new CapturingTelemetry();
-    setTelemetryForTests(telemetry);
     const recordObservation = vi.fn().mockResolvedValue({
       candidateId: 'candidate',
       attempts: 1,
@@ -435,12 +464,17 @@ describe('PageObjectBase self-healing integration', () => {
       },
       required: false,
     };
-    pageObject = new TestPageObject(pageMock as unknown as Page, runtime);
-    process.env.SELF_HEAL_MODE = 'guarded';
-    process.env.SELF_HEAL_REGISTRY_MODE = 'write_pending';
-    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
-    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
-    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'example.test';
+    const { telemetry, context } = setupSelfHealing({
+      configEnv: {
+        SELF_HEAL_MODE: 'guarded',
+        SELF_HEAL_REGISTRY_MODE: 'write_pending',
+        SELF_HEAL_MIN_CONFIDENCE: '0.3',
+        SELF_HEAL_ALLOWED_ACTIONS: 'click,type',
+        SELF_HEAL_ALLOWED_DOMAINS: 'example.test',
+      },
+      registryRuntime: runtime,
+    });
+    pageObject = new TestPageObject(pageMock as unknown as Page, context);
     pageMock.click.mockRejectedValueOnce(new Error('click failed'));
 
     await expect(
@@ -496,12 +530,15 @@ describe('PageObjectBase self-healing integration', () => {
   });
 
   it('auto-applies accepted guarded clickWhenVisible candidates and records success', async () => {
-    const telemetry = new CapturingTelemetry();
-    setTelemetryForTests(telemetry);
-    process.env.SELF_HEAL_MODE = 'guarded';
-    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
-    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
-    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'example.test';
+    const { telemetry, context } = setupSelfHealing({
+      configEnv: {
+        SELF_HEAL_MODE: 'guarded',
+        SELF_HEAL_MIN_CONFIDENCE: '0.3',
+        SELF_HEAL_ALLOWED_ACTIONS: 'click,type',
+        SELF_HEAL_ALLOWED_DOMAINS: 'example.test',
+      },
+    });
+    pageObject = new TestPageObject(pageMock as unknown as Page, context);
     pageMock.waitForSelector.mockRejectedValueOnce(new Error('visible wait failed'));
 
     await expect(pageObject.clickVisible('#submit')).resolves.toBeUndefined();
@@ -538,12 +575,15 @@ describe('PageObjectBase self-healing integration', () => {
   });
 
   it('records guarded auto-heal apply failures without swallowing the original action error', async () => {
-    const telemetry = new CapturingTelemetry();
-    setTelemetryForTests(telemetry);
-    process.env.SELF_HEAL_MODE = 'guarded';
-    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
-    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
-    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'example.test';
+    const { telemetry, context } = setupSelfHealing({
+      configEnv: {
+        SELF_HEAL_MODE: 'guarded',
+        SELF_HEAL_MIN_CONFIDENCE: '0.3',
+        SELF_HEAL_ALLOWED_ACTIONS: 'click,type',
+        SELF_HEAL_ALLOWED_DOMAINS: 'example.test',
+      },
+    });
+    pageObject = new TestPageObject(pageMock as unknown as Page, context);
     pageMock.click.mockRejectedValueOnce(new Error('click failed'));
     pageMock.locatorFirst.click.mockRejectedValueOnce(new Error('healed click failed'));
 
@@ -575,12 +615,15 @@ describe('PageObjectBase self-healing integration', () => {
   });
 
   it('skips guarded auto-heal application when policy blocks candidate validation', async () => {
-    const telemetry = new CapturingTelemetry();
-    setTelemetryForTests(telemetry);
-    process.env.SELF_HEAL_MODE = 'guarded';
-    process.env.SELF_HEAL_MIN_CONFIDENCE = '0.3';
-    process.env.SELF_HEAL_ALLOWED_ACTIONS = 'click,type';
-    process.env.SELF_HEAL_ALLOWED_DOMAINS = 'allowed.test';
+    const { telemetry, context } = setupSelfHealing({
+      configEnv: {
+        SELF_HEAL_MODE: 'guarded',
+        SELF_HEAL_MIN_CONFIDENCE: '0.3',
+        SELF_HEAL_ALLOWED_ACTIONS: 'click,type',
+        SELF_HEAL_ALLOWED_DOMAINS: 'allowed.test',
+      },
+    });
+    pageObject = new TestPageObject(pageMock as unknown as Page, context);
     pageMock.click.mockRejectedValueOnce(new Error('click failed'));
 
     await expect(pageObject.click('#submit')).rejects.toThrow(

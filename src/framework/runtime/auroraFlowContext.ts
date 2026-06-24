@@ -12,6 +12,7 @@ import {
   resolveArtifactPrivacyPolicy,
   type ArtifactPrivacyPolicy,
 } from '../selfHealing/artifactPrivacy';
+import { resolveFailureArtifactOutputDirectory } from '../selfHealing/failureCapture';
 import type { SelfHealingConfig } from '../selfHealing/types';
 import type { SelfHealingRegistryRuntime } from '../selfHealing/registryContracts';
 
@@ -37,8 +38,9 @@ export type AuroraFlowLoggerFactory = (
  * Every member has an env-backed default (see {@link createAuroraFlowContext}),
  * so existing constructors keep working unchanged. Supplying a context lets two
  * runs in the same process resolve telemetry, self-healing configuration,
- * registry runtime, privacy policy, correlation, and time independently, with no
- * `process.env` read or telemetry-singleton access in the action pipeline.
+ * registry runtime, privacy policy, artifact root, correlation, and time
+ * independently, with no `process.env` read or telemetry-singleton access in the
+ * action pipeline.
  */
 export interface AuroraFlowContext {
   /** Creates a component logger bound to the supplied correlation metadata. */
@@ -53,6 +55,8 @@ export interface AuroraFlowContext {
   resolveRegistryRuntime(config: SelfHealingConfig): SelfHealingRegistryRuntime | undefined;
   /** Resolves the artifact privacy policy, reporting any diagnostic to the caller. */
   resolveArtifactPrivacyPolicy(onDiagnostic?: (diagnostic: string) => void): ArtifactPrivacyPolicy;
+  /** Resolves the directory self-healing failure artifacts are written to. */
+  resolveArtifactRoot(): string;
   /** Injectable time source for durations and timestamps. */
   readonly clock: AuroraFlowClock;
 }
@@ -77,6 +81,11 @@ export interface AuroraFlowContextOptions {
   resolveRegistryRuntime?: (config: SelfHealingConfig) => SelfHealingRegistryRuntime | undefined;
   /** Fixed artifact privacy policy. When set, the privacy-preset env is never read. */
   artifactPrivacyPolicy?: ArtifactPrivacyPolicy;
+  /**
+   * Fixed failure-artifact output root. When set, `SELF_HEAL_ARTIFACTS_DIR` env
+   * is never read, so two contexts can write artifacts to isolated directories.
+   */
+  artifactRoot?: string;
   /** Time source overrides. Defaults to `performance.now()` and `new Date()`. */
   clock?: Partial<AuroraFlowClock>;
 }
@@ -97,6 +106,7 @@ export function createAuroraFlowContext(options: AuroraFlowContextOptions = {}):
   const fixedTelemetry = options.telemetry;
   const fixedConfig = options.selfHealingConfig;
   const fixedPrivacyPolicy = options.artifactPrivacyPolicy;
+  const fixedArtifactRoot = options.artifactRoot;
   const createLogger: AuroraFlowLoggerFactory =
     options.createLogger ?? ((name, bindings) => createChildLogger(name, bindings));
   const resolveRegistryRuntime =
@@ -120,6 +130,10 @@ export function createAuroraFlowContext(options: AuroraFlowContextOptions = {}):
     resolveArtifactPrivacyPolicy: fixedPrivacyPolicy
       ? () => fixedPrivacyPolicy
       : (onDiagnostic) => resolveArtifactPrivacyPolicy(env, onDiagnostic),
+    resolveArtifactRoot:
+      fixedArtifactRoot !== undefined
+        ? () => fixedArtifactRoot
+        : () => resolveFailureArtifactOutputDirectory(env),
     clock,
   };
 }
