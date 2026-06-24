@@ -64,7 +64,7 @@
     "workflows:security": "npm run security:workflows",
     "shellcheck": "PATH=\"$HOME/.local/bin:$PATH\" shellcheck scripts/*.sh",
     "security:audit": "npm audit --audit-level=high",
-    "security:workflows": "pipx run zizmor .github/workflows",
+    "security:workflows": "pipx run --spec zizmor==1.26.1 zizmor .github/workflows",
     "security:all": "npm run security:audit && npm run security:workflows",
     "security:check": "npm run security:all",
     "verify": "npm run verify:tools && npm run format:check && npm run lint && npm run typecheck && npm run test:unit && npm run test:contracts && npm run test:integration && npm run schemas:check && npm run shellcheck && npm run workflows:lint:check",

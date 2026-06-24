@@ -23,10 +23,28 @@ const scripts = packageJson.scripts ?? {};
 describe('security workflow secret scanning contract', () => {
   it('splits security command ownership between dependency audit and workflow analysis', () => {
     expect(scripts['security:audit']).toBe('npm audit --audit-level=high');
-    expect(scripts['security:workflows']).toBe('pipx run zizmor .github/workflows');
+    // Match the analyzer command shape while requiring an immutable version pin (see the
+    // dedicated pin test below) so this assertion can never drift back to unpinned.
+    expectTextMatches(scripts['security:workflows'] ?? '', {
+      pattern: /^pipx run .*\bzizmor==\d+\.\d+\.\d+\b.* \.github\/workflows$/u,
+      rationale: 'Workflow analyzer must run a version-pinned zizmor against .github/workflows.',
+    });
     expect(scripts['security:all']).toBe('npm run security:audit && npm run security:workflows');
     expect(scripts['security:check']).toBe('npm run security:all');
     expect(scripts['workflows:security']).toBe('npm run security:workflows');
+  });
+
+  it('pins the zizmor workflow analyzer to an immutable version like every other security tool', () => {
+    // gitleaks is version+sha256 pinned and every action is SHA-pinned, but the zizmor
+    // analyzer is invoked via an npm script and was the lone unpinned security tool. That
+    // let a new upstream release silently add an audit and break this gate with no code
+    // change on our side. Pinning keeps the gate reproducible: it can neither flap on a
+    // newly introduced audit nor silently weaken if an audit is dropped upstream.
+    expectTextMatches(scripts['security:workflows'] ?? '', {
+      pattern: /\bzizmor==\d+\.\d+\.\d+\b/u,
+      rationale:
+        'Workflow analyzer must run a pinned zizmor version for reproducible, non-flapping gating.',
+    });
   });
 
   it('pins every security workflow action to an immutable SHA', () => {
