@@ -15,6 +15,8 @@ Optional flags:
 - `--output-json <path>`: default `test-results/flakiness-summary.json`
 - `--output-md <path>`: default `test-results/flakiness-summary.md`
 - `--top-limit <n>`: number of top flaky cases in markdown table (default `10`)
+- `--triage-policy <path>`: warn-first triage policy JSON (owners, quarantine, repeat threshold)
+- `--triage-output-md <path>`: triage markdown (default `flakiness-triage.md` beside `--output-md`)
 - `--trend-output <path>`: append a bounded JSONL trend point
 - `--trend-limit <n>`: max retained trend points (default `100`)
 
@@ -40,6 +42,7 @@ In `.github/workflows/ci.yml`:
 - report outputs are uploaded as `flakiness-report` artifacts:
   - `flakiness-summary.json`
   - `flakiness-summary.md`
+  - `flakiness-triage.md`
   - `flakiness-trends.jsonl`
 - `.auroraflow-trends/flakiness-trends.jsonl` is restored through a branch-scoped cache and uploaded for triage.
 - Trend reads skip malformed non-empty JSONL lines by default, preserve valid points, and report `skippedMalformedLines`; callers can opt into strict parsing through the library API.
@@ -50,6 +53,23 @@ Use this artifact to identify:
 - flaky cases (`failed attempt(s)` followed by `passed` final status),
 - hard failures,
 - retry pressure by project and test.
+
+## Flake triage governance
+
+`flakiness:report` also emits a warn-first triage report (`flakiness-triage.md`) driven by `configs/flakiness-triage-policy.json`. The policy is **warn-first**: it never blocks the merge gate; it converts flaky/failing signal into ownership and action.
+
+Policy fields:
+
+- `defaultOwner`: owner used when no path rule matches.
+- `owners`: `{ "pathPrefix", "owner" }` rules; the longest matching test-file path prefix wins.
+- `quarantined`: case identifiers (`caseId` or `fullTitle`) excluded from gating but kept visible.
+- `repeatedFailureThreshold`: failed attempts at which a flaky case is flagged as a repeated flake (default `2`).
+
+The triage report groups, per owner, the failing tests, flaky tests, quarantined tests (kept visible even when the run passed), and repeated flakes (failed attempts at or over the threshold), each with an actionable next step. Quarantined and repeated flakes always appear in the report so they cannot silently disappear.
+
+### PR risk E2E lane
+
+Default pull requests stay fast: only smoke and path-filtered lanes run. Risky pull requests can run the full Chrome E2E suite through the `Risk-Triggered E2E` job in `quality.yml`, triggered by the `risk:e2e` or `full-e2e` label, by changes under risk paths (`src/pageObjects/**`, `src/framework/selfHealing/**`, E2E specs and fixtures), or by a manual `workflow_dispatch` run.
 
 ## Downstream SLO and Alerting
 

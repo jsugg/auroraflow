@@ -1,12 +1,17 @@
-import { access, mkdir, readdir, writeFile } from 'node:fs/promises';
+import { access, mkdir, readdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import process from 'node:process';
 import {
   buildFlakinessMarkdown,
   buildFlakinessSummary,
+  buildFlakinessTriage,
+  buildFlakinessTriageMarkdown,
+  DEFAULT_FLAKINESS_TRIAGE_POLICY,
   parseFlakinessReportFile,
+  parseFlakinessTriagePolicy,
   PLAYWRIGHT_REPORT_FILE_PREFIX,
   type FlakinessTestCase,
+  type FlakinessTriagePolicy,
 } from '../src/framework/observability/flakinessReport';
 import { runFlakinessReportTelemetry } from '../src/framework/observability/reportTelemetry';
 import { shutdownTelemetry } from '../src/framework/observability/telemetry';
@@ -24,6 +29,8 @@ interface CliOptions {
   topLimit: number;
   trendOutput?: string;
   trendLimit: number;
+  triagePolicyPath?: string;
+  triageOutputMarkdown?: string;
 }
 
 const DEFAULT_INPUT_DIR = path.join('test-results');
@@ -95,6 +102,22 @@ function parseCliOptions(argv: string[]): CliOptions {
       index += 1;
       continue;
     }
+    if (argument === '--triage-policy') {
+      if (!value) {
+        throw new Error('Missing value for --triage-policy.');
+      }
+      options.triagePolicyPath = value;
+      index += 1;
+      continue;
+    }
+    if (argument === '--triage-output-md') {
+      if (!value) {
+        throw new Error('Missing value for --triage-output-md.');
+      }
+      options.triageOutputMarkdown = value;
+      index += 1;
+      continue;
+    }
 
     throw new Error(`Unknown argument: ${argument}`);
   }
@@ -148,6 +171,14 @@ async function ensureParentDirectory(filePath: string): Promise<void> {
   await mkdir(path.dirname(filePath), { recursive: true });
 }
 
+async function loadTriagePolicy(policyPath: string | undefined): Promise<FlakinessTriagePolicy> {
+  if (!policyPath) {
+    return DEFAULT_FLAKINESS_TRIAGE_POLICY;
+  }
+  const content = await readFile(policyPath, 'utf8');
+  return parseFlakinessTriagePolicy(JSON.parse(content) as unknown);
+}
+
 async function main(): Promise<number> {
   return runFlakinessReportTelemetry({
     task: async () => {
@@ -172,6 +203,15 @@ async function main(): Promise<number> {
 
       await writeFile(options.outputJson, `${JSON.stringify(summary, null, 2)}\n`, 'utf8');
       await writeFile(options.outputMarkdown, `${markdown}\n`, 'utf8');
+
+      const triagePolicy = await loadTriagePolicy(options.triagePolicyPath);
+      const triage = buildFlakinessTriage({ summary, policy: triagePolicy });
+      const triageOutputMarkdown =
+        options.triageOutputMarkdown ??
+        path.join(path.dirname(options.outputMarkdown), 'flakiness-triage.md');
+      await ensureParentDirectory(triageOutputMarkdown);
+      await writeFile(triageOutputMarkdown, `${buildFlakinessTriageMarkdown(triage)}\n`, 'utf8');
+
       if (options.trendOutput) {
         const trend = await appendObservabilityTrendPoint({
           filePath: options.trendOutput,
@@ -192,6 +232,10 @@ async function main(): Promise<number> {
       );
       console.log(`JSON summary: ${options.outputJson}`);
       console.log(`Markdown summary: ${options.outputMarkdown}`);
+      console.log(
+        `Flakiness triage (warn-first): triaged=${triage.totalTriaged} flaky=${triage.flakyTests} failing=${triage.failingTests} quarantined=${triage.quarantinedTests} repeated=${triage.repeatedFlakes}`,
+      );
+      console.log(`Markdown triage: ${triageOutputMarkdown}`);
 
       return { summary, value: 0 };
     },

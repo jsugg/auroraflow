@@ -149,6 +149,8 @@ jobs:
             --input-dir aggregated-e2e-artifacts/test-results \
             --output-json aggregated-e2e-artifacts/flakiness-summary.json \
             --output-md aggregated-e2e-artifacts/flakiness-summary.md \
+            --triage-policy configs/flakiness-triage-policy.json \
+            --triage-output-md aggregated-e2e-artifacts/flakiness-triage.md \
             --trend-output .auroraflow-trends/flakiness-trends.jsonl \
             --trend-limit 250
           # Keep every uploaded file under one parent directory so the artifact
@@ -165,6 +167,7 @@ jobs:
           path: |
             aggregated-e2e-artifacts/flakiness-summary.json
             aggregated-e2e-artifacts/flakiness-summary.md
+            aggregated-e2e-artifacts/flakiness-triage.md
             aggregated-e2e-artifacts/flakiness-trends.jsonl
 
   slo-dashboard:
