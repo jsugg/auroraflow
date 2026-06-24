@@ -66,6 +66,21 @@ The runtime dependency container (`AUR-IMPL-021`, `DID-09`) is experimental beca
 | `AuroraFlowLoggerFactory`  | type    | experimental |
 | `PageObjectProvider`       | type    | experimental |
 
+### Lifecycle
+
+The lifecycle helpers (`AUR-IMPL-023`) are experimental while the page-action pipeline and subsystem auto-registration continue to land. `closeAuroraFlow()` runs owned disposers once, in reverse registration order, and is a no-op for a context with no registered disposers; it never closes consumer-owned Playwright objects and installs no process-exit hooks. The `auroraflow/playwright` fixture (separate entrypoint) builds on these helpers.
+
+| Export                                  | Kind    | Tier         |
+| --------------------------------------- | ------- | ------------ |
+| `closeAuroraFlow`                       | runtime | experimental |
+| `registerAuroraFlowDisposer`            | runtime | experimental |
+| `getDefaultAuroraFlowContext`           | runtime | experimental |
+| `isAuroraFlowContextClosed`             | runtime | experimental |
+| `AuroraFlowCloseError`                  | runtime | experimental |
+| `resetDefaultAuroraFlowContextForTests` | runtime | internal     |
+| `AuroraFlowDisposer`                    | type    | experimental |
+| `AuroraFlowDisposerFailure`             | type    | experimental |
+
 ### Logging
 
 | Export                       | Kind    | Tier   |

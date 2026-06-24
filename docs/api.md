@@ -195,7 +195,7 @@ await store.close();
 
 ## Package lifecycle
 
-Phase 1 defines the lifecycle contract; implementation is planned for `AUR-IMPL-023`. See [Lifecycle contract](./operations/lifecycle.md).
+The lifecycle contract is implemented under `AUR-IMPL-023`. See [Lifecycle contract](./operations/lifecycle.md).
 
 Current APIs remain explicit:
 
@@ -203,7 +203,7 @@ Current APIs remain explicit:
 - call `RedisClient.disconnect()` for consumer-created Redis clients;
 - create a fresh `PageFactory(page)` for each Playwright `Page`.
 
-The planned `closeAuroraFlow(context?)` helper will be additive, idempotent, safe when optional subsystems are disabled, and will never close Playwright `Page`, `BrowserContext`, or `Browser` objects. The planned `auroraflow/playwright` fixture will keep the stable `new PageFactory(page)` constructor intact.
+The `closeAuroraFlow(context?)` helper is additive, idempotent, safe when optional subsystems are disabled, and never closes Playwright `Page`, `BrowserContext`, or `Browser` objects. The `auroraflow/playwright` fixture keeps the stable `new PageFactory(page)` constructor intact and closes its context after each test.
 
 ## Self-healing
 

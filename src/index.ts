@@ -22,6 +22,17 @@ export {
 } from './framework/runtime/auroraFlowContext';
 
 export {
+  AuroraFlowCloseError,
+  closeAuroraFlow,
+  getDefaultAuroraFlowContext,
+  isAuroraFlowContextClosed,
+  registerAuroraFlowDisposer,
+  resetDefaultAuroraFlowContextForTests,
+  type AuroraFlowDisposer,
+  type AuroraFlowDisposerFailure,
+} from './framework/runtime/lifecycle';
+
+export {
   LoggerConfigError,
   createChildLogger,
   createConfiguredLogger,

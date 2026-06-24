@@ -476,7 +476,7 @@ describe('resolveLocatorExpression AUR-IMPL-020 regression safety net', () => {
     expect(pageMock.getByRole).toHaveBeenNthCalledWith(2, 'button', { name: /save changes/i });
   });
 
-  it.fails('documents AUR-QE-112 gap for same-origin frame test-id candidates', () => {
+  it('resolves same-origin frame test-id candidates through the structured path (AUR-QE-112)', () => {
     const pageMock = createGuardedPageMock();
 
     const locator = resolveLocatorExpression(

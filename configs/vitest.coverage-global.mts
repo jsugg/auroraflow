@@ -7,6 +7,12 @@ export default mergeConfig(
     test: {
       coverage: {
         include: ['src/**/*.ts'],
+        // The `auroraflow/playwright` entrypoint (src/playwright.ts) is a thin
+        // Playwright Test fixture wiring (`base.extend`) with no node-reachable
+        // logic. Its lifecycle is proven by the browser-free withAuroraFlowFixture
+        // unit tests and exercised in real Playwright runs, so it is excluded from
+        // node coverage like the browser-only DOM snapshot path (AUR-IMPL-023).
+        exclude: ['src/playwright.ts'],
         thresholds: {
           // Global aggregate floor: erosion guard only. Risk lives in the
           // per-file floors below, not in this aggregate (AUR-QE-109 / TQE-005).

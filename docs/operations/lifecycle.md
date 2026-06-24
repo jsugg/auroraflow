@@ -1,12 +1,12 @@
 # Lifecycle contract
 
-This document records the Phase 1 contract for AuroraFlow lifecycle management. It is a design contract for `AUR-IMPL-013`; implementation remains a Phase 2 task under `AUR-IMPL-023` after `AuroraFlowContext` exists. Today consumers still call the existing subsystem APIs directly, such as `shutdownTelemetry()` and `RedisClient.disconnect()`.
+This document records the AuroraFlow lifecycle contract. It originated as a design contract for `AUR-IMPL-013` and is now implemented under `AUR-IMPL-023`: the disposer registry, `closeAuroraFlow(context?)`, and the `auroraflow/playwright` fixture have shipped. Consumers may still call the existing subsystem APIs directly, such as `shutdownTelemetry()` and `RedisClient.disconnect()`.
 
-## Planned `closeAuroraFlow(context?)`
+## `closeAuroraFlow(context?)`
 
-`closeAuroraFlow(context?)` will be an additive package helper. It must not remove or weaken existing subsystem shutdown APIs.
+`closeAuroraFlow(context?)` is an additive package helper. It does not remove or weaken existing subsystem shutdown APIs.
 
-Required semantics:
+Guaranteed semantics:
 
 - one-shot per runtime context;
 - concurrent calls for the same context coalesce onto the same close operation;
@@ -19,13 +19,13 @@ Required semantics:
 - injected resources remain consumer-owned unless a future API explicitly transfers ownership;
 - no process-exit hooks are installed by default.
 
-The default context will keep current behavior: environment-backed logger, telemetry, Redis, self-healing config, artifact privacy, and registry runtime. Future injected contexts may own only the resources they create.
+The default context keeps current behavior: environment-backed logger, telemetry, Redis, self-healing config, artifact privacy, and registry runtime. Injected contexts own only the resources they create. Register owned cleanup with `registerAuroraFlowDisposer(context, disposer)`; a context with no registered disposers closes as a no-op, which keeps cleanup safe when optional subsystems are disabled.
 
-## Planned `auroraflow/playwright` fixture
+## `auroraflow/playwright` fixture
 
-The future `auroraflow/playwright` entrypoint will wrap Playwright Test fixtures without changing the stable `new PageFactory(page)` constructor.
+The `auroraflow/playwright` entrypoint wraps Playwright Test fixtures without changing the stable `new PageFactory(page)` constructor.
 
-Target fixture shape:
+Fixture shape:
 
 ```ts
 import { test, expect } from 'auroraflow/playwright';
@@ -37,22 +37,22 @@ test('uses AuroraFlow page objects', async ({ auroraFlow }) => {
 });
 ```
 
-Planned fixture ownership:
+Fixture ownership:
 
 - test-scoped AuroraFlow context;
-- fresh `PageFactory` for each Playwright `Page`/attempt;
-- fixture cleanup calls `closeAuroraFlow(context)` after each test;
-- Playwright owns browser/page lifecycle;
+- a `PageFactory` bound to the test's Playwright `Page` and that context;
+- fixture cleanup calls `closeAuroraFlow(context)` after each test, even when the test fails;
+- Playwright owns the browser/page lifecycle;
 - Redis, telemetry, and logger resources are closed only when the AuroraFlow context created them;
-- fixture must be safe when Redis and telemetry are disabled.
+- the fixture is safe when Redis and telemetry are disabled.
 
-## Current consumer responsibilities
+## Consumer responsibilities
 
-Until `AUR-IMPL-023` lands:
+When not using the `auroraflow/playwright` fixture:
 
 - call `shutdownTelemetry()` when telemetry was initialized and final export/flush matters;
 - call `RedisClient.disconnect()` for any Redis client created by the consumer;
 - create a new `PageFactory(page)` when Playwright creates a new `Page`;
 - avoid reusing cached page objects after their underlying Playwright page closes.
 
-This contract intentionally avoids Phase 2 runtime refactors, process hooks, and hidden ownership changes.
+The lifecycle helper deliberately avoids process hooks and hidden ownership changes; consumer-owned Playwright and injected clients remain the consumer's responsibility.

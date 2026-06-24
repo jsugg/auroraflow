@@ -10,6 +10,11 @@
       "require": "./dist/index.js",
       "default": "./dist/index.js"
     },
+    "./playwright": {
+      "types": "./dist/playwright.d.ts",
+      "require": "./dist/playwright.js",
+      "default": "./dist/playwright.js"
+    },
     "./package.json": "./package.json"
   },
   "files": [
@@ -98,7 +103,13 @@
   },
   "homepage": "https://github.com/jsugg/auroraflow#readme",
   "peerDependencies": {
-    "playwright": ">=1.59 <2"
+    "playwright": ">=1.59 <2",
+    "@playwright/test": ">=1.59 <2"
+  },
+  "peerDependenciesMeta": {
+    "@playwright/test": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@axe-core/playwright": "^4.11.3",

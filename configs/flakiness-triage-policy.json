@@ -1,0 +1,10 @@
+{
+  "defaultOwner": "@jsugg",
+  "owners": [
+    { "pathPrefix": "tests/suites/e2e/", "owner": "@jsugg" },
+    { "pathPrefix": "tests/suites/integration/", "owner": "@jsugg" },
+    { "pathPrefix": "tests/suites/unit/", "owner": "@jsugg" }
+  ],
+  "quarantined": [],
+  "repeatedFailureThreshold": 2
+}

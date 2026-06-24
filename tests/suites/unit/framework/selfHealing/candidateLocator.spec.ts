@@ -5,6 +5,7 @@ import {
   CANDIDATE_LOCATOR_SCHEMA_VERSION,
   cssLocator,
   describeCandidateLocator,
+  frameLocator,
   labelLocator,
   parseCandidateLocator,
   parseLegacyLocatorString,
@@ -80,6 +81,21 @@ describe('resolveCandidateLocator (structured guarded path)', () => {
     expect(page.getByRole).toHaveBeenNthCalledWith(3, 'button', { name: /save changes/i });
   });
 
+  it('enters a frame via frameLocator and resolves the inner candidate (AUR-QE-112)', () => {
+    const innerLocator = { inner: true };
+    const frame = { getByTestId: vi.fn().mockReturnValue(innerLocator) };
+    const page = { frameLocator: vi.fn().mockReturnValue(frame) };
+
+    const resolved = resolveCandidateLocator(
+      page as unknown as Page,
+      frameLocator('iframe[title="Checkout iframe"]', testIdLocator('iframe-submit')),
+    );
+
+    expect(page.frameLocator).toHaveBeenCalledWith('iframe[title="Checkout iframe"]');
+    expect(frame.getByTestId).toHaveBeenCalledWith('iframe-submit');
+    expect(resolved).toBe(innerLocator);
+  });
+
   it('returns the Playwright locator instance unchanged', () => {
     const page = createResolverPageMock();
     const locator = resolveCandidateLocator(page as unknown as Page, testIdLocator('x'));
@@ -111,6 +127,11 @@ describe('describeCandidateLocator (display emitter)', () => {
     expect(describeCandidateLocator(cssLocator('button[aria-label="It\'s saved"]'))).toBe(
       'page.locator(`button[aria-label="It\'s saved"]`)',
     );
+    expect(
+      describeCandidateLocator(
+        frameLocator('iframe[title="Checkout iframe"]', testIdLocator('iframe-submit')),
+      ),
+    ).toBe("page.frameLocator('iframe[title=\"Checkout iframe\"]').getByTestId('iframe-submit')");
   });
 
   it('returns null when a value cannot be expressed as one Playwright string literal', () => {
@@ -145,10 +166,26 @@ describe('parseLegacyLocatorString (legacy string read path)', () => {
     );
   });
 
+  it('reads same-origin frame candidates into the structured frame model (AUR-QE-112)', () => {
+    expect(
+      parseLegacyLocatorString(
+        "page.frameLocator('iframe[title=\"Checkout iframe\"]').getByTestId('iframe-submit')",
+      ),
+    ).toEqual(frameLocator('iframe[title="Checkout iframe"]', testIdLocator('iframe-submit')));
+    expect(
+      parseLegacyLocatorString(
+        "page.frameLocator('#outer').frameLocator('#inner').getByRole('button', { name: 'Go' })",
+      ),
+    ).toEqual(
+      frameLocator('#outer', frameLocator('#inner', roleLocator('button', stringName('Go')))),
+    );
+  });
+
   it('returns null for unsupported expressions', () => {
     expect(parseLegacyLocatorString("customResolver('submit')")).toBeNull();
     expect(parseLegacyLocatorString('#submit-order')).toBeNull();
-    expect(parseLegacyLocatorString("page.frameLocator('iframe').getByTestId('x')")).toBeNull();
+    expect(parseLegacyLocatorString("page.frameLocator('iframe')")).toBeNull();
+    expect(parseLegacyLocatorString("page.frameLocator('iframe').customResolver('x')")).toBeNull();
   });
 });
 
@@ -185,6 +222,14 @@ describe('parseCandidateLocator (artifact reader)', () => {
         name: { kind: 'regex', source: 'save', flags: 'i' },
       }),
     ).toEqual(roleLocator('button', regexName('save', 'i')));
+    expect(
+      parseCandidateLocator({
+        schemaVersion: '1.0.0',
+        kind: 'frame',
+        frameSelector: 'iframe[title="Checkout iframe"]',
+        inner: { schemaVersion: '1.0.0', kind: 'testId', value: 'iframe-submit' },
+      }),
+    ).toEqual(frameLocator('iframe[title="Checkout iframe"]', testIdLocator('iframe-submit')));
   });
 
   it('rejects malformed structured locators with actionable schema errors', () => {
@@ -194,8 +239,18 @@ describe('parseCandidateLocator (artifact reader)', () => {
       parseCandidateLocator({ schemaVersion: '0.9.0', kind: 'testId', value: 'x' }),
     ).toThrow(/schemaVersion/);
     expect(() =>
-      parseCandidateLocator({ schemaVersion: '1.0.0', kind: 'frame', value: 'x' }),
+      parseCandidateLocator({ schemaVersion: '1.0.0', kind: 'bogus', value: 'x' }),
     ).toThrow(/kind/);
+    expect(() =>
+      parseCandidateLocator({ schemaVersion: '1.0.0', kind: 'frame', frameSelector: 'iframe' }),
+    ).toThrow(/candidateLocator/);
+    expect(() =>
+      parseCandidateLocator({
+        schemaVersion: '1.0.0',
+        kind: 'frame',
+        inner: { schemaVersion: '1.0.0', kind: 'testId', value: 'x' },
+      }),
+    ).toThrow(/frameSelector/);
     expect(() => parseCandidateLocator({ schemaVersion: '1.0.0', kind: 'testId' })).toThrow(
       SelfHealingArtifactSchemaError,
     );
@@ -247,7 +302,7 @@ function randomSafeString(random: Random): string {
   return value.trim().length === 0 ? 'fallback' : value;
 }
 
-function randomCandidateLocator(random: Random): CandidateLocator {
+function randomNonFrameCandidateLocator(random: Random): CandidateLocator {
   const kind = randomFrom(random, [
     'testId',
     'label',
@@ -270,6 +325,18 @@ function randomCandidateLocator(random: Random): CandidateLocator {
     case 'roleString':
       return roleLocator('button', stringName(randomSafeString(random)));
   }
+}
+
+function randomCandidateLocator(random: Random): CandidateLocator {
+  // 1-in-4 runs wrap a non-frame candidate in a same-origin frame so the
+  // describe -> parse round trip also exercises AUR-QE-112 frame candidates.
+  if (randomInt(random, 0, 3) === 0) {
+    return frameLocator(
+      `iframe[title="${randomSafeString(random)}"]`,
+      randomNonFrameCandidateLocator(random),
+    );
+  }
+  return randomNonFrameCandidateLocator(random);
 }
 
 describe('structured locator round-trip property (AUR-IMPL-020)', () => {
