@@ -176,7 +176,7 @@ Useful methods:
 - `listByPageObjectAndAction(pageObjectName, actionType, limit?)`
 - `delete(id)`
 
-Expected-version writes protect reviewed promotion workflows from silent overwrites. Stale writes throw `SelectorRegistryConflictError`.
+Expected-version writes protect reviewed promotion workflows from silent overwrites. Stale selector writes throw `SelectorRegistryConflictError`; stale promotion-status transitions throw `PromotionStatusConflictError`.
 
 Use `createRedisSelectorStore(getRedisClient())` to back the repository with Redis. Use `createMemorySelectorStore()` for a non-durable, process-local store suitable for unit tests, local experiments, and fixture-scoped selector state.
 
@@ -191,7 +191,7 @@ store.clear();
 await store.close();
 ```
 
-`MemorySelectorStore` implements the same `SelectorStore` capabilities as the Redis adapter for common registry paths: `get`, `getMany`, `set`, `del`, `keys`, `scanKeys`, `compareAndSet`, and `atomicJsonMerge`. It exposes `durability: 'non-durable'`, `clear()`, and idempotent `close()`. It is not shared across processes and must not be used as durable CI or team storage.
+`MemorySelectorStore` implements the same `SelectorStore` capabilities as the Redis adapter for common registry paths: `get`, `getMany`, `set`, `del`, `keys`, `scanKeys`, `compareAndSet`, `compareAndSetJsonField`, and `atomicJsonMerge`. It exposes `durability: 'non-durable'`, `clear()`, and idempotent `close()`. It is not shared across processes and must not be used as durable CI or team storage.
 
 ## Package lifecycle
 
@@ -226,9 +226,9 @@ Current lifecycle:
 3. SAT can enrich artifacts with bounded DOM evidence, registry candidates, and candidate history.
 4. Guarded mode dry-runs ranked candidates and can retry supported actions once.
 5. `write_pending` mode can write SAT history and pending promotion records.
-6. Reviewed promotion workflow can approve, reject, mark conflicts, or roll back selector registry records.
+6. Reviewed promotion workflow can approve, reject, mark conflicts, or roll back selector registry records with authorization policy and expected-status CAS.
 
-Promotion scope is registry mutation only. AuroraFlow does not rewrite source files or apply blind autonomous selector changes.
+Promotion scope is registry mutation only. AuroraFlow does not rewrite source files or apply blind autonomous selector changes. Local promotion authorization is permissive with a warning. Shared promotion authorization requires CODEOWNERS and protected-workflow evidence before mutating selector records.
 
 ### Promotion workflow
 
@@ -248,7 +248,10 @@ npm run self-heal:promotions -- list --selector-id login.submit
 npm run self-heal:promotions -- approve --promotion-id <id> --reviewer qa-owner
 npm run self-heal:promotions -- reject --promotion-id <id> --reviewer qa-owner --reason "Wrong target"
 npm run self-heal:promotions -- rollback --promotion-id <id> --reviewer qa-owner
+npm run self-heal:promotions -- cleanup
 ```
+
+Promotion cleanup is a dry-run by default. Pass `--apply` only after reviewing the summary. For shared registry mutation, run commands with `--authorization-mode shared` and protected workflow evidence.
 
 ## Observability
 

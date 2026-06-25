@@ -40,6 +40,7 @@ describe('documentation surface contract', () => {
       'docs/adr/0004-redis-strategy.md',
       'docs/adr/0005-observability-boundary.md',
       'docs/adr/0006-release-policy.md',
+      'docs/architecture/locator-first-api.md',
       'docs/architecture/self-healing.md',
       'docs/operations/lifecycle.md',
       'docs/operations/privacy-retention.md',
@@ -122,6 +123,26 @@ describe('documentation surface contract', () => {
       expectTextExcludes(`${lifecycle}\n${development}`, {
         text: staleText,
         rationale: 'Lifecycle docs must not keep planned-only wording after AUR-IMPL-023 shipped.',
+      });
+    }
+  });
+
+  it('documents locator-first API review boundaries before prototypes ship', () => {
+    const design = readRepoFile('docs/architecture/locator-first-api.md');
+
+    for (const text of [
+      'Draft for API review; no prototypes shipped',
+      'click(selector: string, options?: ActionOptions)',
+      'click(locator: Locator, options?: ActionOptions)',
+      'type(selector: string, text: string, options?: ActionOptions)',
+      'type(locator: Locator, text: string, options?: ActionOptions)',
+      'Do not remove, rename, or weaken string-selector APIs',
+      'add prototypes only after API review',
+    ]) {
+      expectTextIncludes(design, {
+        text,
+        rationale:
+          'Locator-first design must preserve string-selector compatibility and review gating.',
       });
     }
   });

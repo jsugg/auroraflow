@@ -27,13 +27,23 @@ Invalid `SELF_HEAL_*` values are observable instead of silently defaulting: `res
 | `SELF_HEAL_REGISTRY_MODE` | `off`, `read`, `write_pending` | `read` | Reads active selectors/history or writes reviewable pending records. |
 | `SELF_HEAL_REGISTRY_REQUIRED` | boolean-like | `false` | Fails registry resolution when Redis is required but unavailable. |
 | `SELF_HEAL_REGISTRY_NAMESPACE` | string | `selector-registry` | Active selector namespace. |
-| `SELF_HEAL_PROMOTION_MODE` | `manual`, `ci_acknowledged` | `manual` | Promotion workflow posture. Reserved for future enforcement (`AUR-IMPL-025`): the value is parsed, validated, and exposed as `sat.promotionMode`, but reviewed promotion workflows currently require explicit acknowledgement or reviewer identity regardless of this setting. |
+| `SELF_HEAL_PROMOTION_MODE` | `manual`, `ci_acknowledged` | `manual` | SAT promotion-write posture exposed as `sat.promotionMode`; reviewed mutation authorization is controlled by the promotion CLI/workflow policy below. |
 
 Read mode is opportunistic unless Redis configuration is present or `SELF_HEAL_REGISTRY_REQUIRED=true`. Write-pending mode records SAT history and pending promotions when a registry runtime is configured.
 
 Default guarded healing is registry-curated by policy: fresh heuristic and DOM candidates are diagnostic below the `0.92` floor, while curated registry entries at or above the floor and strongly validated candidate history can pass guarded dry-run validation. Lower thresholds require reachability tests and an updated decision record.
 
 Candidate-history retention follows `AUR-DEC-005`: the exported default and hard cap are both `2,592,000` seconds (30 days). Positive custom TTLs below the cap are honored; higher values are clamped to 30 days. Redis history data is consumer-owned.
+
+## Run-level self-healing budget
+
+| Variable | Values | Default | Purpose |
+| --- | --- | --- | --- |
+| `SELF_HEAL_RUN_BUDGET_MODE` | `warning_only`, `enforce` | `warning_only` | Warning-only mode counts failures and emits one warning when a run exceeds either budget. `enforce` downgrades after the configured max. |
+| `SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS` | `0..10000` | `25` | Max per-run failures eligible for screenshots, SAT/DOM analysis, guarded validation, guarded auto-apply, and registry writes. |
+| `SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS` | `0..10000` | `50` | Max per-run failure artifacts. A value above the healing-attempt budget allows capture-only artifacts after full healing is exhausted. |
+
+`AUR-DEC-013` keeps the default warning-only until a failure-path baseline exists. In `enforce` mode, AuroraFlow first downgrades exhausted healing work to capture-only artifacts with no SAT, guarded probe, auto-apply, or registry write. After the artifact budget is exhausted, it records no self-healing artifact for the remaining storm and surfaces the original page-action failure. Budget downgrades never mutate selector records or source selectors.
 
 ## Artifact privacy
 
@@ -60,7 +70,7 @@ Invalid values use `compatible` and emit a diagnostic without echoing the receiv
 | `AURORAFLOW_REDIS_MAX_BACKOFF_MS` | `2000` | Retry cap; must be at least base delay. |
 | `AURORAFLOW_REDIS_KEY_PREFIX` | `auroraflow` | Key namespace prefix. |
 
-Redis keys are namespaced and selector updates use versioned compare-and-set for reviewed promotion workflows. Selector-candidate history writes use backend-side atomic JSON merges for counters and 30-day capped TTL refreshes; they do not rely on process-local locks.
+Redis keys are namespaced and selector updates use versioned compare-and-set for reviewed promotion workflows. Promotion status transitions use expected-status compare-and-set, so concurrent approve/reject/rollback races become explicit conflicts instead of last-writer-wins updates. Selector-candidate history writes use backend-side atomic JSON merges for counters and 30-day capped TTL refreshes; they do not rely on process-local locks.
 
 ## Self-healing governance
 
@@ -71,9 +81,14 @@ Redis keys are namespaced and selector updates use versioned compare-and-set for
 | `SELF_HEAL_ACKNOWLEDGED` | `false` | Acknowledges accepted candidates after review. |
 | `SELF_HEAL_GOVERNANCE_SUMMARY_JSON` | `test-results/self-healing-governance-summary.json` | JSON summary path. |
 | `SELF_HEAL_GOVERNANCE_SUMMARY_MD` | `test-results/self-healing-governance-summary.md` | Markdown summary path. |
+| `SELF_HEAL_PROMOTION_AUTHORIZATION_MODE` | `local` | Promotion CLI authorization mode. `local` permits mutations and warns; `shared` requires CODEOWNERS plus protected workflow evidence. |
+| `SELF_HEAL_PROMOTION_CODEOWNERS_PATH` | `.github/CODEOWNERS` | CODEOWNERS file used by shared promotion authorization. |
+| `SELF_HEAL_PROMOTION_PROTECTED_WORKFLOW` | `GITHUB_REF_PROTECTED` fallback, otherwise `false` | Explicit protected-workflow evidence for shared promotion authorization. |
 | `SELF_HEAL_REGISTRY_CLEANUP_LIMIT` | `1000` | Max records scanned by cleanup. |
+| `SELF_HEAL_REGISTRY_CLEANUP_APPLY` | `false` | Cleanup is dry-run by default; set `true` to delete expired history, promotion, and audit records. |
+| `SELF_HEAL_AUDIT_RETENTION_SECONDS` | `2592000` | Audit cleanup retention window for records without an explicit `expiresAt`; values above 30 days are clamped. |
 
-In this repository, use `npm run self-heal:governance`, `npm run self-heal:promotions`, and `npm run self-heal:cleanup` for review and cleanup workflows. External projects can call the exported workflow/repository APIs or own equivalent scripts.
+In this repository, use `npm run self-heal:governance`, `npm run self-heal:promotions`, and `npm run self-heal:cleanup` for review and cleanup workflows. `self-heal:cleanup` reports a dry-run summary unless `SELF_HEAL_REGISTRY_CLEANUP_APPLY=true` or the promotions cleanup subcommand receives `--apply`. External projects can call the exported workflow/repository APIs or own equivalent scripts.
 
 ## Observability
 

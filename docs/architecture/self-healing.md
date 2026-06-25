@@ -29,7 +29,7 @@ Selector Analysis Tooling (SAT) enriches `suggest` and `guarded` artifacts with 
 - `SELF_HEAL_REGISTRY_MODE` accepts `off`, `read`, or `write_pending`; `read` loads active selector records/history, while `write_pending` also stores history observations and reviewable pending promotion records after successful guarded auto-apply.
 - `SELF_HEAL_REGISTRY_REQUIRED=true` opts into required registry resolution; otherwise read mode is opportunistic when Redis configuration is present.
 - `SELF_HEAL_REGISTRY_NAMESPACE` overrides the active selector namespace; default is `selector-registry`.
-- `SELF_HEAL_PROMOTION_MODE` accepts `manual` or `ci_acknowledged`; reviewed workflows still require explicit acknowledgement or reviewer identity before active selector records change. The mode is reserved for future enforcement (`AUR-IMPL-025`).
+- `SELF_HEAL_PROMOTION_MODE` accepts `manual` or `ci_acknowledged` for SAT promotion-write posture. Reviewed mutation workflows use the promotion authorization policy: local mode permits with a warning, and shared mode requires CODEOWNERS plus protected-workflow evidence.
 - Invalid `SELF_HEAL_*` values produce diagnostics: `resolveSelfHealingConfig()` warns by default and throws `SelfHealingConfigError` when `AURORAFLOW_CONFIG_STRICT=true`; `resolveSelfHealingConfigWithDiagnostics()` exposes the diagnostics and effective config programmatically. Diagnostics never echo received values.
 
 DOM snapshots are captured inside the browser through `page.evaluate` and serialized as compact summaries:
@@ -115,6 +115,18 @@ When guarded validation produces an accepted candidate and the action is support
   - `skippedReason` when no attempt is made
   - `errorMessage` when retry fails
 
+### Run-Level Failure-Storm Budget
+
+Self-healing work is counted per `AuroraFlowContext`, the run-state seam for isolated execution. The budget covers screenshot capture, SAT/DOM analysis, guarded validation, guarded auto-apply, registry writes, and failure-artifact volume.
+
+Per `AUR-DEC-013`, defaults are baseline-first and warning-only:
+
+- `SELF_HEAL_RUN_BUDGET_MODE=warning_only` emits one warning after either budget is exceeded, but it does not block diagnostics.
+- `SELF_HEAL_RUN_BUDGET_MODE=enforce` first downgrades failures beyond `SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS` to capture-only artifacts.
+- Once `SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS` is exceeded, failures become original-error-only for the rest of the run.
+- Budget downgrades do not auto-apply guarded locators, write pending registry telemetry, mutate selector records, or change source selectors.
+- The original page-action failure stays primary; a failed guarded retry never replaces the propagated cause.
+
 ### Write-Pending Registry Telemetry
 
 When `SELF_HEAL_REGISTRY_MODE=write_pending` and a registry runtime is configured, AuroraFlow writes bounded SAT telemetry after the failure artifact event ID is allocated:
@@ -144,9 +156,9 @@ Behavior:
 - `approve` requires reviewer identity, applies the proposed locator with expected-version compare-and-set, writes audit metadata, and marks conflicts explicitly.
 - `reject` requires reviewer identity and a reason, marks the promotion rejected, and accounts candidate rejection history.
 - `rollback` restores the previous selector snapshot with compare-and-set, writes rollback audit metadata, and accounts rollback history.
-- `cleanup` removes expired history and promotion records from non-active keyspaces.
+- `cleanup` dry-runs by default; pass `--apply` to remove expired history, promotion, and audit records from non-active keyspaces.
 
-Statuses include `pending`, `approved`, `applied`, `rejected`, `conflict`, and `rolled_back`. Conflicts never silently overwrite active selector records.
+Local promotion authorization remains permissive and emits a warning. Shared promotion mode (`--authorization-mode shared` or `SELF_HEAL_PROMOTION_AUTHORIZATION_MODE=shared`) requires CODEOWNERS plus protected workflow evidence before mutating selectors. Statuses include `pending`, `approved`, `applied`, `rejected`, `conflict`, and `rolled_back`. Status updates use expected-status compare-and-set, so concurrent approve/reject/rollback races conflict instead of silently overwriting active selector or promotion records.
 
 ## CI Governance and Triage
 
