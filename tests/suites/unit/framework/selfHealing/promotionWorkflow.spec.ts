@@ -133,6 +133,7 @@ describe('SelfHealingPromotionWorkflow', () => {
       authorizationWarnings: [
         'Local promotion authorization is permissive; use shared mode with CODEOWNERS and a protected workflow for shared registries.',
       ],
+      authorizationEvidence: { codeownersPresent: false, protectedWorkflow: false },
       expiresAt: '2026-07-08T14:00:00.000Z',
     });
     expect(result.authorizationWarnings).toHaveLength(1);

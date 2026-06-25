@@ -622,6 +622,23 @@ describe('PageObjectBase self-healing integration', () => {
     });
   });
 
+  it('captures a failure screenshot but no self-healing artifact when self-healing is off', async () => {
+    const { context } = setupSelfHealing({ configEnv: { SELF_HEAL_MODE: 'off' } });
+    pageObject = new TestPageObject(pageMock as unknown as Page, context);
+    pageMock.click.mockRejectedValueOnce(new Error('click failed'));
+
+    await expect(pageObject.click('#submit')).rejects.toThrow(
+      'Error clicking on selector #submit: click failed',
+    );
+
+    // Off mode still records basic failure evidence (a screenshot) but writes no
+    // self-healing event artifact and never attempts guarded healing.
+    expect(pageMock.screenshot).toHaveBeenCalledTimes(1);
+    expect(pageMock.locatorFirst.click).not.toHaveBeenCalled();
+    const artifacts = await readSelfHealingArtifacts<{ runId: string }>(currentArtifactScope());
+    expect(artifacts).toHaveLength(0);
+  });
+
   it('downgrades a failure storm from full healing to capture-only, then original-error-only', async () => {
     const warn = vi.fn();
     const logger: Logger = {

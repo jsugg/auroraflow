@@ -119,6 +119,10 @@ When guarded validation produces an accepted candidate and the action is support
 
 Self-healing work is counted per `AuroraFlowContext`, the run-state seam for isolated execution. The budget covers screenshot capture, SAT/DOM analysis, guarded validation, guarded auto-apply, registry writes, and failure-artifact volume.
 
+The budget aggregates only across page objects that share one context. The `auroraflow/playwright` fixture and any `PageFactory` provider that forwards `runtimeContext` give every page object in a run the same context and therefore one shared run-level budget. Default-constructed page objects (`new SomePage(page)`, or `PageFactory.getPage()` without a registered provider) keep their constructor's second argument domain-owned and build their own env-backed context, so each holds an independent budget rather than a single process-wide quota.
+
+When self-healing is `off`, AuroraFlow skips all self-healing analysis and writes no self-healing failure-event artifact. A basic failure screenshot is still captured as failure evidence when the artifact privacy policy allows it: `off` disables the self-healing event record, not basic screenshot capture.
+
 Per `AUR-DEC-013`, defaults are baseline-first and warning-only:
 
 - `SELF_HEAL_RUN_BUDGET_MODE=warning_only` emits one warning after either budget is exceeded, but it does not block diagnostics.

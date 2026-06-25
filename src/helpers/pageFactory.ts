@@ -68,6 +68,15 @@ export class PageFactory {
     return this.pageInstances.get(pageClass) as T;
   }
 
+  /**
+   * Default construction keeps the page-object constructor's second argument
+   * domain-owned, so it does not inject this factory's {@link AuroraFlowContext}
+   * positionally. A default-constructed page object therefore builds its own
+   * env-backed context — and its own per-run self-healing budget. To share this
+   * factory's context (and aggregate the run-level failure-storm budget across
+   * page objects), register a provider that forwards `runtimeContext` to the
+   * constructor. The `auroraflow/playwright` fixture wires this for you.
+   */
   private createPage<T extends PageObjectBase>(pageClass: PageObjectConstructor<T>): T {
     const provider = this.pageProviders.get(pageClass) as PageObjectProvider<T> | undefined;
     return provider ? provider(this.page, this.context) : new pageClass(this.page);

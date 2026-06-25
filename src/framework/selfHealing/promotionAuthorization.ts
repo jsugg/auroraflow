@@ -52,7 +52,14 @@ function normalizeAuthorizationMode(
   return mode ?? 'local';
 }
 
-/** Creates the built-in local/shared selector-promotion authorization policy. */
+/**
+ * Creates the built-in local/shared selector-promotion authorization policy.
+ *
+ * Authorization evidence (CODEOWNERS presence and protected-workflow status) is
+ * fixed at construction time and reported back on each {@link PromotionAuthorizationDecision};
+ * the built-in policy does not read per-call evidence. Custom policies may use
+ * {@link PromotionAuthorizationInput.evidence} or compute evidence dynamically.
+ */
 export function createPromotionAuthorizationPolicy({
   mode,
   codeownersPresent = false,

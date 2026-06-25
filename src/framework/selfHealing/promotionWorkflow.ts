@@ -18,6 +18,7 @@ import {
   PromotionAuthorizationError,
   createPromotionAuthorizationPolicy,
   type PromotionAuthorizationDecision,
+  type PromotionAuthorizationEvidence,
   type PromotionAuthorizationMode,
   type PromotionAuthorizationPolicy,
 } from './promotionAuthorization';
@@ -37,6 +38,7 @@ type PromotionWorkflowStatus = 'applied' | 'rejected' | 'rolled_back' | 'conflic
 interface PromotionAuditRecord {
   authorizationMode: PromotionAuthorizationMode;
   authorizationWarnings?: readonly string[];
+  authorizationEvidence?: PromotionAuthorizationEvidence;
   promotionId: string;
   eventId: string;
   selectorId: string;
@@ -53,7 +55,7 @@ interface PromotionAuditRecord {
 
 type PromotionAuditWriteInput = Omit<
   PromotionAuditRecord,
-  'authorizationMode' | 'authorizationWarnings'
+  'authorizationMode' | 'authorizationWarnings' | 'authorizationEvidence'
 > & {
   authorization: PromotionAuthorizationDecision;
 };
@@ -581,6 +583,7 @@ export class SelfHealingPromotionWorkflow {
       ...auditFields,
       authorizationMode: authorization.mode,
       authorizationWarnings: authorization.warnings,
+      authorizationEvidence: authorization.evidence,
       expiresAt,
     };
     await this.store.set(auditKey, JSON.stringify(auditRecord), {
