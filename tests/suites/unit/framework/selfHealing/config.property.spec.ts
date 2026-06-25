@@ -18,6 +18,7 @@ import {
 const SUPPORTED_MODES = new Set(['off', 'suggest', 'guarded']);
 const SUPPORTED_REGISTRY_MODES = new Set(['off', 'read', 'write_pending']);
 const SUPPORTED_PROMOTION_MODES = new Set(['manual', 'ci_acknowledged']);
+const SUPPORTED_RUN_BUDGET_MODES = new Set(['warning_only', 'enforce']);
 const SUPPORTED_ACTIONS = new Set([
   'navigate',
   'click',
@@ -67,6 +68,8 @@ const ENUM_TOKENS: readonly string[] = [
   'write_pending',
   'manual',
   'ci_acknowledged',
+  'warning_only',
+  'enforce',
   'GUARDED',
   'bogus',
   '',
@@ -97,6 +100,9 @@ function generateEnv(random: Random): Env {
   maybe(random, 'SELF_HEAL_MAX_TEXT_LENGTH', NUMERIC_TOKENS, env);
   maybe(random, 'SELF_HEAL_REGISTRY_MODE', ENUM_TOKENS, env);
   maybe(random, 'SELF_HEAL_PROMOTION_MODE', ENUM_TOKENS, env);
+  maybe(random, 'SELF_HEAL_RUN_BUDGET_MODE', ENUM_TOKENS, env);
+  maybe(random, 'SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS', NUMERIC_TOKENS, env);
+  maybe(random, 'SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS', NUMERIC_TOKENS, env);
   maybe(random, 'SELF_HEAL_ALLOWED_ACTIONS', LIST_TOKENS, env);
   maybe(random, 'SELF_HEAL_ALLOWED_DOMAINS', LIST_TOKENS, env);
   maybe(random, 'SELF_HEAL_SAT_ENABLED', ['true', 'false', 'maybe', '1', '0'], env);
@@ -107,6 +113,12 @@ function generateEnv(random: Random): Env {
 function expectBoundedInteger(value: number, max: number): void {
   expect(Number.isInteger(value)).toBe(true);
   expect(value).toBeGreaterThanOrEqual(1);
+  expect(value).toBeLessThanOrEqual(max);
+}
+
+function expectBoundedNonNegativeInteger(value: number, max: number): void {
+  expect(Number.isInteger(value)).toBe(true);
+  expect(value).toBeGreaterThanOrEqual(0);
   expect(value).toBeLessThanOrEqual(max);
 }
 
@@ -135,6 +147,8 @@ describe('resolveSelfHealingConfigWithDiagnostics properties', () => {
         expectBoundedInteger(config.sat.maxDomNodes, 5_000);
         expectBoundedInteger(config.sat.maxCandidates, 50);
         expectBoundedInteger(config.sat.maxTextLength, 500);
+        expectBoundedNonNegativeInteger(config.runBudget.maxHealingAttempts, 10_000);
+        expectBoundedNonNegativeInteger(config.runBudget.maxFailureArtifacts, 10_000);
       },
     });
   });
@@ -149,6 +163,7 @@ describe('resolveSelfHealingConfigWithDiagnostics properties', () => {
         expect(SUPPORTED_MODES.has(config.mode)).toBe(true);
         expect(SUPPORTED_REGISTRY_MODES.has(config.sat.registryMode)).toBe(true);
         expect(SUPPORTED_PROMOTION_MODES.has(config.sat.promotionMode)).toBe(true);
+        expect(SUPPORTED_RUN_BUDGET_MODES.has(config.runBudget.mode)).toBe(true);
         expect(config.safetyPolicy.allowedActions.length).toBeGreaterThanOrEqual(1);
         for (const action of config.safetyPolicy.allowedActions) {
           expect(SUPPORTED_ACTIONS.has(action)).toBe(true);

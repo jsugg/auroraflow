@@ -186,7 +186,7 @@ SELF_HEAL_MODE=guarded npm run test:smoke
 npm run self-heal:governance
 ```
 
-Artifacts are written to `SELF_HEAL_ARTIFACTS_DIR` when set, otherwise `test-results/self-healing/*.json`; governance summaries are written to `test-results/self-healing-governance-summary.{json,md}`. Promotion and registry-cleanup CLIs default to Redis. Use `AURORAFLOW_SELF_HEALING_SCRIPT_STORE=memory` only for deterministic local/process-boundary checks where non-durable state is expected.
+Artifacts are written to `SELF_HEAL_ARTIFACTS_DIR` when set, otherwise `test-results/self-healing/*.json`; governance summaries are written to `test-results/self-healing-governance-summary.{json,md}`. Promotion and registry-cleanup CLIs default to Redis. Local promotion authorization is permissive with a warning; shared mode must provide CODEOWNERS plus protected-workflow evidence. Registry cleanup is dry-run by default; pass `--apply` or set `SELF_HEAL_REGISTRY_CLEANUP_APPLY=true` only after reviewing the summary. Use `AURORAFLOW_SELF_HEALING_SCRIPT_STORE=memory` only for deterministic local/process-boundary checks where non-durable state is expected.
 
 When extending this area, keep these contracts intact:
 

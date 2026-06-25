@@ -78,23 +78,11 @@ function buildConfig(env: Readonly<Record<string, string | undefined>>): SelfHea
 }
 
 // The facade resolves telemetry and the artifact root from the context, so both
-// the page-action span/counters and the failure-artifact output directory are
-// isolated per context. The downstream self-healing subsystems (suggestion
-// engine, guarded validation, failure capture) still record telemetry to the
-// module singleton until the AUR-IMPL-022 action pipeline threads the context
-// through them — so telemetry isolation is asserted on the facade surface only,
-// while artifact-root isolation is asserted directly on the written artifacts.
-const PAGE_ACTION_COUNTER_NAMES = new Set<string>([
-  METRIC_NAMES.pageActionsTotal,
-  METRIC_NAMES.pageActionFailuresTotal,
-]);
-
+// page-action telemetry and failure-artifact output are isolated per context.
+// Page-action filters keep assertions stable when downstream self-healing spans
+// are added to the same context-owned telemetry sink.
 function pageActionSpans(telemetry: CapturingTelemetry) {
   return telemetry.spans.filter((span) => span.name === SPAN_NAMES.pageAction);
-}
-
-function pageActionCounters(telemetry: CapturingTelemetry) {
-  return telemetry.counters.filter((counter) => PAGE_ACTION_COUNTER_NAMES.has(counter.name));
 }
 
 describe('AuroraFlowContext two-context isolation', () => {
@@ -177,26 +165,28 @@ describe('AuroraFlowContext two-context isolation', () => {
       'Error typing in selector #b: fill failed B',
     );
 
-    // Facade telemetry isolation: each context sink owns its page-action span;
-    // the module singleton receives no page-action telemetry at all.
-    expect(telemetryA.spans).toHaveLength(1);
-    expect(telemetryB.spans).toHaveLength(1);
-    expect(telemetryA.spans[0].name).toBe(SPAN_NAMES.pageAction);
-    expect(telemetryB.spans[0].name).toBe(SPAN_NAMES.pageAction);
-    expect(pageActionSpans(globalTelemetry)).toHaveLength(0);
-    expect(pageActionCounters(globalTelemetry)).toHaveLength(0);
+    // Telemetry isolation: each context sink owns its page-action span; the
+    // module singleton receives no page-action or downstream self-healing data.
+    const telemetryAPageActionSpans = pageActionSpans(telemetryA);
+    const telemetryBPageActionSpans = pageActionSpans(telemetryB);
+    expect(telemetryAPageActionSpans).toHaveLength(1);
+    expect(telemetryBPageActionSpans).toHaveLength(1);
+    expect(telemetryAPageActionSpans[0]?.name).toBe(SPAN_NAMES.pageAction);
+    expect(telemetryBPageActionSpans[0]?.name).toBe(SPAN_NAMES.pageAction);
+    expect(globalTelemetry.spans).toHaveLength(0);
+    expect(globalTelemetry.counters).toHaveLength(0);
 
     // Self-healing config isolation: each span reflects its context's mode, not
     // the `SELF_HEAL_MODE=off` value in the adversarial DECOY_ENV.
-    expect(telemetryA.spans[0].attributes['auroraflow.self_heal.mode']).toBe('suggest');
-    expect(telemetryB.spans[0].attributes['auroraflow.self_heal.mode']).toBe('guarded');
+    expect(telemetryAPageActionSpans[0]?.attributes['auroraflow.self_heal.mode']).toBe('suggest');
+    expect(telemetryBPageActionSpans[0]?.attributes['auroraflow.self_heal.mode']).toBe('guarded');
 
     // Correlation isolation: each span carries its context's run/test id, not the
     // `AURORAFLOW_RUN_ID=env-run` value in the adversarial DECOY_ENV.
-    expect(telemetryA.spans[0].attributes['auroraflow.run_id']).toBe('run-A');
-    expect(telemetryA.spans[0].attributes['auroraflow.test_id']).toBe('test-A');
-    expect(telemetryB.spans[0].attributes['auroraflow.run_id']).toBe('run-B');
-    expect(telemetryB.spans[0].attributes['auroraflow.test_id']).toBe('test-B');
+    expect(telemetryAPageActionSpans[0]?.attributes['auroraflow.run_id']).toBe('run-A');
+    expect(telemetryAPageActionSpans[0]?.attributes['auroraflow.test_id']).toBe('test-A');
+    expect(telemetryBPageActionSpans[0]?.attributes['auroraflow.run_id']).toBe('run-B');
+    expect(telemetryBPageActionSpans[0]?.attributes['auroraflow.test_id']).toBe('test-B');
 
     // Failure counters are routed to the owning context only.
     expect(
@@ -232,11 +222,13 @@ describe('AuroraFlowContext two-context isolation', () => {
       'Error typing in selector #f: factory fill failed',
     );
 
-    expect(telemetry.spans).toHaveLength(1);
-    expect(telemetry.spans[0].name).toBe(SPAN_NAMES.pageAction);
-    expect(telemetry.spans[0].attributes['auroraflow.run_id']).toBe('factory-run');
-    expect(telemetry.spans[0].attributes['auroraflow.self_heal.mode']).toBe('suggest');
-    expect(pageActionSpans(globalTelemetry)).toHaveLength(0);
+    const telemetryPageActionSpans = pageActionSpans(telemetry);
+    expect(telemetryPageActionSpans).toHaveLength(1);
+    expect(telemetryPageActionSpans[0]?.name).toBe(SPAN_NAMES.pageAction);
+    expect(telemetryPageActionSpans[0]?.attributes['auroraflow.run_id']).toBe('factory-run');
+    expect(telemetryPageActionSpans[0]?.attributes['auroraflow.self_heal.mode']).toBe('suggest');
+    expect(globalTelemetry.spans).toHaveLength(0);
+    expect(globalTelemetry.counters).toHaveLength(0);
   });
 
   it('writes each context failure artifact to its own injected root', async () => {

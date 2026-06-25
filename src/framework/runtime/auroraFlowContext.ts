@@ -13,6 +13,11 @@ import {
   type ArtifactPrivacyPolicy,
 } from '../selfHealing/artifactPrivacy';
 import { resolveFailureArtifactOutputDirectory } from '../selfHealing/failureCapture';
+import {
+  createSelfHealingRunBudgetController,
+  type SelfHealingRunBudgetController,
+  type SelfHealingRunBudgetDecision,
+} from '../selfHealing/runBudget';
 import type { SelfHealingConfig } from '../selfHealing/types';
 import type { SelfHealingRegistryRuntime } from '../selfHealing/registryContracts';
 
@@ -95,6 +100,35 @@ const defaultClock: AuroraFlowClock = {
   currentDate: () => new Date(),
 };
 
+const selfHealingRunBudgets = new WeakMap<AuroraFlowContext, SelfHealingRunBudgetController>();
+
+export function consumeSelfHealingRunBudget(
+  context: AuroraFlowContext,
+  config: SelfHealingConfig,
+  logger: Parameters<SelfHealingRunBudgetController['consumeFailure']>[1],
+): SelfHealingRunBudgetDecision {
+  if (config.mode === 'off') {
+    return {
+      mode: config.runBudget.mode,
+      healingAttemptSequence: 0,
+      failureArtifactSequence: 0,
+      maxHealingAttempts: config.runBudget.maxHealingAttempts,
+      maxFailureArtifacts: config.runBudget.maxFailureArtifacts,
+      exceeded: false,
+      shouldRunHealing: false,
+      shouldCaptureArtifact: false,
+      downgrade: 'original_error_only',
+    };
+  }
+
+  let controller = selfHealingRunBudgets.get(context);
+  if (controller === undefined) {
+    controller = createSelfHealingRunBudgetController();
+    selfHealingRunBudgets.set(context, controller);
+  }
+  return controller.consumeFailure(config.runBudget, logger);
+}
+
 /**
  * Builds an {@link AuroraFlowContext}. With no options it reproduces the
  * historical env-backed, singleton behavior exactly; each option replaces one
@@ -117,7 +151,7 @@ export function createAuroraFlowContext(options: AuroraFlowContextOptions = {}):
     currentDate: options.clock?.currentDate ?? defaultClock.currentDate,
   };
 
-  return {
+  const context: AuroraFlowContext = {
     createLogger,
     resolveCorrelation: (input) =>
       resolveCorrelationIdentifiers({
@@ -136,4 +170,6 @@ export function createAuroraFlowContext(options: AuroraFlowContextOptions = {}):
         : () => resolveFailureArtifactOutputDirectory(env),
     clock,
   };
+  selfHealingRunBudgets.set(context, createSelfHealingRunBudgetController());
+  return context;
 }

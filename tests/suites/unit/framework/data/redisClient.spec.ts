@@ -502,6 +502,44 @@ describe('RedisClient', () => {
     ).rejects.toThrow('Unexpected Redis compare-and-set status reply.');
   });
 
+  it('maps Redis JSON-field compare-and-set replies from EVAL', async () => {
+    fakeDriver.eval.mockResolvedValueOnce([1, '{"status":"pending"}']);
+    const client = new RedisClient({
+      config: {
+        host: '127.0.0.1',
+        port: 6379,
+        database: 0,
+        tls: false,
+        connectTimeoutMs: 1000,
+        maxRetries: 0,
+        baseBackoffMs: 5,
+        maxBackoffMs: 10,
+        keyPrefix: 'aurora',
+      },
+      createClient: () => fakeDriver,
+      sleep: async () => {},
+      random: () => 0,
+      logger: {
+        info: () => {},
+        error: () => {},
+        warn: () => {},
+        debug: () => {},
+      },
+    });
+
+    const result = await client.compareAndSetJsonField(
+      'selector-promotions:evt-1',
+      '{"status":"applied"}',
+      { fieldName: 'status', expectedValue: 'pending', ttlSeconds: 60 },
+    );
+
+    expect(result).toEqual({ written: true, existingValue: '{"status":"pending"}' });
+    expect(fakeDriver.eval).toHaveBeenCalledWith(expect.any(String), {
+      keys: ['aurora:selector-promotions:evt-1'],
+      arguments: ['status', '"pending"', '{"status":"applied"}', '60'],
+    });
+  });
+
   it('serializes atomic JSON merge patches and parses buffer replies', async () => {
     fakeDriver.eval.mockResolvedValueOnce(Buffer.from('{"attempts":2,"validated":1}'));
     const client = new RedisClient({

@@ -53,6 +53,7 @@ export {
   resetRedisClientForTests,
   resolveRedisRuntimeConfig,
   type RedisCompareAndSetOptions,
+  type RedisCompareAndSetJsonFieldOptions,
   type RedisCompareAndSetResult,
   type RedisClientDriver,
   type RedisRuntimeConfig,
@@ -70,8 +71,10 @@ export {
   type SelectorRegistryNamespaces,
   type SelectorRecord,
   type SelectorStore,
+  type SelectorStoreCompareAndSetJsonFieldOptions,
   type SelectorStoreCompareAndSetOptions,
   type SelectorStoreCompareAndSetResult,
+  type SelectorStoreJsonPrimitive,
   type SelectorStoreSetOptions,
   type SelectorUpsertInput,
   type SelectorUpsertOptions,
@@ -254,11 +257,14 @@ export {
 } from './framework/selfHealing/historyRepository';
 
 export {
+  PromotionStatusConflictError,
   StorePendingSelectorPromotionRepository,
   type StorePendingSelectorPromotionRepositoryOptions,
 } from './framework/selfHealing/promotionRepository';
 
 export {
+  DEFAULT_PROMOTION_AUDIT_RETENTION_SECONDS,
+  MAX_PROMOTION_AUDIT_RETENTION_SECONDS,
   SelfHealingPromotionWorkflow,
   type ApprovePromotionInput,
   type PromotionWorkflowListQuery,
@@ -268,6 +274,18 @@ export {
   type RollbackPromotionInput,
   type SelfHealingPromotionWorkflowOptions,
 } from './framework/selfHealing/promotionWorkflow';
+
+export {
+  PromotionAuthorizationError,
+  createPromotionAuthorizationPolicy,
+  type CreatePromotionAuthorizationPolicyOptions,
+  type PromotionAuthorizationAction,
+  type PromotionAuthorizationDecision,
+  type PromotionAuthorizationEvidence,
+  type PromotionAuthorizationInput,
+  type PromotionAuthorizationMode,
+  type PromotionAuthorizationPolicy,
+} from './framework/selfHealing/promotionAuthorization';
 
 export {
   DEFAULT_PENDING_SELECTOR_PROMOTION_TTL_SECONDS,

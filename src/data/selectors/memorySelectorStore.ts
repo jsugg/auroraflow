@@ -1,5 +1,6 @@
 import type {
   SelectorStore,
+  SelectorStoreCompareAndSetJsonFieldOptions,
   SelectorStoreCompareAndSetOptions,
   SelectorStoreCompareAndSetResult,
   SelectorStoreJsonMergePatch,
@@ -69,6 +70,34 @@ export class MemorySelectorStore implements SelectorStore {
       expectedVersion === null ? existingValue === null : existingVersion === expectedVersion;
 
     if (!matches) {
+      return { written: false, existingValue };
+    }
+
+    this.records.set(normalizedKey, {
+      value,
+      expiresAtMs: this.resolveExpiresAtMs(options.ttlSeconds),
+    });
+    return { written: true, existingValue };
+  }
+
+  public async compareAndSetJsonField(
+    key: string,
+    value: string,
+    options: SelectorStoreCompareAndSetJsonFieldOptions,
+  ): Promise<SelectorStoreCompareAndSetResult> {
+    const normalizedKey = this.normalizeKey(key);
+    const existingValue = this.readLiveEntry(normalizedKey)?.value ?? null;
+    if (existingValue === null) {
+      return { written: false, existingValue };
+    }
+
+    const fieldName = this.validateJsonFieldName(options.fieldName, 'compareAndSetJsonField');
+    const expectedValue = this.validateJsonPrimitive(
+      options.expectedValue,
+      `compareAndSetJsonField.${fieldName}`,
+    );
+    const existingRecord = this.parseStoredJsonObject(existingValue);
+    if (existingRecord[fieldName] !== expectedValue) {
       return { written: false, existingValue };
     }
 
@@ -256,10 +285,26 @@ export class MemorySelectorStore implements SelectorStore {
     return record;
   }
 
-  private validateJsonFieldName(fieldName: string, label: string): void {
+  private validateJsonPrimitive(
+    value: SelectorStoreJsonPrimitive,
+    label: string,
+  ): SelectorStoreJsonPrimitive {
+    if (
+      value === null ||
+      typeof value === 'string' ||
+      typeof value === 'boolean' ||
+      (typeof value === 'number' && Number.isFinite(value))
+    ) {
+      return value;
+    }
+    throw new Error(`${label} must be a JSON primitive.`);
+  }
+
+  private validateJsonFieldName(fieldName: string, label: string): string {
     if (!SUPPORTED_JSON_FIELD_PATTERN.test(fieldName)) {
       throw new Error(`atomicJsonMerge ${label} contains unsupported field name.`);
     }
+    return fieldName;
   }
 
   private patternToRegExp(pattern: string): RegExp {

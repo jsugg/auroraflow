@@ -3,6 +3,7 @@ import type {
   SelectorStore,
   SelectorStoreCompareAndSetOptions,
   SelectorStoreCompareAndSetResult,
+  SelectorStoreCompareAndSetJsonFieldOptions,
   SelectorStoreJsonMergePatch,
   SelectorStoreSetOptions,
 } from './selectorRegistry';
@@ -20,6 +21,12 @@ export function createRedisSelectorStore(client: RedisClient): SelectorStore {
       options: SelectorStoreCompareAndSetOptions,
     ): Promise<SelectorStoreCompareAndSetResult> =>
       client.compareAndSetJsonVersion(key, value, options),
+    compareAndSetJsonField: (
+      key: string,
+      value: string,
+      options: SelectorStoreCompareAndSetJsonFieldOptions,
+    ): Promise<SelectorStoreCompareAndSetResult> =>
+      client.compareAndSetJsonField(key, value, options),
     atomicJsonMerge: (
       key: string,
       patch: SelectorStoreJsonMergePatch,

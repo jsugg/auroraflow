@@ -5,7 +5,7 @@ import {
   type SelfHealingRegistryWriteOperation,
 } from '../observability/attributes';
 import { METRIC_NAMES } from '../observability/metricNames';
-import { getTelemetry } from '../observability/telemetry';
+import { getTelemetry, type AuroraFlowTelemetry } from '../observability/telemetry';
 import type {
   SelectorCandidateHistoryObservation,
   SelfHealingRegistryRuntime,
@@ -28,6 +28,7 @@ export interface PersistSelfHealingRegistryTelemetryInput {
   event: CapturedFailureEvent;
   registryRuntime?: SelfHealingRegistryRuntime;
   pendingPromotionTtlSeconds?: number;
+  telemetry?: AuroraFlowTelemetry;
 }
 
 function shortHash(value: string): string {
@@ -326,13 +327,15 @@ function recordWriteMetric({
   event,
   operation,
   status,
+  telemetry,
 }: {
   config: SelfHealingConfig;
   event: CapturedFailureEvent;
   operation: SelfHealingRegistryWriteOperation;
   status: SelfHealingRegistryWriteMetricStatus;
+  telemetry: AuroraFlowTelemetry;
 }): void {
-  getTelemetry().recordCounter(
+  telemetry.recordCounter(
     METRIC_NAMES.selfHealingRegistryWritesTotal,
     1,
     buildSelfHealingRegistryWriteMetricAttributes({
@@ -350,6 +353,7 @@ export async function persistSelfHealingRegistryTelemetry({
   event,
   registryRuntime,
   pendingPromotionTtlSeconds = DEFAULT_PENDING_SELECTOR_PROMOTION_TTL_SECONDS,
+  telemetry = getTelemetry(),
 }: PersistSelfHealingRegistryTelemetryInput): Promise<SelfHealingRegistryPersistenceSummary> {
   if (config.sat.registryMode !== 'write_pending') {
     return emptySummary(event, config, 'registry_mode_not_write_pending');
@@ -363,6 +367,7 @@ export async function persistSelfHealingRegistryTelemetry({
       event,
       operation: 'pending_promotion',
       status: 'skipped',
+      telemetry,
     });
     return summary;
   }
@@ -377,6 +382,7 @@ export async function persistSelfHealingRegistryTelemetry({
       event,
       operation: 'history_observation',
       status: observation.status,
+      telemetry,
     });
   }
 
@@ -393,6 +399,7 @@ export async function persistSelfHealingRegistryTelemetry({
     event,
     operation: 'pending_promotion',
     status: promotion.status,
+    telemetry,
   });
 
   return {

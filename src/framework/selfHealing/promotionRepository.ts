@@ -8,11 +8,24 @@ import type {
   PendingSelectorPromotionQuery,
   PendingSelectorPromotionRepository,
 } from './registryContracts';
-import type { PendingSelectorPromotion } from './types';
+import type { PendingSelectorPromotion, PendingSelectorPromotionStatus } from './types';
 
 export interface StorePendingSelectorPromotionRepositoryOptions {
   store: SelectorStore;
   activeNamespace?: string;
+}
+
+export class PromotionStatusConflictError extends Error {
+  public constructor(
+    public readonly eventId: string,
+    public readonly expectedStatus: PendingSelectorPromotionStatus,
+    public readonly actualStatus: PendingSelectorPromotionStatus | null,
+  ) {
+    super(
+      `Promotion ${eventId} status conflict. Expected ${expectedStatus}; received ${actualStatus ?? 'missing'}.`,
+    );
+    this.name = 'PromotionStatusConflictError';
+  }
 }
 
 function ttlSecondsUntil(expiresAt: string, now = new Date()): number {
@@ -111,6 +124,53 @@ export class StorePendingSelectorPromotionRepository implements PendingSelectorP
       ttlSeconds === undefined ? undefined : { ttlSeconds },
     );
     return promotion;
+  }
+
+  public async transitionStatus(
+    eventId: string,
+    expectedStatus: PendingSelectorPromotionStatus,
+    buildNextPromotion: (current: PendingSelectorPromotion) => PendingSelectorPromotion,
+  ): Promise<PendingSelectorPromotion> {
+    const key = this.keyFor(eventId);
+    const payload = await this.store.get(key);
+    if (payload === null) {
+      throw new PromotionStatusConflictError(eventId, expectedStatus, null);
+    }
+
+    const current = parsePendingSelectorPromotion(JSON.parse(payload) as unknown);
+    if (current.status !== expectedStatus) {
+      throw new PromotionStatusConflictError(eventId, expectedStatus, current.status);
+    }
+
+    const nextPromotion = buildNextPromotion(current);
+    if (nextPromotion.eventId !== current.eventId) {
+      throw new Error('Promotion status transition cannot change eventId.');
+    }
+    if (nextPromotion.promotionId !== current.promotionId) {
+      throw new Error('Promotion status transition cannot change promotionId.');
+    }
+    if (!this.store.compareAndSetJsonField) {
+      throw new Error(
+        'SelectorStore.compareAndSetJsonField is required for promotion status transitions.',
+      );
+    }
+
+    const ttlSeconds =
+      nextPromotion.expiresAt === undefined ? undefined : ttlSecondsUntil(nextPromotion.expiresAt);
+    const result = await this.store.compareAndSetJsonField(key, JSON.stringify(nextPromotion), {
+      expectedValue: expectedStatus,
+      fieldName: 'status',
+      ...(ttlSeconds === undefined ? {} : { ttlSeconds }),
+    });
+    if (result.written) {
+      return nextPromotion;
+    }
+
+    const actualStatus =
+      result.existingValue === null
+        ? null
+        : parsePendingSelectorPromotion(JSON.parse(result.existingValue) as unknown).status;
+    throw new PromotionStatusConflictError(eventId, expectedStatus, actualStatus);
   }
 
   public async delete(eventId: string): Promise<number> {

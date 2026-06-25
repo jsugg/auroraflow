@@ -19,7 +19,7 @@ import {
   buildSelfHealingCaptureSpanAttributes,
 } from '../observability/attributes';
 import { METRIC_NAMES } from '../observability/metricNames';
-import { getTelemetry } from '../observability/telemetry';
+import { getTelemetry, type AuroraFlowTelemetry } from '../observability/telemetry';
 import { DEFAULT_ARTIFACT_PRIVACY_POLICY, type ArtifactPrivacyPolicy } from './artifactPrivacy';
 
 export type FailureArtifactWriter = (event: CapturedFailureEvent) => Promise<void>;
@@ -46,6 +46,7 @@ export interface CaptureFailureEventInput {
   env?: Readonly<Record<string, string | undefined>>;
   now?: () => Date;
   randomSuffix?: () => string;
+  telemetry?: AuroraFlowTelemetry;
 }
 
 function normalizeError(error: unknown): CapturedFailureError {
@@ -100,6 +101,7 @@ export async function captureFailureEvent({
   env = process.env,
   now = () => new Date(),
   randomSuffix = () => randomUUID(),
+  telemetry: inputTelemetry,
 }: CaptureFailureEventInput): Promise<CapturedFailureEvent | null> {
   if (config.mode === 'off') {
     return null;
@@ -112,7 +114,7 @@ export async function captureFailureEvent({
     },
     env,
   });
-  const telemetry = getTelemetry();
+  const telemetry = inputTelemetry ?? getTelemetry();
   const artifactWriter =
     writer ?? createFileFailureArtifactWriter(resolveFailureArtifactOutputDirectory(env));
 
@@ -134,6 +136,7 @@ export async function captureFailureEvent({
           generateRankedLocatorSuggestions({
             actionType: action.type,
             failedTarget: action.target,
+            telemetry,
           })),
       ];
       const component = normalizeOptionalIdentifier(correlation?.component) ?? pageObjectName;

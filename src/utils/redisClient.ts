@@ -47,6 +47,39 @@ end
 
 return {"1", current or ""}
 `;
+const REDIS_COMPARE_AND_SET_JSON_FIELD_SCRIPT = `
+local current = redis.call("GET", KEYS[1])
+local fieldName = ARGV[1]
+local expectedJson = ARGV[2]
+local nextValue = ARGV[3]
+local ttlSeconds = ARGV[4]
+
+if not current then
+  return {"0", ""}
+end
+
+local okCurrent, decoded = pcall(cjson.decode, current)
+if not okCurrent or type(decoded) ~= "table" then
+  return {"0", current}
+end
+
+local okExpected, expected = pcall(cjson.decode, expectedJson)
+if not okExpected then
+  return redis.error_reply("AuroraFlow compare-and-set JSON field expected value is invalid JSON")
+end
+
+if decoded[fieldName] ~= expected then
+  return {"0", current}
+end
+
+if ttlSeconds == "" then
+  redis.call("SET", KEYS[1], nextValue)
+else
+  redis.call("SET", KEYS[1], nextValue, "EX", tonumber(ttlSeconds))
+end
+
+return {"1", current}
+`;
 const REDIS_ATOMIC_JSON_MERGE_SCRIPT = `
 local current = redis.call("GET", KEYS[1])
 local defaults = cjson.decode(ARGV[1])
@@ -154,6 +187,11 @@ export interface RedisAtomicJsonMergeOptions extends RedisSetOptions {
 
 export interface RedisCompareAndSetOptions extends RedisSetOptions {
   expectedVersion: number | null;
+}
+
+export interface RedisCompareAndSetJsonFieldOptions extends RedisSetOptions {
+  expectedValue: RedisJsonPrimitive;
+  fieldName: string;
 }
 
 export interface RedisCompareAndSetResult {
@@ -510,6 +548,35 @@ export class RedisClient {
     return this.parseCompareAndSetReply(reply);
   }
 
+  public async compareAndSetJsonField(
+    key: string,
+    value: string,
+    options: RedisCompareAndSetJsonFieldOptions,
+  ): Promise<RedisCompareAndSetResult> {
+    const qualifiedKey = this.qualifyKey(key);
+    const fieldName = this.validateJsonFieldName(options.fieldName, 'compareAndSetJsonField');
+    const expectedValue = this.serializeJsonPrimitive(
+      options.expectedValue,
+      'compareAndSetJsonField.expectedValue',
+    );
+    const ttlSeconds =
+      options.ttlSeconds === undefined ? '' : String(this.normalizeTtlSeconds(options.ttlSeconds));
+
+    const reply = await this.executeCommand('compareAndSetJsonField', async (client) => {
+      if (!client.eval) {
+        throw new RedisConfigError(
+          'Redis client driver must support EVAL for compare-and-set operations.',
+        );
+      }
+      return client.eval(REDIS_COMPARE_AND_SET_JSON_FIELD_SCRIPT, {
+        keys: [qualifiedKey],
+        arguments: [fieldName, expectedValue, value, ttlSeconds],
+      });
+    });
+
+    return this.parseCompareAndSetReply(reply);
+  }
+
   public async atomicJsonMerge(key: string, options: RedisAtomicJsonMergeOptions): Promise<string> {
     const qualifiedKey = this.qualifyKey(key);
     const ttlSeconds =
@@ -775,6 +842,18 @@ export class RedisClient {
     return JSON.stringify(value);
   }
 
+  private serializeJsonPrimitive(value: RedisJsonPrimitive, label: string): string {
+    if (
+      value === null ||
+      typeof value === 'string' ||
+      typeof value === 'boolean' ||
+      (typeof value === 'number' && Number.isFinite(value))
+    ) {
+      return JSON.stringify(value);
+    }
+    throw new RedisConfigError(`${label} must be a JSON primitive.`);
+  }
+
   private serializeJsonIncrements(increments: Readonly<Record<string, number>>): string {
     for (const [fieldName, increment] of Object.entries(increments)) {
       this.validateJsonFieldName(fieldName, 'increments');
@@ -786,10 +865,11 @@ export class RedisClient {
     return JSON.stringify(increments);
   }
 
-  private validateJsonFieldName(fieldName: string, label: string): void {
+  private validateJsonFieldName(fieldName: string, label: string): string {
     if (!/^[A-Za-z0-9_.:-]+$/.test(fieldName)) {
       throw new RedisConfigError(`atomicJsonMerge ${label} contains unsupported field name.`);
     }
+    return fieldName;
   }
 
   private normalizeTtlSeconds(ttlSeconds: number): number {

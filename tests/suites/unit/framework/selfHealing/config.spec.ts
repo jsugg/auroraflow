@@ -4,12 +4,20 @@ import {
   DEFAULT_SELF_HEAL_MAX_DOM_NODES,
   DEFAULT_SELF_HEAL_MAX_TEXT_LENGTH,
   DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
+  DEFAULT_SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS,
+  DEFAULT_SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS,
   describeEffectiveSelfHealingConfig,
   resolveSelfHealingConfig,
   resolveSelfHealingConfigWithDiagnostics,
   SELF_HEAL_CONFIG_STRICT_ENV,
   SelfHealingConfigError,
 } from '../../../../../src/framework/selfHealing/config';
+
+const DEFAULT_RUN_BUDGET = {
+  mode: 'warning_only',
+  maxHealingAttempts: DEFAULT_SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS,
+  maxFailureArtifacts: DEFAULT_SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS,
+} as const;
 
 describe('resolveSelfHealingConfig', () => {
   it('returns safe defaults when no environment values are set', () => {
@@ -42,6 +50,7 @@ describe('resolveSelfHealingConfig', () => {
         registryMode: 'read',
         promotionMode: 'manual',
       },
+      runBudget: DEFAULT_RUN_BUDGET,
     });
   });
 
@@ -78,6 +87,7 @@ describe('resolveSelfHealingConfig', () => {
         registryMode: 'read',
         promotionMode: 'manual',
       },
+      runBudget: DEFAULT_RUN_BUDGET,
     });
   });
 
@@ -114,6 +124,7 @@ describe('resolveSelfHealingConfig', () => {
         registryMode: 'read',
         promotionMode: 'manual',
       },
+      runBudget: DEFAULT_RUN_BUDGET,
     });
   });
 
@@ -185,6 +196,26 @@ describe('resolveSelfHealingConfig', () => {
       allowedAttributes: ['data-testid', 'aria-label', 'data-token'],
       registryMode: 'write_pending',
       promotionMode: 'ci_acknowledged',
+    });
+  });
+
+  it('defaults the run-level budget to warning-only until a baseline exists', () => {
+    const config = resolveSelfHealingConfig({});
+
+    expect(config.runBudget).toEqual(DEFAULT_RUN_BUDGET);
+  });
+
+  it('parses run-level budget controls with bounded non-negative counts', () => {
+    const config = resolveSelfHealingConfig({
+      SELF_HEAL_RUN_BUDGET_MODE: 'enforce',
+      SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS: '0',
+      SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS: '3',
+    });
+
+    expect(config.runBudget).toEqual({
+      mode: 'enforce',
+      maxHealingAttempts: 0,
+      maxFailureArtifacts: 3,
     });
   });
 
@@ -296,11 +327,12 @@ describe('resolveSelfHealingConfigWithDiagnostics', () => {
     expect(resolution.config).toEqual(resolveSelfHealingConfig({}));
   });
 
-  it('reports invalid enums for mode, registry mode, and promotion mode', () => {
+  it('reports invalid enums for mode, registry mode, promotion mode, and budget mode', () => {
     const resolution = resolveSelfHealingConfigWithDiagnostics({
       SELF_HEAL_MODE: 'gaurded',
       SELF_HEAL_REGISTRY_MODE: 'sometimes',
       SELF_HEAL_PROMOTION_MODE: 'auto',
+      SELF_HEAL_RUN_BUDGET_MODE: 'block',
     });
 
     expect(resolution.diagnostics).toEqual([
@@ -323,6 +355,13 @@ describe('resolveSelfHealingConfigWithDiagnostics', () => {
         message:
           'SELF_HEAL_PROMOTION_MODE is invalid; expected one of: manual, ci_acknowledged. Using "manual".',
         applied: 'manual',
+      },
+      {
+        envVar: 'SELF_HEAL_RUN_BUDGET_MODE',
+        code: 'invalid_enum',
+        message:
+          'SELF_HEAL_RUN_BUDGET_MODE is invalid; expected one of: warning_only, enforce. Using "warning_only".',
+        applied: 'warning_only',
       },
     ]);
   });
@@ -348,17 +387,25 @@ describe('resolveSelfHealingConfigWithDiagnostics', () => {
       SELF_HEAL_MAX_DOM_NODES: 'zero',
       SELF_HEAL_MAX_CANDIDATES: '1.5',
       SELF_HEAL_MAX_TEXT_LENGTH: '900',
+      SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS: '-1',
+      SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS: '10001',
     });
 
     expect(resolution.config.minConfidence).toBe(DEFAULT_SELF_HEAL_MIN_CONFIDENCE);
     expect(resolution.config.sat.maxDomNodes).toBe(DEFAULT_SELF_HEAL_MAX_DOM_NODES);
     expect(resolution.config.sat.maxCandidates).toBe(DEFAULT_SELF_HEAL_MAX_CANDIDATES);
     expect(resolution.config.sat.maxTextLength).toBe(500);
+    expect(resolution.config.runBudget.maxHealingAttempts).toBe(
+      DEFAULT_SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS,
+    );
+    expect(resolution.config.runBudget.maxFailureArtifacts).toBe(10_000);
     expect(resolution.diagnostics.map(({ envVar, code }) => ({ envVar, code }))).toEqual([
       { envVar: 'SELF_HEAL_MIN_CONFIDENCE', code: 'out_of_range' },
       { envVar: 'SELF_HEAL_MAX_DOM_NODES', code: 'invalid_number' },
       { envVar: 'SELF_HEAL_MAX_CANDIDATES', code: 'invalid_number' },
       { envVar: 'SELF_HEAL_MAX_TEXT_LENGTH', code: 'clamped' },
+      { envVar: 'SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS', code: 'out_of_range' },
+      { envVar: 'SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS', code: 'clamped' },
     ]);
   });
 
@@ -415,10 +462,13 @@ describe('resolveSelfHealingConfigWithDiagnostics', () => {
       SELF_HEAL_ALLOWED_ACTIONS: secret,
       SELF_HEAL_REGISTRY_MODE: secret,
       SELF_HEAL_PROMOTION_MODE: secret,
+      SELF_HEAL_RUN_BUDGET_MODE: secret,
+      SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS: secret,
+      SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS: secret,
       [SELF_HEAL_CONFIG_STRICT_ENV]: secret,
     });
 
-    expect(resolution.diagnostics.length).toBeGreaterThanOrEqual(8);
+    expect(resolution.diagnostics.length).toBeGreaterThanOrEqual(11);
     const serialized = JSON.stringify(resolution.diagnostics);
     expect(serialized).not.toContain(secret);
     expect(serialized.toLowerCase()).not.toContain(secret.toLowerCase());

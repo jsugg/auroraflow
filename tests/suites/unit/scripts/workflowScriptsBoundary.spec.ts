@@ -548,13 +548,32 @@ describe('workflow script process boundaries', () => {
   it(
     'self-healing promotions exits with actionable output for memory-backed list and bad command',
     async () => {
-      const [success, failure] = await Promise.all([
+      const [success, failure, unauthorized] = await Promise.all([
         runTypeScriptScript(
           'scripts/self-healing-promotions.ts',
           ['list', '--namespace', 'process-boundary', '--limit', '5'],
           { AURORAFLOW_SELF_HEALING_SCRIPT_STORE: 'memory' },
         ),
         runTypeScriptScript('scripts/self-healing-promotions.ts', ['unknown']),
+        runTypeScriptScript(
+          'scripts/self-healing-promotions.ts',
+          [
+            'approve',
+            '--namespace',
+            'process-boundary',
+            '--event-id',
+            'evt-1',
+            '--reviewer',
+            'reviewer',
+            '--authorization-mode',
+            'shared',
+            '--codeowners-present',
+            'true',
+            '--protected-workflow',
+            'false',
+          ],
+          { AURORAFLOW_SELF_HEALING_SCRIPT_STORE: 'memory' },
+        ),
       ]);
 
       expect(success.status).toBe(0);
@@ -568,6 +587,12 @@ describe('workflow script process boundaries', () => {
       expect(failure.stdout).toBe('');
       expect(failure.stderr).toContain(
         'Usage: self-healing-promotions <list|approve|reject|rollback|cleanup> [--flag value]',
+      );
+
+      expect(unauthorized.status).toBe(1);
+      expect(unauthorized.stdout).toBe('');
+      expect(unauthorized.stderr).toContain(
+        'Shared promotion authorization requires CODEOWNERS and a protected workflow',
       );
     },
     BOUNDARY_TEST_TIMEOUT_MS,
@@ -589,10 +614,17 @@ describe('workflow script process boundaries', () => {
 
       expect(success.status).toBe(0);
       expect(JSON.parse(success.stdout) as unknown).toMatchObject({
+        dryRun: true,
         historyScanned: 0,
+        historyExpired: 0,
         historyDeleted: 0,
         promotionsScanned: 0,
+        promotionsExpired: 0,
         promotionsDeleted: 0,
+        auditScanned: 0,
+        auditExpired: 0,
+        auditDeleted: 0,
+        auditLegalHold: 0,
         malformedRecords: 0,
       });
       expect(success.stderr).toBe('');

@@ -41,4 +41,28 @@ describe('MemorySelectorStore lifecycle', () => {
 
     await expect(store.get('local:key')).rejects.toThrow('Memory selector store is closed.');
   });
+
+  it('compares and sets JSON records by field value atomically', async () => {
+    const store = createMemorySelectorStore();
+    await store.set('local:promotion', JSON.stringify({ status: 'pending', value: 1 }));
+
+    await expect(
+      store.compareAndSetJsonField('local:promotion', JSON.stringify({ status: 'applied' }), {
+        fieldName: 'status',
+        expectedValue: 'pending',
+      }),
+    ).resolves.toMatchObject({
+      written: true,
+      existingValue: JSON.stringify({ status: 'pending', value: 1 }),
+    });
+    await expect(
+      store.compareAndSetJsonField('local:promotion', JSON.stringify({ status: 'rejected' }), {
+        fieldName: 'status',
+        expectedValue: 'pending',
+      }),
+    ).resolves.toMatchObject({
+      written: false,
+      existingValue: JSON.stringify({ status: 'applied' }),
+    });
+  });
 });

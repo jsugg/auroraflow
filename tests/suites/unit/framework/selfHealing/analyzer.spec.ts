@@ -33,6 +33,11 @@ function selfHealingConfig(overrides: Partial<SelfHealingConfig['sat']> = {}): S
       promotionMode: 'manual',
       ...overrides,
     },
+    runBudget: {
+      mode: 'warning_only',
+      maxHealingAttempts: 25,
+      maxFailureArtifacts: 50,
+    },
   };
 }
 

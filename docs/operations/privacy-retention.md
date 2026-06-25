@@ -13,7 +13,7 @@ AuroraFlow treats test evidence as potentially sensitive even when tests use syn
 | Redis records | Active selectors, candidate history, pending promotions, audit context | Medium-High | Namespaced records and bounded history/pending TTLs. Redis deployment, ACLs, backups, eviction, and deletion are consumer-owned. |
 | Telemetry | Action type/status, counts, durations, hashes, optional raw selectors | Medium | Raw selector export is disabled by default. OTLP destination and backend retention are consumer-owned. |
 | Trends | Aggregated flakiness/SLO points, branch/commit/workflow metadata | Low-Medium | JSONL point-count bounds; CI cache/artifact storage is consumer-owned and not a durable analytics guarantee. |
-| Audit records | Promotion reviewer/action/time and selector-change context | Medium-High | Audit writes exist, but time-based cleanup is not yet enforced; `AUR-IMPL-026` owns that implementation. |
+| Audit records | Promotion reviewer/action/time and selector-change context | Medium-High | Audit writes carry 30-day expiry metadata by default; cleanup is dry-run unless explicitly applied, and `legalHold: true` records are skipped. |
 
 Structural fields such as URLs, selectors, element IDs, test IDs, CSS paths, errors, and consumer-added metadata can still contain sensitive values. Privacy presets reduce capture; they do not discover arbitrary PII.
 
@@ -52,7 +52,7 @@ Retention below is operational guidance unless marked **enforced**. Use the shor
 | Selector candidate history | 30-day default and hard cap; choose a shorter positive TTL when practical. | **Enforced** by AuroraFlow Redis writes. Redis itself remains consumer-owned. |
 | Pending selector promotions | 30-day default; review or remove sooner. | **Enforced** by AuroraFlow Redis writes unless a shorter caller-supplied TTL is used. |
 | Active selector records | Retain only while the selector is active and needed. | No time TTL by default; consumer/operator lifecycle. |
-| Audit records | Target 30 days for ordinary non-production review evidence; longer retention requires a separate policy decision. | Not time-enforced yet. Cleanup/legal-hold support is deferred to `AUR-IMPL-026`. |
+| Audit records | Target 30 days for ordinary non-production review evidence; longer retention requires a separate policy decision. | **Enforced for new workflow writes** through audit TTL metadata. Cleanup defaults to dry-run and excludes `legalHold: true` records unless operators export/delete them under a separate policy. |
 | Trend JSONL and CI trend artifacts | Keep only the bounded window needed for flakiness/SLO review; target 30 days or less for copied/exported files. | Point-count bounds apply; CI cache eviction is not a deletion SLA. Durable export remains optional and operator-owned. |
 | Release dry-run evidence | 30 days in this repository; should not contain page captures or test credentials. | **Enforced** by the repository release workflow artifact setting. |
 

@@ -1,6 +1,7 @@
 import type { ElementHandle, Page, Response } from 'playwright';
 import type { Logger } from '../utils/logger';
 import {
+  consumeSelfHealingRunBudget,
   createAuroraFlowContext,
   type AuroraFlowContext,
 } from '../framework/runtime/auroraFlowContext';
@@ -36,6 +37,7 @@ import {
 } from '../framework/observability/attributes';
 import { METRIC_NAMES } from '../framework/observability/metricNames';
 import type { TelemetrySpan } from '../framework/observability/telemetry';
+import { PageActionPipeline, type PageActionPipelineExecution } from './pageActionPipeline';
 
 export interface NavigationOptions {
   waitUntil?: 'load' | 'domcontentloaded' | 'networkidle';
@@ -124,7 +126,7 @@ export class PageActionError extends Error {
     message: string,
     public readonly originalError?: Error,
   ) {
-    super(message);
+    super(message, originalError === undefined ? undefined : { cause: originalError });
     this.name = 'PageActionError';
   }
 }
@@ -145,6 +147,7 @@ export abstract class PageObjectBase {
   protected runId: string;
   protected testId?: string;
   protected readonly context: AuroraFlowContext;
+  private readonly actionPipeline: PageActionPipeline;
   private initialized = false;
   private initializationPromise: Promise<void> | null = null;
 
@@ -162,6 +165,18 @@ export abstract class PageObjectBase {
     this.logger = context.createLogger(pageObjectName, {
       runId: this.runId,
       testId: this.testId,
+    });
+    this.actionPipeline = new PageActionPipeline({
+      page: this.page,
+      execute: <T>(execution: PageActionPipelineExecution<T>) =>
+        this.safeAction(
+          execution.action,
+          execution.successMessage,
+          execution.errorMessage,
+          execution.actionContext,
+          execution.guardedAutoHealAction,
+        ),
+      resolveGuardedLocator: (locatorExpression) => this.resolveGuardedLocator(locatorExpression),
     });
     this.url = '#';
   }
@@ -249,8 +264,30 @@ export abstract class PageObjectBase {
       errorCode = `page_action_${actionContext.type}_failed`;
       span.recordException(actionError);
       this.logger.error(errorMessage, { error });
+      const selfHealingConfig = this.context.resolveSelfHealingConfig();
+      const runBudget = consumeSelfHealingRunBudget(this.context, selfHealingConfig, this.logger);
+      span.setAttribute('auroraflow.self_heal.mode', selfHealingConfig.mode);
+      span.setAttribute('auroraflow.self_heal.run_budget.mode', runBudget.mode);
+      span.setAttribute(
+        'auroraflow.self_heal.run_budget.healing_attempt_sequence',
+        runBudget.healingAttemptSequence,
+      );
+      span.setAttribute(
+        'auroraflow.self_heal.run_budget.failure_artifact_sequence',
+        runBudget.failureArtifactSequence,
+      );
+      span.setAttribute(
+        'auroraflow.self_heal.run_budget.should_run_healing',
+        runBudget.shouldRunHealing,
+      );
+      span.setAttribute(
+        'auroraflow.self_heal.run_budget.should_capture_artifact',
+        runBudget.shouldCaptureArtifact,
+      );
+      span.setAttribute('auroraflow.self_heal.run_budget.downgrade', runBudget.downgrade);
       const artifactPrivacyPolicy = this.resolveArtifactPrivacyPolicy();
       const screenshotPath =
+        (selfHealingConfig.mode === 'off' || runBudget.shouldRunHealing) &&
         artifactPrivacyPolicy.screenshot.mode === 'capture'
           ? this.buildFailureScreenshotPath(errorMessage)
           : undefined;
@@ -263,13 +300,16 @@ export abstract class PageObjectBase {
         );
       }
 
-      const selfHealingConfig = this.context.resolveSelfHealingConfig();
-      span.setAttribute('auroraflow.self_heal.mode', selfHealingConfig.mode);
-      const registryRuntime = this.resolveRegistryRuntime(selfHealingConfig);
-      const rankedSuggestions = generateRankedLocatorSuggestions({
-        actionType: actionContext.type,
-        failedTarget: actionContext.target,
-      });
+      const registryRuntime = runBudget.shouldRunHealing
+        ? this.resolveRegistryRuntime(selfHealingConfig)
+        : undefined;
+      const rankedSuggestions = runBudget.shouldRunHealing
+        ? generateRankedLocatorSuggestions({
+            actionType: actionContext.type,
+            failedTarget: actionContext.target,
+            telemetry,
+          })
+        : [];
       const failureActionContext = {
         type: actionContext.type,
         target: actionContext.target,
@@ -280,37 +320,39 @@ export abstract class PageObjectBase {
         description: errorMessage,
       };
       let selfHealingAnalysis: Awaited<ReturnType<typeof analyzeSelfHealingFailure>> | undefined;
-      try {
-        selfHealingAnalysis = await analyzeSelfHealingFailure({
-          page: this.page,
-          config: selfHealingConfig,
-          pageObjectName: this.pageObjectName,
-          action: failureActionContext,
-          currentUrl,
-          existingSuggestions: rankedSuggestions,
-          registryRuntime,
-          privacyPolicy: artifactPrivacyPolicy,
-        });
-        if (selfHealingAnalysis.sat) {
-          span.setAttribute(
-            'auroraflow.self_heal.sat.candidate_count',
-            selfHealingAnalysis.sat.candidates.length,
-          );
-          span.setAttribute(
-            'auroraflow.self_heal.registry.history_loaded_candidates',
-            selfHealingAnalysis.sat.history.loadedCandidates,
-          );
-          span.setAttribute(
-            'auroraflow.self_heal.registry.warning_count',
-            selfHealingAnalysis.sat.history.warnings.length,
-          );
+      if (runBudget.shouldRunHealing) {
+        try {
+          selfHealingAnalysis = await analyzeSelfHealingFailure({
+            page: this.page,
+            config: selfHealingConfig,
+            pageObjectName: this.pageObjectName,
+            action: failureActionContext,
+            currentUrl,
+            existingSuggestions: rankedSuggestions,
+            registryRuntime,
+            privacyPolicy: artifactPrivacyPolicy,
+          });
+          if (selfHealingAnalysis.sat) {
+            span.setAttribute(
+              'auroraflow.self_heal.sat.candidate_count',
+              selfHealingAnalysis.sat.candidates.length,
+            );
+            span.setAttribute(
+              'auroraflow.self_heal.registry.history_loaded_candidates',
+              selfHealingAnalysis.sat.history.loadedCandidates,
+            );
+            span.setAttribute(
+              'auroraflow.self_heal.registry.warning_count',
+              selfHealingAnalysis.sat.history.warnings.length,
+            );
+          }
+        } catch (analysisError: unknown) {
+          this.logger.error('Failed to analyze self-healing failure.', { analysisError });
         }
-      } catch (analysisError: unknown) {
-        this.logger.error('Failed to analyze self-healing failure.', { analysisError });
       }
       let guardedAutoHealResult: T | undefined;
 
-      if (selfHealingConfig.mode === 'guarded') {
+      if (runBudget.shouldRunHealing && selfHealingConfig.mode === 'guarded') {
         const satCandidates = selfHealingAnalysis?.sat?.candidates ?? [];
         const guardedSuggestions = satCandidates.length > 0 ? satCandidates : rankedSuggestions;
         guardedValidation = await evaluateGuardedSuggestionsDryRun({
@@ -321,6 +363,7 @@ export abstract class PageObjectBase {
           currentUrl,
           safetyPolicy: selfHealingConfig.safetyPolicy,
           maxCandidates: selfHealingConfig.sat.maxCandidates,
+          telemetry,
         });
         const acceptedCandidate = guardedValidation.candidates.find(
           (candidate) => candidate.locator === guardedValidation?.acceptedLocator,
@@ -373,46 +416,53 @@ export abstract class PageObjectBase {
         }
       }
 
-      await captureFailureEvent({
-        config: selfHealingConfig,
-        // Route artifacts to the context-owned root so two contexts isolate
-        // their output without reading or mutating `SELF_HEAL_ARTIFACTS_DIR`.
-        writer: createFileFailureArtifactWriter(this.context.resolveArtifactRoot()),
-        pageObjectName: this.pageObjectName,
-        currentUrl,
-        screenshotPath,
-        privacyPolicy: artifactPrivacyPolicy,
-        action: failureActionContext,
-        error,
-        suggestions: selfHealingAnalysis?.suggestions ?? rankedSuggestions,
-        correlation: {
-          runId: this.runId,
-          testId: this.testId,
-          component: this.pageObjectName,
-          errorCode: `page_action_${actionContext.type}_failed`,
-        },
-        decorateEvent: async (event) => {
-          if (selfHealingAnalysis?.sat) {
-            event.sat = selfHealingAnalysis.sat;
-          }
-          if (guardedValidation) {
-            event.guardedValidation = guardedValidation;
-          }
-          if (guardedAutoHeal) {
-            event.guardedAutoHeal = guardedAutoHeal;
-          }
-          if (selfHealingConfig.sat.registryMode === 'write_pending') {
-            registryPersistence = await persistSelfHealingRegistryTelemetry({
-              config: selfHealingConfig,
-              event,
-              registryRuntime,
-            });
-            event.registryPersistence = registryPersistence;
-          }
-        },
-      }).catch((captureError) =>
-        this.logger.error('Failed to capture self-healing failure artifact.', { captureError }),
-      );
+      if (runBudget.shouldCaptureArtifact) {
+        await captureFailureEvent({
+          config: selfHealingConfig,
+          // Route artifacts to the context-owned root so two contexts isolate
+          // their output without reading or mutating `SELF_HEAL_ARTIFACTS_DIR`.
+          writer: createFileFailureArtifactWriter(this.context.resolveArtifactRoot()),
+          pageObjectName: this.pageObjectName,
+          currentUrl,
+          screenshotPath,
+          privacyPolicy: artifactPrivacyPolicy,
+          action: failureActionContext,
+          error,
+          suggestions: selfHealingAnalysis?.suggestions ?? rankedSuggestions,
+          correlation: {
+            runId: this.runId,
+            testId: this.testId,
+            component: this.pageObjectName,
+            errorCode: `page_action_${actionContext.type}_failed`,
+          },
+          telemetry,
+          decorateEvent: async (event) => {
+            if (selfHealingAnalysis?.sat) {
+              event.sat = selfHealingAnalysis.sat;
+            }
+            if (guardedValidation) {
+              event.guardedValidation = guardedValidation;
+            }
+            if (guardedAutoHeal) {
+              event.guardedAutoHeal = guardedAutoHeal;
+            }
+            if (
+              runBudget.shouldRunHealing &&
+              selfHealingConfig.sat.registryMode === 'write_pending'
+            ) {
+              registryPersistence = await persistSelfHealingRegistryTelemetry({
+                config: selfHealingConfig,
+                event,
+                registryRuntime,
+                telemetry,
+              });
+              event.registryPersistence = registryPersistence;
+            }
+          },
+        }).catch((captureError) =>
+          this.logger.error('Failed to capture self-healing failure artifact.', { captureError }),
+        );
+      }
 
       if (registryPersistence) {
         span.setAttribute(
@@ -573,17 +623,11 @@ export abstract class PageObjectBase {
   public async click(selector: string, options: ActionOptions = {}): Promise<void | null> {
     const actionOptions = normalizeActionOptions(options, 'ActionOptions.timeout');
 
-    return this.safeAction(
-      () => this.page.click(selector, actionOptions),
-      `Clicked on selector: ${selector}`,
-      `Error clicking on selector ${selector}`,
-      actionContextFor('click', selector, options),
-      async (acceptedLocator) => {
-        const locator = this.resolveGuardedLocator(acceptedLocator);
-        await locator.first().click(actionOptions);
-        return null;
-      },
-    );
+    return this.actionPipeline.click({
+      selector,
+      actionOptions,
+      actionContext: actionContextFor('click', selector, options),
+    });
   }
 
   protected async clickWhenVisible(selector: string, options: ActionOptions = {}): Promise<void> {
@@ -613,17 +657,12 @@ export abstract class PageObjectBase {
   ): Promise<void | null> {
     const actionOptions = normalizeActionOptions(options, 'ActionOptions.timeout');
 
-    return this.safeAction(
-      () => this.page.fill(selector, text, actionOptions),
-      `Typed text in selector: ${selector}`,
-      `Error typing in selector ${selector}`,
-      actionContextFor('type', selector, options),
-      async (acceptedLocator) => {
-        const locator = this.resolveGuardedLocator(acceptedLocator);
-        await locator.first().fill(text, actionOptions);
-        return null;
-      },
-    );
+    return this.actionPipeline.type({
+      selector,
+      text,
+      actionOptions,
+      actionContext: actionContextFor('type', selector, options),
+    });
   }
 
   public async getText(selector: string, options: ActionOptions = {}): Promise<string | null> {
