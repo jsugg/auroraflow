@@ -1,6 +1,16 @@
+import { existsSync } from 'node:fs';
+import path from 'node:path';
 import { cleanupExpiredSelfHealingRegistryRecords } from './self-healing-registry-cleanup';
 import { createSelfHealingScriptStoreHandle } from './self-healing-script-store';
-import { SelfHealingPromotionWorkflow } from '../src/framework/selfHealing/promotionWorkflow';
+import {
+  createPromotionAuthorizationPolicy,
+  type PromotionAuthorizationMode,
+  type PromotionAuthorizationPolicy,
+} from '../src/framework/selfHealing/promotionAuthorization';
+import {
+  DEFAULT_PROMOTION_AUDIT_RETENTION_SECONDS,
+  SelfHealingPromotionWorkflow,
+} from '../src/framework/selfHealing/promotionWorkflow';
 
 type CommandName = 'approve' | 'cleanup' | 'list' | 'reject' | 'rollback';
 
@@ -66,6 +76,13 @@ function readBooleanFlag(
   return defaultValue;
 }
 
+function readOptionalBooleanFlag(
+  flags: Readonly<Record<string, string | boolean>>,
+  key: string,
+): boolean | undefined {
+  return flags[key] === undefined ? undefined : readBooleanFlag(flags, key);
+}
+
 function readPositiveIntegerFlag(
   flags: Readonly<Record<string, string | boolean>>,
   key: string,
@@ -91,10 +108,81 @@ function resolveReviewer(flags: Readonly<Record<string, string | boolean>>): str
   return reviewer.trim();
 }
 
+function readPromotionAuthorizationMode(
+  flags: Readonly<Record<string, string | boolean>>,
+): PromotionAuthorizationMode {
+  const rawMode =
+    readStringFlag(flags, 'authorization-mode') ??
+    process.env.SELF_HEAL_PROMOTION_AUTHORIZATION_MODE ??
+    'local';
+  if (rawMode === 'local' || rawMode === 'shared') {
+    return rawMode;
+  }
+  throw new Error('--authorization-mode must be local or shared.');
+}
+
+function readEnvBoolean(name: string): boolean | undefined {
+  const rawValue = process.env[name];
+  if (rawValue === undefined) {
+    return undefined;
+  }
+  return ['1', 'true', 'yes', 'on'].includes(rawValue.trim().toLowerCase());
+}
+
+function resolveCodeownersPresent(flags: Readonly<Record<string, string | boolean>>): boolean {
+  const flagOverride = readOptionalBooleanFlag(flags, 'codeowners-present');
+  if (flagOverride !== undefined) {
+    return flagOverride;
+  }
+
+  const configuredPath =
+    readStringFlag(flags, 'codeowners-path') ??
+    process.env.SELF_HEAL_PROMOTION_CODEOWNERS_PATH ??
+    path.join(process.cwd(), '.github', 'CODEOWNERS');
+  return existsSync(configuredPath);
+}
+
+function resolveProtectedWorkflow(flags: Readonly<Record<string, string | boolean>>): boolean {
+  return (
+    readOptionalBooleanFlag(flags, 'protected-workflow') ??
+    readEnvBoolean('SELF_HEAL_PROMOTION_PROTECTED_WORKFLOW') ??
+    readEnvBoolean('GITHUB_REF_PROTECTED') ??
+    false
+  );
+}
+
+function buildPromotionAuthorizationPolicy(
+  flags: Readonly<Record<string, string | boolean>>,
+): PromotionAuthorizationPolicy {
+  const mode = readPromotionAuthorizationMode(flags);
+  const codeownersPresent = resolveCodeownersPresent(flags);
+  const protectedWorkflow = resolveProtectedWorkflow(flags);
+  if (mode === 'shared' && (!codeownersPresent || !protectedWorkflow)) {
+    throw new Error(
+      'Shared promotion authorization requires CODEOWNERS and a protected workflow before mutating selectors.',
+    );
+  }
+  return createPromotionAuthorizationPolicy({
+    mode,
+    codeownersPresent,
+    protectedWorkflow,
+  });
+}
+
+function writeAuthorizationWarnings(warnings: readonly string[]): void {
+  for (const warning of warnings) {
+    console.error(`WARNING: ${warning}`);
+  }
+}
+
 export async function runSelfHealingPromotions(argv = process.argv.slice(2)): Promise<number> {
   const { command, flags } = parseArgs(argv);
-  const handle = createSelfHealingScriptStoreHandle();
   const namespace = readStringFlag(flags, 'namespace');
+  const authorizationPolicy =
+    command === 'list' || command === 'cleanup'
+      ? undefined
+      : buildPromotionAuthorizationPolicy(flags);
+  const handle = createSelfHealingScriptStoreHandle();
 
   try {
     if (command === 'cleanup') {
@@ -102,6 +190,12 @@ export async function runSelfHealingPromotions(argv = process.argv.slice(2)): Pr
         store: handle.store,
         activeNamespace: namespace,
         limit: readPositiveIntegerFlag(flags, 'limit', 1000),
+        auditRetentionSeconds: readPositiveIntegerFlag(
+          flags,
+          'audit-retention-seconds',
+          DEFAULT_PROMOTION_AUDIT_RETENTION_SECONDS,
+        ),
+        dryRun: !readBooleanFlag(flags, 'apply', false),
       });
       console.log(JSON.stringify(summary, null, 2));
       return 0;
@@ -110,6 +204,7 @@ export async function runSelfHealingPromotions(argv = process.argv.slice(2)): Pr
     const workflow = new SelfHealingPromotionWorkflow({
       store: handle.store,
       activeNamespace: namespace,
+      authorizationPolicy,
     });
 
     if (command === 'list') {
@@ -133,6 +228,7 @@ export async function runSelfHealingPromotions(argv = process.argv.slice(2)): Pr
         ...identifier,
         reviewer: resolveReviewer(flags),
       });
+      writeAuthorizationWarnings(result.authorizationWarnings);
       console.log(JSON.stringify(result, null, 2));
       return result.status === 'conflict' ? 2 : 0;
     }
@@ -143,6 +239,7 @@ export async function runSelfHealingPromotions(argv = process.argv.slice(2)): Pr
         reviewer: resolveReviewer(flags),
         reason: readStringFlag(flags, 'reason') ?? '',
       });
+      writeAuthorizationWarnings(result.authorizationWarnings);
       console.log(JSON.stringify(result, null, 2));
       return 0;
     }
@@ -152,6 +249,7 @@ export async function runSelfHealingPromotions(argv = process.argv.slice(2)): Pr
       reviewer: resolveReviewer(flags),
       reason: readStringFlag(flags, 'reason'),
     });
+    writeAuthorizationWarnings(result.authorizationWarnings);
     console.log(JSON.stringify(result, null, 2));
     return result.status === 'conflict' ? 2 : 0;
   } finally {

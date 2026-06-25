@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { createRedisSelectorStore } from '../../../../../src/data/selectors/redisSelectorStore';
 import type {
   SelectorStoreCompareAndSetOptions,
+  SelectorStoreCompareAndSetJsonFieldOptions,
   SelectorStoreJsonMergePatch,
 } from '../../../../../src/data/selectors/selectorRegistry';
 import type { RedisClient } from '../../../../../src/utils/redisClient';
@@ -19,6 +20,7 @@ function createFakeRedisClient(): {
     mget: ReturnType<typeof vi.fn>;
     set: ReturnType<typeof vi.fn>;
     compareAndSetJsonVersion: ReturnType<typeof vi.fn>;
+    compareAndSetJsonField: ReturnType<typeof vi.fn>;
     atomicJsonMerge: ReturnType<typeof vi.fn>;
     del: ReturnType<typeof vi.fn>;
     keys: ReturnType<typeof vi.fn>;
@@ -30,6 +32,10 @@ function createFakeRedisClient(): {
     mget: vi.fn(async () => ['a', null]),
     set: vi.fn(async () => undefined),
     compareAndSetJsonVersion: vi.fn(async () => ({ written: true, existingValue: null })),
+    compareAndSetJsonField: vi.fn(async () => ({
+      written: true,
+      existingValue: '{"status":"pending"}',
+    })),
     atomicJsonMerge: vi.fn(async () => '{"version":2}'),
     del: vi.fn(async () => 1),
     keys: vi.fn(async () => ['auroraflow:selectors:login']),
@@ -74,6 +80,25 @@ describe('createRedisSelectorStore', () => {
     expect(result).toEqual({ written: true, existingValue: null });
     expect(mocks.compareAndSetJsonVersion).toHaveBeenCalledWith(
       'selectors:login',
+      'payload',
+      options,
+    );
+  });
+
+  it('maps compareAndSetJsonField to the Redis JSON field primitive', async () => {
+    const { client, mocks } = createFakeRedisClient();
+    const store = createRedisSelectorStore(client);
+    const options: SelectorStoreCompareAndSetJsonFieldOptions = {
+      fieldName: 'status',
+      expectedValue: 'pending',
+      ttlSeconds: 120,
+    };
+
+    const result = await store.compareAndSetJsonField?.('selectors:promotion', 'payload', options);
+
+    expect(result).toEqual({ written: true, existingValue: '{"status":"pending"}' });
+    expect(mocks.compareAndSetJsonField).toHaveBeenCalledWith(
+      'selectors:promotion',
       'payload',
       options,
     );

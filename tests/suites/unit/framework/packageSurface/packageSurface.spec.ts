@@ -8,10 +8,14 @@ import {
 import {
   AlertPolicyValidationError,
   DEFAULT_OBSERVABILITY_TREND_LIMIT,
+  DEFAULT_PROMOTION_AUDIT_RETENTION_SECONDS,
   DEFAULT_SELF_HEAL_MAX_CANDIDATES,
   DEFAULT_PENDING_SELECTOR_PROMOTION_TTL_SECONDS,
   DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS,
+  MAX_PROMOTION_AUDIT_RETENTION_SECONDS,
   MAX_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS,
+  PromotionAuthorizationError,
+  PromotionStatusConflictError,
   SelfHealingArtifactSchemaError,
   DEFAULT_SELF_HEAL_MIN_CONFIDENCE,
   LoggerConfigError,
@@ -38,6 +42,7 @@ import {
   createChildLogger,
   createConfiguredLogger,
   createMemorySelectorStore,
+  createPromotionAuthorizationPolicy,
   createRedisSelfHealingRegistryRuntime,
   createRedisSelectorStore,
   createStoreSelfHealingRegistryRuntime,
@@ -75,6 +80,9 @@ import {
   type RankedSelfHealingCandidate,
   type RedisRuntimeConfig,
   type ResolveSelfHealingRegistryRuntimeOptions,
+  type PromotionAuthorizationDecision,
+  type PromotionAuthorizationInput,
+  type PromotionAuthorizationPolicy,
   type SelfHealingConfig,
   type SelfHealingConfigDiagnostic,
   type SelfHealingConfigResolution,
@@ -103,8 +111,12 @@ describe('public package surface', () => {
     expect(SelfHealingArtifactSchemaError).toBeTypeOf('function');
     expect(StorePendingSelectorPromotionRepository).toBeTypeOf('function');
     expect(StoreSelectorCandidateHistoryRepository).toBeTypeOf('function');
+    expect(PromotionAuthorizationError).toBeTypeOf('function');
+    expect(PromotionStatusConflictError).toBeTypeOf('function');
     expect(DEFAULT_OBSERVABILITY_TREND_LIMIT).toBeGreaterThan(0);
     expect(DEFAULT_PENDING_SELECTOR_PROMOTION_TTL_SECONDS).toBeGreaterThan(0);
+    expect(DEFAULT_PROMOTION_AUDIT_RETENTION_SECONDS).toBe(2_592_000);
+    expect(MAX_PROMOTION_AUDIT_RETENTION_SECONDS).toBe(2_592_000);
     expect(DEFAULT_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS).toBe(2_592_000);
     expect(MAX_SELECTOR_CANDIDATE_HISTORY_TTL_SECONDS).toBe(2_592_000);
     expect(DEFAULT_SELF_HEAL_MIN_CONFIDENCE).toBe(0.92);
@@ -122,6 +134,7 @@ describe('public package surface', () => {
     expect(createChildLogger).toBeTypeOf('function');
     expect(createConfiguredLogger).toBeTypeOf('function');
     expect(createMemorySelectorStore).toBeTypeOf('function');
+    expect(createPromotionAuthorizationPolicy).toBeTypeOf('function');
     expect(createRedisSelfHealingRegistryRuntime).toBeTypeOf('function');
     expect(createRedisSelectorStore).toBeTypeOf('function');
     expect(createStoreSelfHealingRegistryRuntime).toBeTypeOf('function');
@@ -175,6 +188,11 @@ describe('public package surface', () => {
     expectTypeOf<SelfHealingConfig['sat']['registryMode']>().toEqualTypeOf<
       'off' | 'read' | 'write_pending'
     >();
+    expectTypeOf<SelfHealingConfig['runBudget']>().toMatchTypeOf<{
+      mode: 'warning_only' | 'enforce';
+      maxHealingAttempts: number;
+      maxFailureArtifacts: number;
+    }>();
     expectTypeOf<SelfHealingConfigResolution>().toMatchTypeOf<{
       config: SelfHealingConfig;
       diagnostics: SelfHealingConfigDiagnostic[];
@@ -191,6 +209,11 @@ describe('public package surface', () => {
       required: boolean;
     }>();
     expectTypeOf<ResolveSelfHealingRegistryRuntimeOptions>().toMatchTypeOf<object>();
+    expectTypeOf<PromotionAuthorizationPolicy>().toMatchTypeOf<{
+      authorize(
+        input: PromotionAuthorizationInput,
+      ): PromotionAuthorizationDecision | Promise<PromotionAuthorizationDecision>;
+    }>();
     expectTypeOf<SelectorRecord>().toMatchTypeOf<{
       id: string;
       locator: string;

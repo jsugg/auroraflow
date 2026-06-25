@@ -5,7 +5,36 @@ import {
 } from '../../../../../src/data/selectors/memorySelectorStore';
 import { SelfHealingPromotionWorkflow } from '../../../../../src/framework/selfHealing/promotionWorkflow';
 import { parsePendingSelectorPromotion } from '../../../../../src/framework/selfHealing/artifactSchema';
+import {
+  PromotionStatusConflictError,
+  StorePendingSelectorPromotionRepository,
+} from '../../../../../src/framework/selfHealing/promotionRepository';
+import {
+  PromotionAuthorizationError,
+  createPromotionAuthorizationPolicy,
+} from '../../../../../src/framework/selfHealing/promotionAuthorization';
 import { parseArgs } from '../../../../../scripts/self-healing-promotions';
+
+const PROMOTION_KEY = 'selector-registry-promotions-unit-promotions:evt-1';
+
+class PromotionRaceMemorySelectorStore extends MemorySelectorStore {
+  private promotionReads = 0;
+  private releaseReads: (() => void) | undefined;
+  private readonly readGate = new Promise<void>((resolve) => {
+    this.releaseReads = resolve;
+  });
+
+  public override async get(key: string): Promise<string | null> {
+    if (key === PROMOTION_KEY && this.promotionReads < 2) {
+      this.promotionReads += 1;
+      if (this.promotionReads === 2) {
+        this.releaseReads?.();
+      }
+      await this.readGate;
+    }
+    return super.get(key);
+  }
+}
 
 function workflowFixture() {
   const store = createMemorySelectorStore();
@@ -36,7 +65,7 @@ async function seedActiveSelector(store: MemorySelectorStore): Promise<void> {
 
 async function seedPromotion(store: MemorySelectorStore): Promise<void> {
   await store.set(
-    'selector-registry-promotions-unit-promotions:evt-1',
+    PROMOTION_KEY,
     JSON.stringify({
       promotionId: 'promotion:evt-1:candidate-new',
       eventId: 'evt-1',
@@ -98,6 +127,95 @@ describe('SelfHealingPromotionWorkflow', () => {
     });
     const auditKeys = await store.keys('selector-registry-promotions-unit-audit:*');
     expect(auditKeys).toHaveLength(1);
+    const auditPayload = await store.get(auditKeys[0] ?? '');
+    expect(auditPayload ? JSON.parse(auditPayload) : null).toMatchObject({
+      authorizationMode: 'local',
+      authorizationWarnings: [
+        'Local promotion authorization is permissive; use shared mode with CODEOWNERS and a protected workflow for shared registries.',
+      ],
+      expiresAt: '2026-07-08T14:00:00.000Z',
+    });
+    expect(result.authorizationWarnings).toHaveLength(1);
+  });
+
+  it('denies shared promotion mutations without protected workflow evidence', async () => {
+    const { store } = workflowFixture();
+    await seedActiveSelector(store);
+    await seedPromotion(store);
+    const workflow = new SelfHealingPromotionWorkflow({
+      store,
+      activeNamespace: 'selector-registry-promotions-unit',
+      authorizationPolicy: createPromotionAuthorizationPolicy({
+        mode: 'shared',
+        codeownersPresent: true,
+        protectedWorkflow: false,
+      }),
+    });
+
+    await expect(
+      workflow.approve({ eventId: 'evt-1', reviewer: 'reviewer-shared' }),
+    ).rejects.toThrow(PromotionAuthorizationError);
+    const promotionPayload = await store.get(PROMOTION_KEY);
+    expect(promotionPayload ? JSON.parse(promotionPayload) : null).toMatchObject({
+      status: 'pending',
+      acknowledged: false,
+    });
+  });
+
+  it('allows shared promotion mutations with CODEOWNERS and protected workflow evidence', async () => {
+    const { store } = workflowFixture();
+    await seedActiveSelector(store);
+    await seedPromotion(store);
+    const workflow = new SelfHealingPromotionWorkflow({
+      store,
+      activeNamespace: 'selector-registry-promotions-unit',
+      now: () => new Date('2026-06-08T14:00:00.000Z'),
+      authorizationPolicy: createPromotionAuthorizationPolicy({
+        mode: 'shared',
+        codeownersPresent: true,
+        protectedWorkflow: true,
+      }),
+    });
+
+    const result = await workflow.approve({ eventId: 'evt-1', reviewer: 'reviewer-shared' });
+
+    expect(result.status).toBe('applied');
+    expect(result.authorizationMode).toBe('shared');
+    expect(result.authorizationWarnings).toEqual([]);
+  });
+
+  it('conflicts one winner under concurrent expected-status promotion races', async () => {
+    const store = new PromotionRaceMemorySelectorStore();
+    const repository = new StorePendingSelectorPromotionRepository({
+      store,
+      activeNamespace: 'selector-registry-promotions-unit',
+    });
+    await seedPromotion(store);
+
+    const results = await Promise.allSettled([
+      repository.transitionStatus('evt-1', 'pending', (current) => ({
+        ...current,
+        status: 'rejected',
+        acknowledged: true,
+        reviewedBy: 'reviewer-a',
+      })),
+      repository.transitionStatus('evt-1', 'pending', (current) => ({
+        ...current,
+        status: 'conflict',
+        acknowledged: true,
+        reviewedBy: 'reviewer-b',
+      })),
+    ]);
+    const fulfilled = results.filter((result) => result.status === 'fulfilled');
+    const rejected = results.filter((result) => result.status === 'rejected');
+    const finalPayload = await store.get(PROMOTION_KEY);
+
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+    expect(rejected[0]?.reason).toBeInstanceOf(PromotionStatusConflictError);
+    expect(finalPayload ? JSON.parse(finalPayload) : null).toMatchObject({
+      status: fulfilled[0]?.status === 'fulfilled' ? fulfilled[0].value.status : undefined,
+    });
   });
 
   it('marks stale approvals as explicit conflicts', async () => {

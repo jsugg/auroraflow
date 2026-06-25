@@ -85,6 +85,11 @@ function selfHealingConfig(
       registryMode,
       promotionMode: 'manual',
     },
+    runBudget: {
+      mode: 'warning_only',
+      maxHealingAttempts: 25,
+      maxFailureArtifacts: 50,
+    },
   };
 }
 
@@ -251,7 +256,7 @@ describe('self-healing registry runtime', () => {
     expect(store.ttlSecondsByKey.get('selector-promotions:evt-001')).toBeGreaterThan(0);
   });
 
-  it('cleanup removes only expired history and promotion records', async () => {
+  it('cleanup defaults to dry-run and reports expired history, promotion, and audit records', async () => {
     const store = new TrackingMemorySelectorStore();
     await store.rawSet(
       'selector-history:expired',
@@ -284,6 +289,31 @@ describe('self-healing registry runtime', () => {
       }),
     );
     await store.rawSet('selector-registry:checkout.submit', '{"id":"checkout.submit"}');
+    await store.rawSet(
+      'selector-audit:expired',
+      JSON.stringify({
+        promotionId: 'promotion:expired',
+        eventId: 'evt-expired',
+        selectorId: 'checkout.submit',
+        action: 'approve',
+        status: 'applied',
+        reviewer: 'reviewer',
+        reviewedAt: '2026-05-01T12:00:00.000Z',
+      }),
+    );
+    await store.rawSet(
+      'selector-audit:legal-hold',
+      JSON.stringify({
+        promotionId: 'promotion:hold',
+        eventId: 'evt-hold',
+        selectorId: 'checkout.submit',
+        action: 'approve',
+        status: 'applied',
+        reviewer: 'reviewer',
+        reviewedAt: '2026-05-01T12:00:00.000Z',
+        legalHold: true,
+      }),
+    );
 
     const summary = await cleanupExpiredSelfHealingRegistryRecords({
       store,
@@ -291,16 +321,70 @@ describe('self-healing registry runtime', () => {
     });
 
     expect(summary).toMatchObject({
+      dryRun: true,
       historyScanned: 1,
-      historyDeleted: 1,
+      historyExpired: 1,
+      historyDeleted: 0,
       promotionsScanned: 1,
-      promotionsDeleted: 1,
+      promotionsExpired: 1,
+      promotionsDeleted: 0,
+      auditScanned: 2,
+      auditExpired: 1,
+      auditDeleted: 0,
+      auditLegalHold: 1,
       malformedRecords: 0,
     });
-    await expect(store.get('selector-history:expired')).resolves.toBeNull();
-    await expect(store.get('selector-promotions:expired')).resolves.toBeNull();
+    await expect(store.get('selector-history:expired')).resolves.not.toBeNull();
+    await expect(store.get('selector-promotions:expired')).resolves.not.toBeNull();
+    await expect(store.get('selector-audit:expired')).resolves.not.toBeNull();
     await expect(store.get('selector-registry:checkout.submit')).resolves.toBe(
       '{"id":"checkout.submit"}',
     );
+  });
+
+  it('cleanup apply deletes expired audit records while preserving legal hold records', async () => {
+    const store = new TrackingMemorySelectorStore();
+    await store.rawSet(
+      'selector-audit:expired',
+      JSON.stringify({
+        promotionId: 'promotion:expired',
+        eventId: 'evt-expired',
+        selectorId: 'checkout.submit',
+        action: 'approve',
+        status: 'applied',
+        reviewer: 'reviewer',
+        reviewedAt: '2026-05-01T12:00:00.000Z',
+      }),
+    );
+    await store.rawSet(
+      'selector-audit:legal-hold',
+      JSON.stringify({
+        promotionId: 'promotion:hold',
+        eventId: 'evt-hold',
+        selectorId: 'checkout.submit',
+        action: 'approve',
+        status: 'applied',
+        reviewer: 'reviewer',
+        reviewedAt: '2026-05-01T12:00:00.000Z',
+        legalHold: true,
+      }),
+    );
+
+    const summary = await cleanupExpiredSelfHealingRegistryRecords({
+      store,
+      now: new Date('2026-06-08T12:00:00.000Z'),
+      dryRun: false,
+    });
+
+    expect(summary).toMatchObject({
+      dryRun: false,
+      auditScanned: 2,
+      auditExpired: 1,
+      auditDeleted: 1,
+      auditLegalHold: 1,
+      malformedRecords: 0,
+    });
+    await expect(store.get('selector-audit:expired')).resolves.toBeNull();
+    await expect(store.get('selector-audit:legal-hold')).resolves.not.toBeNull();
   });
 });

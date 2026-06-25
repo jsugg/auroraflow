@@ -71,6 +71,11 @@ export interface SelectorStoreCompareAndSetOptions extends SelectorStoreSetOptio
   expectedVersion: number | null;
 }
 
+export interface SelectorStoreCompareAndSetJsonFieldOptions extends SelectorStoreSetOptions {
+  expectedValue: SelectorStoreJsonPrimitive;
+  fieldName: string;
+}
+
 export interface SelectorStoreCompareAndSetResult {
   written: boolean;
   existingValue: string | null;
@@ -84,6 +89,11 @@ export interface SelectorStore {
     key: string,
     value: string,
     options: SelectorStoreCompareAndSetOptions,
+  ): Promise<SelectorStoreCompareAndSetResult>;
+  compareAndSetJsonField?(
+    key: string,
+    value: string,
+    options: SelectorStoreCompareAndSetJsonFieldOptions,
   ): Promise<SelectorStoreCompareAndSetResult>;
   /**
    * Atomically merges JSON object fields at one key.
