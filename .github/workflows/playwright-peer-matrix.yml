@@ -34,7 +34,7 @@ jobs:
             version_spec: ^1.59.0
     steps:
       - name: Checkout
-        uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
@@ -84,7 +84,7 @@ jobs:
         run: npm run test:unit -- --run tests/suites/unit/framework/pageFactory/pageFactory.spec.ts tests/suites/unit/framework/pageObjectBase/pageObjectBase.spec.ts
 
       - name: Cache Playwright Chrome
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5.0.5
+        uses: actions/cache@2c8a9bd7457de244a408f35966fab2fb45fda9c8 # v6.0.0
         with:
           path: ~/.cache/ms-playwright
           key: ${{ runner.os }}-playwright-peer-${{ matrix.lane }}-${{ matrix.version_spec }}
