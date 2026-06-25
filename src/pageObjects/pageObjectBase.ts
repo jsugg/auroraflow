@@ -286,6 +286,11 @@ export abstract class PageObjectBase {
       );
       span.setAttribute('auroraflow.self_heal.run_budget.downgrade', runBudget.downgrade);
       const artifactPrivacyPolicy = this.resolveArtifactPrivacyPolicy();
+      // Capture a failure screenshot on the active healing path, and also when
+      // self-healing is `off`: an off-mode run intentionally still records basic
+      // failure evidence (a screenshot) even though it writes no self-healing
+      // event artifact. A budget downgrade in a non-off mode (shouldRunHealing
+      // false) intentionally stops screenshots to bound failure-storm cost.
       const screenshotPath =
         (selfHealingConfig.mode === 'off' || runBudget.shouldRunHealing) &&
         artifactPrivacyPolicy.screenshot.mode === 'capture'

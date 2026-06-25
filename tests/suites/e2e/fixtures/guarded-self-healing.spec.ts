@@ -10,7 +10,6 @@ import type {
   SelfHealingRegistryRuntime,
 } from '../../../../src/framework/selfHealing/registryContracts';
 import {
-  SELF_HEALING_ARTIFACT_ENV_KEYS,
   createPlaywrightSelfHealingArtifactScope,
   readSelfHealingArtifactFor,
   type SelfHealingArtifactScope,
@@ -28,36 +27,7 @@ const GUARDED_ACTION_TIMEOUT_MS = 3_000;
 
 test.setTimeout(90_000);
 
-// The framework resolves self-healing config and correlation identifiers from
-// `process.env` (PageObjectBase reads it directly), so these tests drive the
-// real config path by setting process.env and restoring it per test — the same
-// pattern as tests/suites/e2e/examples/self-healing-sat.spec.ts. The registry runtime is supplied through the existing
-// `resolveRegistryRuntime` override seam on FixtureSelfHealingPage.
-const SELF_HEAL_ENV_KEYS = [
-  ...SELF_HEALING_ARTIFACT_ENV_KEYS,
-  'SELF_HEAL_MODE',
-  'SELF_HEAL_MIN_CONFIDENCE',
-  'SELF_HEAL_ALLOWED_ACTIONS',
-  'SELF_HEAL_ALLOWED_DOMAINS',
-  'SELF_HEAL_MAX_CANDIDATES',
-  'SELF_HEAL_MAX_DOM_NODES',
-  'SELF_HEAL_SAT_CAPTURE_DOM',
-  'SELF_HEAL_SAT_ENABLED',
-] as const;
-
-let previousEnv: Map<(typeof SELF_HEAL_ENV_KEYS)[number], string | undefined> | undefined;
 let artifactScope: SelfHealingArtifactScope | undefined;
-
-function applyGuardedEnv(env: Readonly<Record<string, string | undefined>>): void {
-  for (const key of SELF_HEAL_ENV_KEYS) {
-    const value = env[key];
-    if (value === undefined) {
-      delete process.env[key];
-    } else {
-      process.env[key] = value;
-    }
-  }
-}
 
 interface GuardedArtifact {
   mode: string;
@@ -172,8 +142,7 @@ async function runGuardedClick({
   selectorId: string;
   staleSelector: string;
 }): Promise<void> {
-  applyGuardedEnv(env);
-  const pageObject = new FixtureSelfHealingPage(page, registryRuntime(record));
+  const pageObject = new FixtureSelfHealingPage(page, registryRuntime(record), { env });
   await pageObject.openFixture();
   await pageObject.click(staleSelector, { selectorId, timeout: GUARDED_ACTION_TIMEOUT_MS });
 }
@@ -182,29 +151,14 @@ test.describe.configure({ mode: 'parallel' });
 
 test.beforeEach(async ({ page }, testInfo) => {
   void page;
-  previousEnv = new Map(SELF_HEAL_ENV_KEYS.map((key) => [key, process.env[key]]));
-  for (const key of SELF_HEAL_ENV_KEYS) {
-    delete process.env[key];
-  }
   artifactScope = await createPlaywrightSelfHealingArtifactScope(testInfo, {
     prefix: 'guarded-self-healing',
   });
 });
 
 test.afterEach(async () => {
-  if (previousEnv !== undefined) {
-    for (const key of SELF_HEAL_ENV_KEYS) {
-      const value = previousEnv.get(key);
-      if (value === undefined) {
-        delete process.env[key];
-      } else {
-        process.env[key] = value;
-      }
-    }
-  }
   resetTelemetryForTests();
   artifactScope = undefined;
-  previousEnv = undefined;
 });
 
 test('guarded self-heal auto-applies registry candidate at default 0.92', async ({ page }) => {
@@ -255,8 +209,7 @@ test('guarded self-heal auto-applies registry candidate at default 0.92', async 
 test('guarded self-heal rejects fresh DOM candidates at default 0.92', async ({ page }) => {
   const scope = currentArtifactScope();
   const env = createGuardedEnv(scope);
-  applyGuardedEnv(env);
-  const pageObject = new FixtureSelfHealingPage(page);
+  const pageObject = new FixtureSelfHealingPage(page, undefined, { env });
   await pageObject.openFixture();
 
   await expect(
@@ -282,7 +235,6 @@ test('guarded self-heal rejects fresh DOM candidates at default 0.92', async ({ 
 
 test('guarded self-heal recovers dynamic re-render fixture by effect', async ({ page }) => {
   const env = createGuardedEnv(currentArtifactScope());
-  applyGuardedEnv(env);
   const pageObject = new FixtureSelfHealingPage(
     page,
     registryRuntime(
@@ -291,6 +243,7 @@ test('guarded self-heal recovers dynamic re-render fixture by effect', async ({ 
         locator: "page.getByTestId('dynamic-submit')",
       }),
     ),
+    { env },
   );
   await pageObject.openFixture();
   await page.evaluate(() => {
