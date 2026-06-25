@@ -190,7 +190,8 @@ See [`docs/operations/observability-contract.md`](docs/operations/observability-
 src/
   data/selectors/          Redis-backed selector registry primitives
   framework/observability/ Telemetry facade, report aggregation, SLO and alert artifacts
-  framework/selfHealing/   Failure capture, DOM snapshots, candidate scoring, guarded validation
+  framework/runtime/       Runtime context container, lifecycle/disposer registry, and Playwright test fixture
+  framework/selfHealing/   Failure capture, DOM snapshots, candidate scoring, guarded validation, and promotion governance
   helpers/                 Page factory and small utilities
   pageObjects/             Base page object implementation
   utils/                   Logger and Redis client

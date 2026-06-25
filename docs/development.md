@@ -35,12 +35,14 @@ npx playwright install --with-deps
 | Path | Responsibility |
 | --- | --- |
 | `src/index.ts` | Root package export surface. |
+| `src/playwright.ts` | `auroraflow/playwright` entrypoint: Playwright `test`/`expect` fixture extension and lifecycle re-exports. |
 | `src/pageObjects/pageObjectBase.ts` | Base page action wrapper, screenshots, self-healing failure path, and page action telemetry. |
 | `src/helpers/pageFactory.ts` | Page object instance cache. |
-| `src/framework/selfHealing/` | Configuration, DOM snapshots, candidate extraction/scoring, failure artifacts, guarded validation, and artifact schemas. |
+| `src/framework/selfHealing/` | Configuration, DOM snapshots, candidate extraction/scoring, failure artifacts, guarded validation, run-level budget, reviewed promotion governance, and artifact schemas. |
 | `src/data/selectors/selectorRegistry.ts` | Typed selector registry repository over a Redis-compatible store contract. |
 | `src/utils/redisClient.ts` | Redis runtime configuration, connection lifecycle, namespacing, retries, and key scanning. |
 | `src/framework/observability/` | No-op/default telemetry facade, OpenTelemetry adapter, attribute builders, flakiness reports, SLO dashboards, and alert evaluation. |
+| `src/framework/runtime/` | `AuroraFlowContext` dependency container, `closeAuroraFlow` lifecycle/disposer registry, and the Playwright fixture helper. |
 | `src/utils/logger.ts` | Structured logging configuration and redaction defaults. |
 | `tests/suites/unit/` | Fast unit tests. |
 | `tests/suites/contracts/` | Package, workflow, infrastructure, documentation, and schema-adjacent contracts. |
