@@ -74,8 +74,11 @@ export class PageFactory {
    * positionally. A default-constructed page object therefore builds its own
    * env-backed context — and its own per-run self-healing budget. To share this
    * factory's context (and aggregate the run-level failure-storm budget across
-   * page objects), register a provider that forwards `runtimeContext` to the
-   * constructor. The `auroraflow/playwright` fixture wires this for you.
+   * page objects), register a provider that forwards `runtimeContext`, or pass
+   * the context to the page object's constructor directly. The
+   * `auroraflow/playwright` fixture exposes a `PageFactory` already bound to the
+   * test's shared context, but page objects still share it only through a
+   * provider or a context-aware constructor.
    */
   private createPage<T extends PageObjectBase>(pageClass: PageObjectConstructor<T>): T {
     const provider = this.pageProviders.get(pageClass) as PageObjectProvider<T> | undefined;
