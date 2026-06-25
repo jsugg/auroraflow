@@ -39,11 +39,20 @@ export interface SelfHealingSatConfig {
   promotionMode: SelfHealingPromotionMode;
 }
 
+export type SelfHealingRunBudgetMode = 'warning_only' | 'enforce';
+
+export interface SelfHealingRunBudgetConfig {
+  mode: SelfHealingRunBudgetMode;
+  maxHealingAttempts: number;
+  maxFailureArtifacts: number;
+}
+
 export interface SelfHealingConfig {
   mode: SelfHealingMode;
   minConfidence: number;
   safetyPolicy: SelfHealingSafetyPolicy;
   sat: SelfHealingSatConfig;
+  runBudget: SelfHealingRunBudgetConfig;
 }
 
 export type SelfHealingSuggestionStrategy =

@@ -24,6 +24,7 @@ export interface GuardedValidationInput {
   currentUrl?: string;
   safetyPolicy: SelfHealingSafetyPolicy;
   maxCandidates?: number;
+  telemetry?: AuroraFlowTelemetry;
 }
 
 const DEFAULT_MAX_GUARDED_CANDIDATES = 5;
@@ -133,7 +134,7 @@ function createPolicyDecision({
 export async function evaluateGuardedSuggestionsDryRun(
   input: GuardedValidationInput,
 ): Promise<GuardedValidationSummary> {
-  const telemetry = getTelemetry();
+  const telemetry = input.telemetry ?? getTelemetry();
   return telemetry.runSpan({
     name: SPAN_NAMES.guardedValidation,
     attributes: buildGuardedValidationSpanAttributes({

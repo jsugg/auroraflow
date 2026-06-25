@@ -45,6 +45,11 @@ function selfHealingConfig(mode: SelfHealingMode): SelfHealingConfig {
       registryMode: 'read',
       promotionMode: 'manual',
     },
+    runBudget: {
+      mode: 'warning_only',
+      maxHealingAttempts: 25,
+      maxFailureArtifacts: 50,
+    },
   };
 }
 

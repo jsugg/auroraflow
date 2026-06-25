@@ -5,6 +5,8 @@ import {
   SelfHealingMode,
   SelfHealingPromotionMode,
   SelfHealingRegistryMode,
+  SelfHealingRunBudgetConfig,
+  SelfHealingRunBudgetMode,
   SelfHealingSatConfig,
 } from './types';
 
@@ -12,12 +14,15 @@ export const DEFAULT_SELF_HEAL_MIN_CONFIDENCE = 0.92;
 export const DEFAULT_SELF_HEAL_MAX_DOM_NODES = 500;
 export const DEFAULT_SELF_HEAL_MAX_CANDIDATES = 10;
 export const DEFAULT_SELF_HEAL_MAX_TEXT_LENGTH = 120;
+export const DEFAULT_SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS = 25;
+export const DEFAULT_SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS = 50;
 
 export const SELF_HEAL_CONFIG_STRICT_ENV = 'AURORAFLOW_CONFIG_STRICT';
 
 const HARD_MAX_SELF_HEAL_DOM_NODES = 5_000;
 const HARD_MAX_SELF_HEAL_CANDIDATES = 50;
 const HARD_MAX_SELF_HEAL_TEXT_LENGTH = 500;
+const HARD_MAX_SELF_HEAL_RUN_BUDGET_EVENTS = 10_000;
 
 const SUPPORTED_SELF_HEAL_MODES: ReadonlySet<SelfHealingMode> = new Set([
   'off',
@@ -65,6 +70,11 @@ const SUPPORTED_REGISTRY_MODES: ReadonlySet<SelfHealingRegistryMode> = new Set([
 const SUPPORTED_PROMOTION_MODES: ReadonlySet<SelfHealingPromotionMode> = new Set([
   'manual',
   'ci_acknowledged',
+]);
+
+const SUPPORTED_RUN_BUDGET_MODES: ReadonlySet<SelfHealingRunBudgetMode> = new Set([
+  'warning_only',
+  'enforce',
 ]);
 
 const TRUE_BOOLEAN_TOKENS = ['1', 'true', 'yes', 'on'];
@@ -280,6 +290,54 @@ function parseBoundedPositiveInteger({
   return parsedValue;
 }
 
+function parseBoundedNonNegativeInteger({
+  envVar,
+  rawValue,
+  defaultValue,
+  hardMaximum,
+  report,
+}: {
+  envVar: string;
+  rawValue: string | undefined;
+  defaultValue: number;
+  hardMaximum: number;
+  report: DiagnosticSink;
+}): number {
+  if (!rawValue) {
+    return defaultValue;
+  }
+
+  const parsedValue = Number(rawValue.trim());
+  if (!Number.isInteger(parsedValue)) {
+    report({
+      envVar,
+      code: 'invalid_number',
+      message: `${envVar} is not an integer. Using default ${defaultValue}.`,
+      applied: String(defaultValue),
+    });
+    return defaultValue;
+  }
+  if (parsedValue < 0) {
+    report({
+      envVar,
+      code: 'out_of_range',
+      message: `${envVar} must be at least 0. Using default ${defaultValue}.`,
+      applied: String(defaultValue),
+    });
+    return defaultValue;
+  }
+  if (parsedValue > hardMaximum) {
+    report({
+      envVar,
+      code: 'clamped',
+      message: `${envVar} exceeds the hard maximum ${hardMaximum}. Clamping to ${hardMaximum}.`,
+      applied: String(hardMaximum),
+    });
+    return hardMaximum;
+  }
+  return parsedValue;
+}
+
 function parseAllowedActions(
   rawValue: string | undefined,
   report: DiagnosticSink,
@@ -369,6 +427,28 @@ function parsePromotionMode(
   return 'manual';
 }
 
+function parseRunBudgetMode(
+  rawValue: string | undefined,
+  report: DiagnosticSink,
+): SelfHealingRunBudgetMode {
+  if (!rawValue) {
+    return 'warning_only';
+  }
+
+  const normalizedValue = rawValue.trim().toLowerCase();
+  if (SUPPORTED_RUN_BUDGET_MODES.has(normalizedValue as SelfHealingRunBudgetMode)) {
+    return normalizedValue as SelfHealingRunBudgetMode;
+  }
+  report(
+    enumDiagnostic({
+      envVar: 'SELF_HEAL_RUN_BUDGET_MODE',
+      supported: SUPPORTED_RUN_BUDGET_MODES,
+      applied: 'warning_only',
+    }),
+  );
+  return 'warning_only';
+}
+
 function resolveSatConfig(
   mode: SelfHealingMode,
   env: Readonly<Record<string, string | undefined>>,
@@ -418,6 +498,29 @@ function resolveSatConfig(
   };
 }
 
+function resolveRunBudgetConfig(
+  env: Readonly<Record<string, string | undefined>>,
+  report: DiagnosticSink,
+): SelfHealingRunBudgetConfig {
+  return {
+    mode: parseRunBudgetMode(env.SELF_HEAL_RUN_BUDGET_MODE, report),
+    maxHealingAttempts: parseBoundedNonNegativeInteger({
+      envVar: 'SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS',
+      rawValue: env.SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS,
+      defaultValue: DEFAULT_SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS,
+      hardMaximum: HARD_MAX_SELF_HEAL_RUN_BUDGET_EVENTS,
+      report,
+    }),
+    maxFailureArtifacts: parseBoundedNonNegativeInteger({
+      envVar: 'SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS',
+      rawValue: env.SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS,
+      defaultValue: DEFAULT_SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS,
+      hardMaximum: HARD_MAX_SELF_HEAL_RUN_BUDGET_EVENTS,
+      report,
+    }),
+  };
+}
+
 /**
  * Resolves the effective self-healing configuration plus diagnostics for every
  * invalid `SELF_HEAL_*` value, without logging or throwing.
@@ -444,6 +547,7 @@ export function resolveSelfHealingConfigWithDiagnostics(
       allowedDomains: parseAllowedDomains(env.SELF_HEAL_ALLOWED_DOMAINS),
     },
     sat: resolveSatConfig(mode, env, report),
+    runBudget: resolveRunBudgetConfig(env, report),
   };
 
   return { config, diagnostics, strict };

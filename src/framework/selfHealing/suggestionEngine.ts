@@ -16,7 +16,7 @@ import {
 } from './candidateLocator';
 import { buildSelfHealingSuggestionMetricAttributes } from '../observability/attributes';
 import { METRIC_NAMES } from '../observability/metricNames';
-import { getTelemetry } from '../observability/telemetry';
+import { getTelemetry, type AuroraFlowTelemetry } from '../observability/telemetry';
 import {
   SELF_HEALING_HEURISTIC_STRATEGY_BASE_SIGNAL,
   SELF_HEALING_SCORE_WEIGHTS,
@@ -27,6 +27,7 @@ export interface SuggestionEngineInput {
   failedTarget?: string;
   historicalSuccessByLocator?: Readonly<Record<string, number>>;
   maxCandidates?: number;
+  telemetry?: AuroraFlowTelemetry;
 }
 
 const DEFAULT_MAX_CANDIDATES = 5;
@@ -292,6 +293,7 @@ export function generateRankedLocatorSuggestions({
   failedTarget,
   historicalSuccessByLocator = {},
   maxCandidates = DEFAULT_MAX_CANDIDATES,
+  telemetry = getTelemetry(),
 }: SuggestionEngineInput): SelfHealingSuggestion[] {
   const boundedMax = Number.isFinite(maxCandidates)
     ? Math.max(1, Math.floor(maxCandidates))
@@ -325,7 +327,6 @@ export function generateRankedLocatorSuggestions({
   });
 
   const selectedSuggestions = suggestions.slice(0, boundedMax);
-  const telemetry = getTelemetry();
   for (const suggestion of selectedSuggestions) {
     telemetry.recordCounter(
       METRIC_NAMES.selfHealingSuggestionsTotal,

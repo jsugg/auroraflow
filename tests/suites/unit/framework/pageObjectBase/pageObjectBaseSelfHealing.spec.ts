@@ -16,7 +16,8 @@ import {
   type ArtifactPrivacyPolicy,
 } from '../../../../../src/framework/selfHealing/artifactPrivacy';
 import type { SelfHealingRegistryRuntime } from '../../../../../src/framework/selfHealing/registryContracts';
-import { PageObjectBase } from '../../../../../src/pageObjects/pageObjectBase';
+import type { Logger } from '../../../../../src/utils/logger';
+import { PageActionError, PageObjectBase } from '../../../../../src/pageObjects/pageObjectBase';
 import { CapturingTelemetry } from '../observability/capturingTelemetry';
 import {
   SYNTHETIC_SECRET,
@@ -25,6 +26,7 @@ import {
 import {
   cleanupSelfHealingArtifactScope,
   createVitestSelfHealingArtifactScope,
+  readSelfHealingArtifacts,
   readSelfHealingArtifactFor,
   type SelfHealingArtifactScope,
 } from '../../../../helpers/selfHealingArtifacts';
@@ -133,6 +135,7 @@ describe('PageObjectBase self-healing integration', () => {
   function setupSelfHealing(
     options: {
       configEnv?: Readonly<Record<string, string | undefined>>;
+      logger?: Logger;
       privacyPolicy?: ArtifactPrivacyPolicy;
       registryRuntime?: SelfHealingRegistryRuntime;
     } = {},
@@ -140,7 +143,7 @@ describe('PageObjectBase self-healing integration', () => {
     const scope = currentArtifactScope();
     const telemetry = new CapturingTelemetry();
     setTelemetryForTests(telemetry);
-    const context = createAuroraFlowContext({
+    const contextOptions: Parameters<typeof createAuroraFlowContext>[0] = {
       telemetry,
       selfHealingConfig: resolveSelfHealingConfig({
         SELF_HEAL_MODE: 'suggest',
@@ -151,7 +154,12 @@ describe('PageObjectBase self-healing integration', () => {
       artifactRoot: scope.artifactsDir,
       artifactPrivacyPolicy: options.privacyPolicy ?? DEFAULT_ARTIFACT_PRIVACY_POLICY,
       resolveRegistryRuntime: () => options.registryRuntime,
-    });
+    };
+    if (options.logger !== undefined) {
+      const logger = options.logger;
+      contextOptions.createLogger = () => logger;
+    }
+    const context = createAuroraFlowContext(contextOptions);
     return { telemetry, context };
   }
 
@@ -612,6 +620,99 @@ describe('PageObjectBase self-healing integration', () => {
         'auroraflow.self_heal.status': 'failed',
       },
     });
+  });
+
+  it('downgrades a failure storm from full healing to capture-only, then original-error-only', async () => {
+    const warn = vi.fn();
+    const logger: Logger = {
+      debug: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn,
+    };
+    const { context } = setupSelfHealing({
+      configEnv: {
+        SELF_HEAL_MODE: 'guarded',
+        SELF_HEAL_MIN_CONFIDENCE: '0.3',
+        SELF_HEAL_ALLOWED_ACTIONS: 'click,type',
+        SELF_HEAL_ALLOWED_DOMAINS: 'example.test',
+        SELF_HEAL_RUN_BUDGET_MODE: 'enforce',
+        SELF_HEAL_RUN_BUDGET_MAX_HEALING_ATTEMPTS: '1',
+        SELF_HEAL_RUN_BUDGET_MAX_FAILURE_ARTIFACTS: '2',
+      },
+      logger,
+    });
+    pageObject = new TestPageObject(pageMock as unknown as Page, context);
+    const originalErrors = [
+      new Error('click failed 1'),
+      new Error('click failed 2'),
+      new Error('click failed 3'),
+    ];
+    pageMock.click
+      .mockRejectedValueOnce(originalErrors[0])
+      .mockRejectedValueOnce(originalErrors[1])
+      .mockRejectedValueOnce(originalErrors[2]);
+    pageMock.locatorFirst.click.mockRejectedValue(new Error('healed click failed'));
+
+    const errors: PageActionError[] = [];
+    for (let attempt = 0; attempt < originalErrors.length; attempt += 1) {
+      try {
+        await pageObject.click('#submit');
+      } catch (error: unknown) {
+        expect(error).toBeInstanceOf(PageActionError);
+        errors.push(error as PageActionError);
+      }
+    }
+
+    expect(errors).toHaveLength(3);
+    for (const [index, error] of errors.entries()) {
+      expect(error.message).toBe(`Error clicking on selector #submit: click failed ${index + 1}`);
+      expect(error.originalError).toBe(originalErrors[index]);
+      expect(error.cause).toBe(originalErrors[index]);
+    }
+    expect(pageMock.click).toHaveBeenCalledTimes(3);
+    expect(pageMock.locatorFirst.click).toHaveBeenCalledTimes(1);
+    expect(pageMock.evaluate).toHaveBeenCalledTimes(1);
+    expect(pageMock.screenshot).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith(
+      'Self-healing run budget exceeded.',
+      expect.objectContaining({
+        mode: 'enforce',
+        maxHealingAttempts: 1,
+        maxFailureArtifacts: 2,
+        healingAttemptSequence: 2,
+        failureArtifactSequence: 2,
+        downgrade: 'capture_only',
+      }),
+    );
+    expect(warn).toHaveBeenCalledTimes(1);
+
+    const artifacts = (
+      await readSelfHealingArtifacts<{
+        runId: string;
+        testId?: string;
+        suggestions: unknown[];
+        sat?: unknown;
+        guardedValidation?: unknown;
+        guardedAutoHeal?: { attempted: boolean; succeeded: boolean };
+      }>(currentArtifactScope())
+    ).filter(
+      (artifact) =>
+        artifact.runId === currentArtifactScope().runId &&
+        artifact.testId === currentArtifactScope().testId,
+    );
+
+    expect(artifacts).toHaveLength(2);
+    expect(artifacts[0]?.sat).toBeDefined();
+    expect(artifacts[0]?.guardedValidation).toBeDefined();
+    expect(artifacts[0]?.guardedAutoHeal).toMatchObject({
+      attempted: true,
+      succeeded: false,
+    });
+    expect(artifacts[1]?.suggestions).toEqual([]);
+    expect(artifacts[1]?.sat).toBeUndefined();
+    expect(artifacts[1]?.guardedValidation).toBeUndefined();
+    expect(artifacts[1]?.guardedAutoHeal).toBeUndefined();
   });
 
   it('skips guarded auto-heal application when policy blocks candidate validation', async () => {
