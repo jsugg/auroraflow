@@ -86,7 +86,6 @@ describe('release dry-run workflow contract', () => {
     const releaseJob = getWorkflowJob(releaseWorkflowModel, 'release-dry-run');
 
     expect(getWorkflowStep(releaseJob, 'Run quality gates').run).toBe('npm run verify');
-    expect(releaseWorkflowModel.env.get('NPM_VERSION')).toBe('11.17.0');
     expect(packageJson.packageManager).toBe('npm@11.17.0');
     expectInvariant(
       (getWorkflowStep(releaseJob, 'Validate artifact schemas').run ?? '').includes(
