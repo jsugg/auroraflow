@@ -32,6 +32,8 @@ export type GuardedValidationMetricStatus =
   | GuardedValidationPolicyBlockReason;
 export type SelfHealingRegistryWriteMetricStatus = 'succeeded' | 'failed' | 'skipped';
 export type SelfHealingRegistryWriteOperation = 'history_observation' | 'pending_promotion';
+export type SelfHealingDurationMetricOperation = 'dom_snapshot' | 'failure_path';
+export type SelfHealingDurationMetricStatus = PageActionMetricStatus;
 
 export interface PageActionTelemetryInput {
   pageObjectName: string;
@@ -67,6 +69,14 @@ export interface SelfHealingCaptureTelemetryInput {
 export interface SelfHealingArtifactMetricInput {
   mode: SelfHealingMode;
   actionType: SelfHealingActionType;
+}
+
+export interface SelfHealingDurationMetricInput {
+  mode: SelfHealingMode;
+  actionType: SelfHealingActionType;
+  operation: SelfHealingDurationMetricOperation;
+  status: SelfHealingDurationMetricStatus;
+  pageObjectName: string;
 }
 
 export interface SelfHealingSuggestionMetricInput {
@@ -228,6 +238,22 @@ export function buildSelfHealingArtifactMetricAttributes({
   return {
     'auroraflow.self_heal.mode': mode,
     'auroraflow.action.type': actionType,
+  };
+}
+
+export function buildSelfHealingDurationMetricAttributes({
+  mode,
+  actionType,
+  operation,
+  status,
+  pageObjectName,
+}: SelfHealingDurationMetricInput): TelemetryAttributes {
+  return {
+    'auroraflow.self_heal.mode': mode,
+    'auroraflow.self_heal.operation': operation,
+    'auroraflow.self_heal.status': status,
+    'auroraflow.action.type': actionType,
+    'auroraflow.page_object': normalizeTelemetryString(pageObjectName),
   };
 }
 

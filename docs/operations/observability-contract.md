@@ -70,6 +70,8 @@ Every emitted signal should carry these attributes when the value is known:
 - `auroraflow_slo_metric_value`
 - `auroraflow_slo_alert_breaches_total`
 - `auroraflow_self_healing_artifacts_total`
+- `auroraflow_self_healing_dom_snapshot_duration_ms`
+- `auroraflow_self_healing_failure_path_duration_ms`
 - `auroraflow_self_healing_suggestions_total`
 - `auroraflow_guarded_validation_candidates_total`
 - `auroraflow_guarded_auto_heal_total`

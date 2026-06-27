@@ -83,6 +83,8 @@
     "test:coverage:global": "vitest run tests/suites/unit --config=configs/vitest.coverage-global.mts --coverage",
     "test:mutation": "node scripts/mutation-baseline.mjs",
     "test:mutation:check": "node scripts/mutation-baseline.mjs --check",
+    "benchmark:failure-path": "node -r ts-node/register scripts/failure-path-benchmark.ts",
+    "benchmark:failure-path:record": "npm run benchmark:failure-path -- --record",
     "test:e2e:guarded": "npm run test:e2e -- --project='Google Chrome' --grep 'guarded self-heal' --workers=2",
     "workflows:lint:check": "node scripts/workflows-lint.mjs",
     "postverify": "node scripts/verify-stamp.mjs write"

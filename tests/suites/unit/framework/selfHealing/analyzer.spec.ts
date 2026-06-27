@@ -1,5 +1,6 @@
 import type { Page } from 'playwright';
 import { describe, expect, it, vi } from 'vitest';
+import { METRIC_NAMES } from '../../../../../src/framework/observability/metricNames';
 import { analyzeSelfHealingFailure } from '../../../../../src/framework/selfHealing/analyzer';
 import { buildSelfHealingCandidateId } from '../../../../../src/framework/selfHealing/candidateScoring';
 import { SENSITIVE_ARTIFACT_PRIVACY_POLICY } from '../../../../../src/framework/selfHealing/artifactPrivacy';
@@ -13,6 +14,7 @@ import {
   SYNTHETIC_SECRET,
   createSyntheticSecretDomSnapshot,
 } from '../../../../fixtures/privacy/syntheticSecrets';
+import { CapturingTelemetry } from '../observability/capturingTelemetry';
 
 function selfHealingConfig(overrides: Partial<SelfHealingConfig['sat']> = {}): SelfHealingConfig {
   return {
@@ -70,6 +72,8 @@ const snapshot = {
 
 describe('analyzeSelfHealingFailure', () => {
   it('enriches suggest-mode failures with SAT snapshot summary and ranked candidates', async () => {
+    const telemetry = new CapturingTelemetry();
+    const timestamps = [10, 14];
     const page = {
       evaluate: vi
         .fn<(_: unknown, input: unknown) => Promise<DomSnapshot>>()
@@ -86,6 +90,8 @@ describe('analyzeSelfHealingFailure', () => {
         target: '#submit',
         description: 'Error clicking selector #submit',
       },
+      telemetry,
+      now: () => timestamps.shift() ?? 14,
     });
 
     expect(result.sat).toMatchObject({
@@ -99,6 +105,17 @@ describe('analyzeSelfHealingFailure', () => {
     });
     expect(result.sat?.candidates.some((candidate) => candidate.strategy === 'testId')).toBe(true);
     expect(result.sat?.selectedCandidateId).toBe(result.sat?.candidates[0]?.id);
+    expect(telemetry.histograms).toContainEqual({
+      name: METRIC_NAMES.selfHealingDomSnapshotDurationMs,
+      value: 4,
+      attributes: {
+        'auroraflow.self_heal.mode': 'suggest',
+        'auroraflow.self_heal.operation': 'dom_snapshot',
+        'auroraflow.self_heal.status': 'succeeded',
+        'auroraflow.action.type': 'click',
+        'auroraflow.page_object': 'CheckoutPage',
+      },
+    });
   });
 
   it('does not capture DOM when SAT is explicitly disabled', async () => {

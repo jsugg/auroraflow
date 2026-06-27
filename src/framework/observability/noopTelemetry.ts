@@ -1,11 +1,13 @@
 import type {
   AuroraFlowTelemetry,
+  TelemetryAttributes,
   TelemetryAttributeValue,
   TelemetryLogCorrelation,
   TelemetryOperationOptions,
   TelemetrySpan,
   TelemetrySpanStatus,
 } from './telemetry';
+import type { MetricName } from './metricNames';
 import { resolveTelemetryConfig, type TelemetryRuntimeConfig } from './telemetryConfig';
 
 class NoopTelemetrySpan implements TelemetrySpan {
@@ -36,9 +38,17 @@ export class NoopTelemetry implements AuroraFlowTelemetry {
     return task(NOOP_SPAN);
   }
 
-  public recordCounter(): void {}
+  public recordCounter(name: MetricName, value: number, attributes?: TelemetryAttributes): void {
+    void name;
+    void value;
+    void attributes;
+  }
 
-  public recordHistogram(): void {}
+  public recordHistogram(name: MetricName, value: number, attributes?: TelemetryAttributes): void {
+    void name;
+    void value;
+    void attributes;
+  }
 
   public getLogCorrelation(): TelemetryLogCorrelation {
     return {};

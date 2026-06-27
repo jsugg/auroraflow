@@ -7,6 +7,7 @@ import {
   buildPageActionMetricAttributes,
   buildRedisOperationMetricAttributes,
   buildSelfHealingArtifactMetricAttributes,
+  buildSelfHealingDurationMetricAttributes,
   buildSelfHealingRegistryWriteMetricAttributes,
   buildSelfHealingSuggestionMetricAttributes,
   SPAN_NAMES,
@@ -110,6 +111,28 @@ function recordRepresentativeSmokeMetrics(telemetry: AuroraFlowTelemetry): void 
     METRIC_NAMES.selfHealingArtifactsTotal,
     1,
     buildSelfHealingArtifactMetricAttributes({ actionType: 'click', mode: 'guarded' }),
+  );
+  telemetry.recordHistogram(
+    METRIC_NAMES.selfHealingDomSnapshotDurationMs,
+    12,
+    buildSelfHealingDurationMetricAttributes({
+      actionType: 'click',
+      mode: 'guarded',
+      operation: 'dom_snapshot',
+      pageObjectName: 'ObservabilitySmokePage',
+      status: 'succeeded',
+    }),
+  );
+  telemetry.recordHistogram(
+    METRIC_NAMES.selfHealingFailurePathDurationMs,
+    35,
+    buildSelfHealingDurationMetricAttributes({
+      actionType: 'click',
+      mode: 'guarded',
+      operation: 'failure_path',
+      pageObjectName: 'ObservabilitySmokePage',
+      status: 'failed',
+    }),
   );
   telemetry.recordCounter(
     METRIC_NAMES.selfHealingSuggestionsTotal,
