@@ -126,6 +126,13 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Activate repo npm version
+        run: |
+          npm_version=$(node -p "require('./package.json').packageManager.replace(/^npm@/, '')")
+          corepack enable
+          corepack prepare "npm@${npm_version}" --activate
+          npm --version
+
       - name: Analyze workflows with zizmor
         run: npm run security:workflows
 

@@ -46,7 +46,7 @@ function summaryFor(cases: FlakinessTestCase[]) {
   });
 }
 
-describe('resolveFlakinessOwner (AUR-QE-114)', () => {
+describe('resolveFlakinessOwner', () => {
   it('credits the longest matching path prefix and falls back to the default owner', () => {
     expect(resolveFlakinessOwner('tests/suites/e2e/checkout/pay.spec.ts', POLICY)).toBe(
       'team-checkout',
@@ -56,7 +56,7 @@ describe('resolveFlakinessOwner (AUR-QE-114)', () => {
   });
 });
 
-describe('buildFlakinessTriage (warn-first governance, AUR-QE-114)', () => {
+describe('buildFlakinessTriage (warn-first governance)', () => {
   it('triages flaky, failing, and quarantined cases, skipping clean passes', () => {
     const triage = buildFlakinessTriage({
       summary: summaryFor([
@@ -142,7 +142,7 @@ describe('buildFlakinessTriage (warn-first governance, AUR-QE-114)', () => {
   });
 });
 
-describe('buildFlakinessTriageMarkdown (AUR-QE-114)', () => {
+describe('buildFlakinessTriageMarkdown', () => {
   it('renders owners and an actionable triage queue', () => {
     const markdown = buildFlakinessTriageMarkdown(
       buildFlakinessTriage({
@@ -172,7 +172,7 @@ describe('buildFlakinessTriageMarkdown (AUR-QE-114)', () => {
   });
 });
 
-describe('parseFlakinessTriagePolicy (AUR-QE-114)', () => {
+describe('parseFlakinessTriagePolicy', () => {
   it('parses a valid policy and drops malformed owner rules', () => {
     const policy = parseFlakinessTriagePolicy({
       defaultOwner: '@maintainer',

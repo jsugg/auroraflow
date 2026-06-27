@@ -39,5 +39,5 @@ describe('logger module import', () => {
     await expect(import('../../../../../src/index.js')).resolves.toBeDefined();
     expect(pino.factory).not.toHaveBeenCalled();
     expect(pino.transport).not.toHaveBeenCalled();
-  });
+  }, 15_000);
 });

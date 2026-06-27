@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-06-15
-- Related: `AUR-ARCH-008`, `AUR-ARCH-009`, `AUR-ARCH-031`, `AUR-DEC-001`, `AUR-DEC-012`, `AUR-IMPL-009`, `AUR-IMPL-010`
+- Related: `AUR-DEC-001`, `AUR-DEC-012`
 - Owners: maintainer / API governance
 
 ## Context

@@ -2,12 +2,12 @@
 
 - Status: Accepted
 - Date: 2026-06-15
-- Related: `AUR-ARCH-001`, `AUR-ARCH-002`, `AUR-ARCH-040`, `AUR-DEC-002`, `AUR-IMPL-002`, `AUR-IMPL-003`, `AUR-IMPL-020`, `AUR-IMPL-024`, `AUR-IMPL-025`
+- Related: `AUR-DEC-002`
 - Owners: maintainer / self-healing owner
 
 ## Context
 
-Self-healing can reduce locator maintenance cost, but unsafe automation can hide product regressions or mutate selectors without review. The architecture plan therefore treats safety-first behavior as a preservation guardrail.
+Self-healing can reduce locator maintenance cost, but unsafe automation can hide product regressions or mutate selectors without review. AuroraFlow governance therefore treats safety-first behavior as a preservation guardrail.
 
 ## Decision
 
@@ -26,4 +26,4 @@ This keeps failure evidence auditable and avoids surprising test mutations. It a
 
 ## Revisit triggers
 
-Revisit only if reachability fixtures prove a broader default is safe, promotion authorization is implemented for shared workflows, and the implementation plan updates `AUR-DEC-002`.
+Revisit only if reachability fixtures prove a broader default is safe, promotion authorization is implemented for shared workflows, and the decision log or a successor ADR updates `AUR-DEC-002`.

@@ -1,6 +1,6 @@
 # Lifecycle contract
 
-This document records the AuroraFlow lifecycle contract. It originated as a design contract for `AUR-IMPL-013` and is now implemented under `AUR-IMPL-023`: the disposer registry, `closeAuroraFlow(context?)`, and the `auroraflow/playwright` fixture have shipped. Consumers may still call the existing subsystem APIs directly, such as `shutdownTelemetry()` and `RedisClient.disconnect()`.
+This document records the AuroraFlow lifecycle contract. The disposer registry, `closeAuroraFlow(context?)`, and the `auroraflow/playwright` fixture have shipped. Consumers may still call the existing subsystem APIs directly, such as `shutdownTelemetry()` and `RedisClient.disconnect()`.
 
 ## `closeAuroraFlow(context?)`
 

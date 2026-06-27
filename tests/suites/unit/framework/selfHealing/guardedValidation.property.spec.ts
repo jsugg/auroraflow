@@ -21,7 +21,7 @@ import {
 } from '../../../../helpers/propertyTesting';
 
 /**
- * AUR-QE-110 scoped property baseline for guarded validation.
+ * Property baseline for guarded validation.
  *
  * Two calibration-critical behaviors: the locator-string parser must round-trip
  * the supported `page.*` expressions, and the confidence gate must accept exactly

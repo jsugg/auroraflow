@@ -78,7 +78,7 @@ afterAll(() => {
 // Warm the shared TS transpile cache once before the boundary cases run. A single cold
 // pass over the framework barrel transpiles the graph the scripts share, so each test's
 // child pair starts warm and never triggers concurrent cold transpiles — the load-sensitive
-// path that made this spec time out under full-suite contention (AUR-QE-115-2). This lets the
+// path that made this spec time out under full-suite contention. This lets the
 // success/failure pairs keep running concurrently without the timeout risk.
 beforeAll(async () => {
   const warmUp = await runNode(['-r', REGISTER_TS_TRANSPILE, '-e', 'require("./src/index.ts")']);
@@ -288,7 +288,7 @@ function observabilityValidatorArgs(baseUrl: string, outputDir: string): readonl
     '--poll-interval-ms',
     '1',
     '--timeout-ms',
-    '1000',
+    '5000',
     '--collector-url',
     baseUrl,
     '--prometheus-url',

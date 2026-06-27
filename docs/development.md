@@ -82,7 +82,7 @@ npm run verify
 
 `npm run verify` runs repo-local actionlint bootstrap, formatting, linting, typechecking, unit tests, contracts, Redis/OTLP integration, schema validation, ShellCheck, and workflow linting.
 
-### Contract assertion policy (`AUR-QE-107`)
+### Contract assertion policy
 
 Contract specs are semantic-first:
 
@@ -106,7 +106,7 @@ Contract specs are semantic-first:
 
 ### Risk-weighted coverage floors
 
-`npm run test:coverage` enforces per-file floors for high-risk modules in addition to the global erosion guard (AUR-QE-109). Floors live in `configs/vitest.coverage-global.mts` and sit just below measured coverage, so a failure means real erosion, not noise. Covered surfaces include the OpenTelemetry adapter, the Redis client and selector store, and the promotion workflow.
+`npm run test:coverage` enforces per-file floors for high-risk modules in addition to the global erosion guard. Floors live in `configs/vitest.coverage-global.mts` and sit just below measured coverage, so a failure means real erosion, not noise. Covered surfaces include the OpenTelemetry adapter, the Redis client and selector store, and the promotion workflow.
 
 `src/framework/selfHealing/domSnapshot.ts` carries a documented exemption: ~90% of it runs inside `page.evaluate` (browser context), which node coverage cannot reach and which the guarded Chrome proof exercises instead. Its node-reachable privacy/normalization helpers are unit-tested; the line/statement floor guards that surface only. Structured-candidate coverage lives in the node-side candidate locator, DOM extraction, and guarded-validation suites.
 
@@ -124,7 +124,7 @@ Calibration-critical code (scoring, config, guarded validation, retry, Redis CAS
 | --- | --- | --- | --- |
 | `Node Compatibility (Node 20/22/24)` | Fast matrix | Pull requests, `main`, scheduled, and manual quality workflow runs | `npm ci`, lint, typecheck, and unit tests only; no Docker, Redis, OTLP collector, or browser install. |
 | `Repository Gates (Node 22)` | Static + Docker integration | Pull requests, `main`, scheduled, and manual quality workflow runs | Format, contracts, Redis/OTLP integration with `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true`, schemas, ShellCheck, and workflow lint. |
-| `Coverage (Critical + Global)` | Coverage | Pull requests, `main`, scheduled, and manual quality workflow runs | Enforces critical-module thresholds, global `src/**` coverage, and risk-weighted per-file floors for high-risk modules once on Node 22 (AUR-QE-109). |
+| `Coverage (Critical + Global)` | Coverage | Pull requests, `main`, scheduled, and manual quality workflow runs | Enforces critical-module thresholds, global `src/**` coverage, and risk-weighted per-file floors for high-risk modules once on Node 22. |
 | `Guarded Self-Heal Proof (Chrome)` | Guarded browser proof | Pull requests, `main`, scheduled, and manual quality workflow runs | Preserves Chrome proof for guarded self-heal at the shipped default confidence gate. |
 | `Risk-Triggered E2E (Chrome)` | Browser heavy | `main`, scheduled/manual runs, risky browser/runtime paths, or `full-e2e`/`risk:e2e` PR labels | Runs the full Chrome E2E project outside the Node compatibility matrix. |
 | Observability smoke jobs | Docker/remote optional | Path-triggered, `main`, scheduled, or manual runs depending on the job | Keeps collector/full-stack/remote export evidence separate from fast compatibility gates. |
@@ -258,7 +258,7 @@ Use [`../CONTRIBUTING.md`](../CONTRIBUTING.md) as the lightweight contributor en
 
 Ownership is advisory by default: [`.github/CODEOWNERS`](../.github/CODEOWNERS) routes review to the current maintainer handle, but it becomes enforceable only if branch protection requires code-owner review. Confirm or replace owner handles with the maintainer before enabling that enforcement.
 
-Architecture decision records live in [`adr/`](adr/). Add or supersede an ADR when a change affects safety-first self-healing, API compatibility tiers, scoring/SLO policy, Redis ownership, observability support boundaries, release policy, or another durable architecture decision.
+Architecture decision records live in [`adr/`](adr/). Add or supersede an ADR when a change affects safety-first self-healing, API compatibility tiers, scoring/SLO policy, Redis ownership, observability support boundaries, release policy, adoption-gated backend/CI extensibility, or another durable architecture decision.
 
 ## Documentation rules
 
@@ -266,7 +266,7 @@ Documentation should remain precise and source-backed:
 
 - Prefer "implemented", "available", or "enabled by" only for behavior present in source.
 - Prefer "planned", "reference", or "roadmap" for future services, deployments, or automation.
-- Lifecycle docs describe `closeAuroraFlow(context?)` and `auroraflow/playwright` as shipped in `AUR-IMPL-023`; keep their idempotent-cleanup and consumer-owned-Playwright guarantees source-backed.
+- Lifecycle docs describe `closeAuroraFlow(context?)` and `auroraflow/playwright` as shipped in the lifecycle helper implementation; keep their idempotent-cleanup and consumer-owned-Playwright guarantees source-backed.
 - Link to the source-owning architecture or operations document when a README section would otherwise become too detailed.
 - Keep production observability wording clear: local assets and reference manifests are not environment ownership.
 

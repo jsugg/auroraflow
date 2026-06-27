@@ -29,7 +29,7 @@ function createFakePage(): {
   return { page: page as unknown as Page, pageClose, browserContextClose };
 }
 
-describe('withAuroraFlowFixture (auroraflow/playwright lifecycle, AUR-QE-113)', () => {
+describe('withAuroraFlowFixture (auroraflow/playwright lifecycle)', () => {
   it('provides a test-scoped context and page factory, then closes the context after the test', async () => {
     const { page } = createFakePage();
     const subsystemDispose = vi.fn();

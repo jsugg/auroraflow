@@ -7,7 +7,7 @@ import type * as OtelModule from '../../../../../src/framework/observability/ote
 type DiagnosticLogMethod = (message: string, metadata?: Readonly<Record<string, unknown>>) => void;
 
 /**
- * AUR-QE-109: the OpenTelemetry adapter was at 0% line coverage. These tests mock
+ * The OpenTelemetry adapter was at 0% line coverage. These tests mock
  * the OTel SDK/API so the adapter's construction, span lifecycle, metric guards,
  * caching, log correlation, and shutdown error handling are exercised
  * deterministically in node, without a live collector.

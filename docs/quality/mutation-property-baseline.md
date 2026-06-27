@@ -1,10 +1,10 @@
-# Mutation & property baseline (AUR-QE-110)
+# Mutation & property baseline
 
 This is the scoped assertion-quality baseline for calibration-critical code. It measures whether tests actually _catch_ defects, not just whether lines execute.
 
 ## Approach and dependency policy
 
-Per the plan's open decision, this starts with the **smallest deterministic footprint and no new test dependency** (no Stryker, no fast-check) until runtime and tooling are accepted for PR gating:
+This baseline starts with the **smallest deterministic footprint and no new test dependency** (no Stryker, no fast-check) until runtime and tooling are accepted for PR gating:
 
 - **Property tests** use an in-repo seeded generator, `tests/helpers/propertyTesting.ts` (mulberry32 PRNG + `forAll`). They run inside the normal `npm run test:unit` suite. Failures are reproducible from the seed: every failure reports `seed`, `run`, and the offending `case`.
 - **Mutation tests** use an in-repo runner, `scripts/mutation-baseline.mjs`, that applies a curated set of source mutations in place, runs the scoped specs, and records killed/survived. It runs **manually or on a schedule**, not in `verify`.
@@ -39,6 +39,6 @@ Recorded in `docs/quality/mutation-baseline.json`: **11/11 mutants killed (kill 
 
 ## Triage policy
 
-- A surviving mutant means an assertion gap. Per the plan it must be **triaged into a test or recorded as a documented exception** — never silently ignored.
+- A surviving mutant means an assertion gap. It must be **triaged into a test or recorded as a documented exception** — never silently ignored.
 - The runner marks a mutation `inapplicable` when its `find` string no longer matches exactly once (source drift). Treat that as a prompt to update the manifest in the same change as the source edit, not as a pass.
 - Expanding the manifest: add an entry to `MUTATIONS` in `scripts/mutation-baseline.mjs` and re-run `npm run test:mutation`. New survivors are expected as coverage of operators grows; resolve each before promoting the gate from warning-only to required.

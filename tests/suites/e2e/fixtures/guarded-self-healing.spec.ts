@@ -273,7 +273,7 @@ test('guarded self-heal recovers open shadow DOM fixture by effect', async ({ pa
   await expect(page.locator('#shadow-status')).toHaveText('Shadow order submitted');
 });
 
-// Frame-aware structured candidates (AUR-QE-112) let guarded validation resolve a
+// Frame-aware structured candidates let guarded validation resolve a
 // `page.frameLocator(...).getByTestId(...)` registry candidate structurally: the
 // registry locator string is converted to a structured frame candidate at read
 // time (candidateScoring -> parseLegacyLocatorString), so both the guarded dry-run

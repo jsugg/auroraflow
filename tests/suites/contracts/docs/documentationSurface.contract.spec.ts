@@ -41,8 +41,12 @@ describe('documentation surface contract', () => {
       'docs/adr/0005-observability-boundary.md',
       'docs/adr/0006-release-policy.md',
       'docs/adr/0007-durable-trend-export.md',
+      'docs/adr/0008-adoption-gated-extensibility.md',
+      'docs/adr/0009-strategic-architecture.md',
+      'docs/architecture/adoption-readiness.md',
       'docs/architecture/locator-first-api.md',
       'docs/architecture/self-healing.md',
+      'docs/architecture/traceability.md',
       'docs/operations/artifact-schemas.md',
       'docs/operations/lifecycle.md',
       'docs/operations/privacy-retention.md',
@@ -110,6 +114,53 @@ describe('documentation surface contract', () => {
     }
   });
 
+  it('records adoption-gated extensibility without authorizing expansion', () => {
+    const adoption = readRepoFile('docs/architecture/adoption-readiness.md');
+    const adr = readRepoFile('docs/adr/0008-adoption-gated-extensibility.md');
+    const decisionLog = readRepoFile('docs/architecture/decision-log.md');
+    const dataLayer = readRepoFile('docs/architecture/data-layer.md');
+    const docs = `${adoption}\n${adr}\n${decisionLog}\n${dataLayer}`;
+
+    for (const text of [
+      'Evidence-gate result: not approved for expansion.',
+      'Redis remains the only durable selector-store backend',
+      '`MemorySelectorStore` remains a supported non-durable tier',
+      'GitHub Actions remains the only first-class CI target',
+      'No GitLab CI, Azure DevOps, Jenkins, CircleCI, Buildkite, or other CI template is approved',
+      'New selector-store backends remain evidence-gated.',
+      'Current trigger status: not met.',
+      'no package split, hosted service, new backend, CI template family, or architecture expansion is authorized',
+    ]) {
+      expectTextIncludes(docs, {
+        text,
+        rationale:
+          'Adoption governance docs must preserve evidence gates and non-expansion boundaries.',
+      });
+    }
+  });
+
+  it('records strategic decisions without authorizing expansion', () => {
+    const adr = readRepoFile('docs/adr/0009-strategic-architecture.md');
+    const decisionLog = readRepoFile('docs/architecture/decision-log.md');
+    const docs = `${adr}\n${decisionLog}`;
+
+    for (const text of [
+      'This ADR is decision-only and authorizes no implementation',
+      'AuroraFlow keeps one `auroraflow` npm package',
+      'Hosted SAT remains a deferred non-goal',
+      'Feature-level SAT (Selector Analysis Tooling) remains implemented and supported',
+      'Observability assets remain in-package',
+      'No companion observability repository is extracted',
+      'adoption evidence, a named owner, a migration plan, and a release strategy',
+    ]) {
+      expectTextIncludes(docs, {
+        text,
+        rationale:
+          'Strategic ADR must keep package split, hosted SAT, and observability deferred without authorizing expansion.',
+      });
+    }
+  });
+
   it('documents the implemented lifecycle and fixture contract', () => {
     const lifecycle = readRepoFile('docs/operations/lifecycle.md');
     const api = readRepoFile('docs/api.md');
@@ -119,7 +170,6 @@ describe('documentation surface contract', () => {
     for (const requiredTerm of [
       'closeAuroraFlow(context?)',
       'auroraflow/playwright',
-      'AUR-IMPL-023',
       'one-shot per runtime context',
       'concurrent calls for the same context coalesce',
       'reverse registration order',
@@ -135,19 +185,11 @@ describe('documentation surface contract', () => {
       });
     }
 
-    expectTextIncludes(lifecycle, {
-      text: 'implemented under `AUR-IMPL-023`',
-      rationale:
-        'Lifecycle docs must record that the Phase 2 lifecycle helper and fixture shipped.',
-    });
-    expectTextIncludes(development, {
-      text: 'shipped in `AUR-IMPL-023`',
-      rationale: 'Development docs must mark the lifecycle fixture surface as shipped.',
-    });
-    for (const staleText of ['implementation remains a Phase 2 task', 'labeled as planned until']) {
+    for (const staleText of ['implementation remains a planned task', 'labeled as planned until']) {
       expectTextExcludes(`${lifecycle}\n${development}`, {
         text: staleText,
-        rationale: 'Lifecycle docs must not keep planned-only wording after AUR-IMPL-023 shipped.',
+        rationale:
+          'Lifecycle docs must not keep planned-only wording after the lifecycle helper shipped.',
       });
     }
   });
@@ -245,19 +287,6 @@ describe('documentation surface contract', () => {
       expectTextIncludes(adrDocs, {
         text: topic,
         rationale: 'ADR docs must preserve accepted decision topics.',
-      });
-    }
-
-    for (const issueId of [
-      'AUR-ARCH-034',
-      'AUR-ARCH-035',
-      'AUR-ARCH-009',
-      'AUR-ARCH-040',
-      'AUR-ARCH-041',
-    ]) {
-      expectTextIncludes(adrDocs, {
-        text: issueId,
-        rationale: 'ADR docs must preserve architecture issue traceability.',
       });
     }
   });

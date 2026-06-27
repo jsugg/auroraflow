@@ -12,7 +12,7 @@ import { CapturingTelemetry } from '../observability/capturingTelemetry';
 import { createSeededRandom, randomFrom } from '../../../../helpers/propertyTesting';
 
 /**
- * AUR-QE-110 scoped property baseline for the Redis compare-and-set adapter.
+ * Property baseline for the Redis compare-and-set adapter.
  *
  * The Lua reply parser and expected-version normalization are CAS-critical: a
  * misparse silently corrupts optimistic concurrency. These seeded properties pin

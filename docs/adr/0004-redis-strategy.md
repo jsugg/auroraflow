@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-06-15
-- Related: `AUR-ARCH-004`, `AUR-ARCH-005`, `AUR-ARCH-016`, `AUR-ARCH-026`, `AUR-ARCH-029`, `AUR-ARCH-037`, `AUR-ARCH-042`, `AUR-DEC-005`, `AUR-DEC-006`, `AUR-DEC-007`, `AUR-IMPL-005`, `AUR-IMPL-006`, `AUR-IMPL-017`, `AUR-IMPL-025`, `AUR-IMPL-028`
+- Related: `AUR-DEC-005`, `AUR-DEC-006`, `AUR-DEC-007`
 - Owners: maintainer / data and SRE reviewers
 
 ## Context
@@ -23,7 +23,7 @@ Redis remains optional and consumer/operator-owned:
 
 ## Consequences
 
-The package can offer useful durable registry primitives without becoming a managed data service. Operators remain responsible for TLS, ACLs, backups, restore, eviction, capacity, retention, and incident response. The `AUR-IMPL-028` runbook in [`../operations/redis-production-runbook.md`](../operations/redis-production-runbook.md) documents these responsibilities without shifting ownership to AuroraFlow.
+The package can offer useful durable registry primitives without becoming a managed data service. Operators remain responsible for TLS, ACLs, backups, restore, eviction, capacity, retention, and incident response. The Redis production runbook in [`../operations/redis-production-runbook.md`](../operations/redis-production-runbook.md) documents these responsibilities without shifting ownership to AuroraFlow.
 
 ## Revisit triggers
 

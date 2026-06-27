@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-06-15
-- Related: `AUR-ARCH-009`, `AUR-ARCH-034`, `AUR-ARCH-035`, `AUR-DEC-001`, `AUR-DEC-012`, `AUR-IMPL-010`, `AUR-IMPL-016`
+- Related: `AUR-DEC-001`, `AUR-DEC-012`
 - Owners: maintainer / release and security reviewers
 
 ## Context

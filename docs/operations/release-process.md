@@ -55,7 +55,7 @@ Each lane runs type checking, focused page-object/factory unit tests, and the Ch
 Per `AUR-DEC-012`:
 
 - **npm provenance — required at publish time.** The future publish path must run `npm publish --provenance` from GitHub Actions with OIDC (`id-token: write` granted only to the publish job). Provenance statements cannot be produced by a dry run; the dry-run workflow instead validates the prerequisites (public package, `repository.url` matching the repository, explicit `files` allowlist).
-- **SBOM — required for every release.** Generated with the npm CLI's built-in `npm sbom` in both SPDX and CycloneDX formats, restricted to runtime dependencies (`--omit dev`). Requires npm >= 9.5; the workflow's Node 22 toolchain satisfies this.
+- **SBOM — required for every release.** Generated with the npm CLI's built-in `npm sbom` in both SPDX and CycloneDX formats, restricted to runtime dependencies (`--omit dev`). The package manager is pinned to `npm@11.17.0`, and the release dry-run workflow installs that version and verifies `npm sbom --help` before dependency install and SBOM generation.
 - **Artifact signing — deferred.** No Sigstore/GPG signing ceremony until the product demonstrates release readiness; revisit when the first real publish is scheduled.
 
 ## Publish gating (future publish path)
@@ -64,7 +64,7 @@ A real publish must never be reachable from a routine CI event. The gates, all o
 
 1. Manual `workflow_dispatch` by a maintainer with an explicit non-empty confirmation input.
 2. The protected `release` GitHub environment with required reviewers configured (the placeholder job already binds to this environment).
-3. A dedicated publish job — added by a future task — carrying the npm token or OIDC trust configuration; no publish credentials exist in the repository today, and adding them is out of scope for `AUR-IMPL-010`.
+3. A dedicated publish job — added by a future task — carrying the npm token or OIDC trust configuration; no publish credentials exist in the repository today, and adding them is out of scope for the current release dry-run workflow.
 
 ## Rollback policy
 

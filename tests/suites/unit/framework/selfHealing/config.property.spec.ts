@@ -8,7 +8,7 @@ import {
 } from '../../../../helpers/propertyTesting';
 
 /**
- * AUR-QE-110 scoped property baseline for self-healing config parsing.
+ * Property baseline for self-healing config parsing.
  *
  * Whatever the raw `SELF_HEAL_*` input, the resolved config must stay inside its
  * documented safe ranges and be idempotent. These bounds mirror the hard maxima

@@ -393,7 +393,7 @@ export async function parseFlakinessReportFile(reportFile: string): Promise<Flak
 }
 
 // ---------------------------------------------------------------------------
-// Flake triage governance (AUR-QE-114)
+// Flake triage governance
 // ---------------------------------------------------------------------------
 
 /** Path-prefix ownership rule used to credit a flaky/failing test to an owner. */

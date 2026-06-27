@@ -69,7 +69,7 @@ describe('extractDomCandidateSeeds', () => {
     ).toBe(true);
   });
 
-  it('attaches structured candidate locators to each DOM seed (AUR-IMPL-020)', () => {
+  it('attaches structured candidate locators to each DOM seed', () => {
     const candidates = extractDomCandidateSeeds({
       snapshot,
       actionType: 'click',
@@ -102,7 +102,7 @@ describe('extractDomCandidateSeeds', () => {
     });
   });
 
-  it('emits quoted role, label, text, and CSS locators parseable until AUR-IMPL-020', () => {
+  it('emits quoted role, label, text, and CSS locators parseable by the legacy resolver', () => {
     const quotedSnapshot: DomSnapshot = {
       ...snapshot,
       elements: [
