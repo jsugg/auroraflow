@@ -12,6 +12,7 @@ Important current boundaries:
 - `SELF_HEAL_REGISTRY_MODE=read` can load active selector records and candidate history when a registry runtime is configured.
 - `SELF_HEAL_REGISTRY_MODE=write_pending` can persist SAT history observations and reviewable pending promotion records.
 - Reviewed approve, reject, conflict, and rollback workflows mutate selector registry records only; they do not rewrite source files.
+- Redis is an optional durable selector-store backend owned by consumers/operators; prefixes are namespace hygiene, not authorization.
 - The observability stack is suitable for local development and CI smoke validation. Production deployment requires environment-owned credentials, TLS, storage, retention, network policy, and operations support.
 - The package build emits `src/**/*.ts` declarations and JavaScript into `dist`; the package also includes curated `docs/` and `schemas/`.
 
@@ -101,6 +102,7 @@ Contract specs are semantic-first:
 | `npm run test:e2e:guarded` | Guarded browser proof | Parallel Chrome proof for guarded self-heal at the default gate. |
 | `npm run verify` | Full local gate | Static checks, unit, contracts, integration, schemas, ShellCheck, and workflow lint. |
 | `npm run test:mutation` / `test:mutation:check` | Scheduled/manual | Scoped mutation baseline for calibration-critical code; not part of `verify`. See [mutation & property baseline](quality/mutation-property-baseline.md). |
+| `npm run benchmark:failure-path` | Manual/browser | Warning-only safe-action failure, DOM snapshot, SAT extraction, and artifact-write timing; not part of `verify`. See [failure-path performance baseline](quality/failure-path-performance-baseline.md). |
 
 ### Risk-weighted coverage floors
 
@@ -111,6 +113,10 @@ Contract specs are semantic-first:
 ### Mutation & property baseline
 
 Calibration-critical code (scoring, config, guarded validation, retry, Redis CAS) has a scoped mutation/property baseline that measures assertion catch-rate, not just execution. Property tests run inside `npm run test:unit` with fixed seeds and are reproducible from the seed; the mutation baseline runs manually or on a schedule via `npm run test:mutation` (warning-only) and `npm run test:mutation:check` (no-regression). No new test dependency is used. See [mutation & property baseline](quality/mutation-property-baseline.md).
+
+### Failure-path performance baseline
+
+`npm run benchmark:failure-path` measures bounded DOM capture, SAT candidate extraction, representative artifact writes, and aggregate post-error safe-action diagnostics on a fixed, network-free Chrome fixture. The default command compares medians with the committed baseline but reports trends without failing; refresh the committed observation only with `npm run benchmark:failure-path:record`. No latency threshold participates in `verify` or required CI before maintainer approval. See [failure-path performance baseline](quality/failure-path-performance-baseline.md).
 
 ### CI gate topology
 
@@ -165,11 +171,14 @@ npm run infra:redis:down
 
 Default local Redis behavior is skip-friendly: if Docker/Testcontainers cannot start Redis, the Redis integration spec reports an explicit skip so non-Redis contributors are not blocked. Required mode is blocking: `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` fails on Redis startup, connection, or evidence failures and is the CI/release mode used by `Repository Gates (Node 22)` and the release dry-run. External mode is opt-in: `AURORAFLOW_REDIS_INTEGRATION_EXTERNAL=true AURORAFLOW_REDIS_HOST=127.0.0.1 AURORAFLOW_REDIS_PORT=6379 npm run test:integration` reuses an existing Redis with a per-run key prefix.
 
+Production Redis use is outside local development ownership: operators own TLS, auth, ACLs, backups, restore drills, no-eviction capacity planning, retention, and incident response. Keep the [Redis production runbook](operations/redis-production-runbook.md) aligned with selector-store behavior when changing Redis keys, commands, TTLs, or cleanup workflows.
+
 Keep selector registry changes aligned with:
 
 - `src/data/selectors/selectorRegistry.ts`
 - `src/utils/redisClient.ts`
 - `docs/architecture/data-layer.md`
+- `docs/operations/redis-production-runbook.md`
 - `tests/suites/integration/framework/data/redisIntegration.spec.ts`
 
 ## Self-healing development
@@ -186,9 +195,10 @@ Useful commands:
 SELF_HEAL_MODE=suggest npm run test:smoke
 SELF_HEAL_MODE=guarded npm run test:smoke
 npm run self-heal:governance
+npm run self-heal:repair
 ```
 
-Artifacts are written to `SELF_HEAL_ARTIFACTS_DIR` when set, otherwise `test-results/self-healing/*.json`; governance summaries are written to `test-results/self-healing-governance-summary.{json,md}`. Promotion and registry-cleanup CLIs default to Redis. Local promotion authorization is permissive with a warning; shared mode must provide CODEOWNERS plus protected-workflow evidence. Registry cleanup is dry-run by default; pass `--apply` or set `SELF_HEAL_REGISTRY_CLEANUP_APPLY=true` only after reviewing the summary. Use `AURORAFLOW_SELF_HEALING_SCRIPT_STORE=memory` only for deterministic local/process-boundary checks where non-durable state is expected.
+Artifacts are written to `SELF_HEAL_ARTIFACTS_DIR` when set, otherwise `test-results/self-healing/*.json`; governance summaries are written to `test-results/self-healing-governance-summary.{json,md}`. Promotion, cleanup, and repair CLIs default to Redis. Local promotion authorization is permissive with a warning; shared mode must provide CODEOWNERS plus protected-workflow evidence. Registry cleanup and repair are dry-run by default. Repair reports selector schema/index drift and requires `--apply` or `SELF_HEAL_REGISTRY_REPAIR_APPLY=true` before mutation. Use `AURORAFLOW_SELF_HEALING_SCRIPT_STORE=memory` only for deterministic local/process-boundary checks where non-durable state is expected.
 
 When extending this area, keep these contracts intact:
 

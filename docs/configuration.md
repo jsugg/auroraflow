@@ -72,6 +72,8 @@ Invalid values use `compatible` and emit a diagnostic without echoing the receiv
 
 Redis keys are namespaced and selector updates use versioned compare-and-set for reviewed promotion workflows. Promotion status transitions use expected-status compare-and-set, so concurrent approve/reject/rollback races become explicit conflicts instead of last-writer-wins updates. Selector-candidate history writes use backend-side atomic JSON merges for counters and 30-day capped TTL refreshes; they do not rely on process-local locks.
 
+Production Redis deployments are consumer/operator-owned. Configure TLS, authentication, ACLs, backups, restore drills, no-eviction capacity headroom, retention, and incident response outside AuroraFlow; key prefixes are namespace hygiene, not authorization. See the [Redis production runbook](./operations/redis-production-runbook.md).
+
 ## Self-healing governance
 
 | Variable | Default | Purpose |
@@ -85,10 +87,12 @@ Redis keys are namespaced and selector updates use versioned compare-and-set for
 | `SELF_HEAL_PROMOTION_CODEOWNERS_PATH` | `.github/CODEOWNERS` | CODEOWNERS file used by shared promotion authorization. |
 | `SELF_HEAL_PROMOTION_PROTECTED_WORKFLOW` | `GITHUB_REF_PROTECTED` fallback, otherwise `false` | Explicit protected-workflow evidence for shared promotion authorization. |
 | `SELF_HEAL_REGISTRY_CLEANUP_LIMIT` | `1000` | Max records scanned by cleanup. |
+| `SELF_HEAL_REGISTRY_REPAIR_LIMIT` | `1000` | Max active records and index keys scanned per repair pass (`1..100000`). |
+| `SELF_HEAL_REGISTRY_REPAIR_APPLY` | `false` | Apply schema/index repairs; default repair behavior is dry-run. |
 | `SELF_HEAL_REGISTRY_CLEANUP_APPLY` | `false` | Cleanup is dry-run by default; set `true` to delete expired history, promotion, and audit records. |
 | `SELF_HEAL_AUDIT_RETENTION_SECONDS` | `2592000` | Audit cleanup retention window for records without an explicit `expiresAt`; values above 30 days are clamped. |
 
-In this repository, use `npm run self-heal:governance`, `npm run self-heal:promotions`, and `npm run self-heal:cleanup` for review and cleanup workflows. `self-heal:cleanup` reports a dry-run summary unless `SELF_HEAL_REGISTRY_CLEANUP_APPLY=true` or the promotions cleanup subcommand receives `--apply`. External projects can call the exported workflow/repository APIs or own equivalent scripts.
+In this repository, use `npm run self-heal:governance`, `npm run self-heal:promotions`, `npm run self-heal:cleanup`, and `npm run self-heal:repair` for review and maintenance workflows. Cleanup and repair report dry-run summaries by default. Repair applies only with `--apply` or `SELF_HEAL_REGISTRY_REPAIR_APPLY=true`; cleanup uses its corresponding apply controls. External projects can call the exported workflow/repository APIs or own equivalent scripts.
 
 ## Observability
 
@@ -106,7 +110,9 @@ In this repository, use `npm run self-heal:governance`, `npm run self-heal:promo
 | `OTEL_SERVICE_NAME` | unset | Standard fallback service name. |
 | `OTEL_RESOURCE_ATTRIBUTES` | unset | Standard resource attributes. |
 
-Snapshot and live assertion scripts also accept URL/path flags for Prometheus, Grafana, Jaeger, Kibana, Elasticsearch, dashboards, rules, and output directories. See [Observability contract](./operations/observability-contract.md).
+Snapshot, backend-validator, and live assertion scripts also accept URL/path flags for Prometheus, Grafana, Jaeger, Kibana, Elasticsearch, dashboards, rules, and output directories. `npm run observability:validate` additionally accepts `--mode readiness|smoke`, `--max-attempts`, and `--poll-interval-ms`; it writes typed JSON diagnostics. See [Observability contract](./operations/observability-contract.md).
+
+Artifact-only/no-op is the supported default. The collector-only Lite tier is opt-in and best effort; the Full stack is local/reference only. Starting either topology does not set `AURORAFLOW_OBSERVABILITY_ENABLED`. See [Observability support tiers](./operations/observability-support-tiers.md).
 
 ## Logging
 
@@ -118,6 +124,8 @@ Snapshot and live assertion scripts also accept URL/path flags for Prometheus, G
 | `AURORAFLOW_LOG_REDACT_ENABLED` | `true` | Enables redaction. |
 | `AURORAFLOW_LOG_REDACT_PATHS` | built-in secret-shaped paths | Comma-separated Pino redaction paths. |
 | `AURORAFLOW_LOG_REDACT_CENSOR` | `[Redacted]` | Replacement value. |
+
+Logger configuration is resolved on first default logger use. Importing `auroraflow` or its logger module does not validate logger environment values or create Pino transports. `getMainLogger()`, `createChildLogger()`, and `setLogLevel()` retain their existing API and initialize the shared logger only when called.
 
 ## Trends
 
@@ -131,6 +139,8 @@ Snapshot and live assertion scripts also accept URL/path flags for Prometheus, G
 | `AURORAFLOW_PROJECT`      | package name/local fallback | Trend project metadata.    |
 
 CLI flags such as `--trend-output` and `--trend-limit` override environment fallbacks.
+
+Durable copies are optional and consumer/operator-owned. AuroraFlow configures no destination or upload credentials; see [Durable trend export](./operations/trend-durable-export.md).
 
 ## Package contents
 

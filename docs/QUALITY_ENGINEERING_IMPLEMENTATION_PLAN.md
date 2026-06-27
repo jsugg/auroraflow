@@ -400,6 +400,7 @@ Do not weaken these to make future work easier.
 
 - **Objective:** Protect CI/report consumers from artifact drift.
 - **Architecture dependency:** `AUR-IMPL-029` for full schema versioning/repair.
+- **Current state:** Implemented. Published schema fixtures live under `tests/fixtures/artifacts/v1`; legacy and unknown-future fixtures exercise current schema validators, runtime parsers, tolerant trend reads, and selector registry migration/repair. Compatibility policy classifies must-read, skip-with-warning, and hard-reject boundaries.
 - **Implementation steps:**
   1. Add `tests/fixtures/artifacts/v1/**`.
   2. Define compatibility policy in `docs/operations/artifact-schemas.md`.
@@ -414,6 +415,7 @@ Do not weaken these to make future work easier.
 ### `AUR-QE-117 — Convert observability workflow grep checks to typed validators`
 
 - **Objective:** Replace shell text checks with typed JSON/API validation.
+- **Current state:** Implemented. `backendValidation.ts` provides readiness and smoke modes with explicit boundary parsing, bounded concurrent retries, timeouts, semantic backend checks, and versioned JSON diagnostics. The quality workflow invokes the validator and keeps API payload parsing out of YAML; contracts assert validator delegation and durable job/configuration invariants. Unit and process-boundary tests cover successful output plus exact missing series, target, data source, trace, index, and data-view failures.
 - **Implementation steps:**
   1. Move Prometheus/Grafana/Jaeger/Elasticsearch/Kibana checks into Node validator(s).
   2. Keep workflow as orchestration only.
@@ -426,11 +428,13 @@ Do not weaken these to make future work easier.
 - **Acceptance criteria:**
   - Backend failures identify exact missing series/query/service.
   - Contract tests no longer mirror dozens of workflow grep strings.
+- **Completion evidence:** Validator unit tests cover exact missing target, series, data source, trace, index, and data view diagnostics. Process-boundary coverage proves successful and failed CLI exits plus persisted JSON. Full `npm run verify` passes; the scheduled/manual workflow owns heavy Full-stack environment execution.
 
 ### `AUR-QE-118 — Add failure-path and DOM snapshot performance baseline`
 
 - **Objective:** Measure overhead before any hard performance gate.
 - **Architecture dependency:** `AUR-IMPL-032`.
+- **Current state:** Implemented. The deterministic Chrome fixture measures the safe-action failure path, bounded DOM snapshot, SAT candidate extraction, and representative artifact write. The default command compares medians with the committed baseline and reports every observed trend as warning-only; no benchmark runs in required CI or `verify`.
 - **Implementation steps:**
   1. Build deterministic failure fixture.
   2. Measure safe-action failure path, DOM snapshot, SAT candidate extraction, artifact write.
@@ -442,6 +446,7 @@ Do not weaken these to make future work easier.
 - **Acceptance criteria:**
   - Baseline exists and is reproducible.
   - No hard gate is added before maintainer accepts budget.
+- **Completion evidence:** Schema-v2 baseline records 12 samples after 3 warmups for all four costs, fixed fixture invariants (500 captured nodes, 625 SAT seeds, and a 13,753-byte artifact), environment metadata, pending approval, `hardThresholds: null`, and warning-only median comparisons. Unit and semantic contract coverage validate parsing/comparison and manual-only gate ownership; real-Chrome smoke and baseline recording pass.
 
 ## 9. Required Gate Model
 
@@ -522,7 +527,6 @@ This QE plan is complete when:
 | Should mutation testing add Stryker, use Vitest-only mutation tooling, or use custom seeded generators first? | Start scheduled/manual with smallest dependency footprint. | Required mutation gate |
 | Should PR full E2E be label-triggered, path-triggered, or required for all runtime PRs? | Path-triggered plus manual label. | `AUR-QE-114` |
 | Who owns SLO/flake fail-on-breach policy? | Warn-only with triage output. | Hard flake/SLO gate |
-| What artifact versions must remain readable after `AUR-IMPL-029`? | Preserve current public schemas; skip unknown future versions with warning. | `AUR-QE-116` |
 
 ## 12. Reviewer Checklist for QE PRs
 

@@ -162,6 +162,7 @@ interface SelectorUpsertInput {
 }
 
 interface SelectorRecord extends SelectorUpsertInput {
+  schemaVersion: '1.0.0';
   updatedAt: string;
   version: number;
 }
@@ -178,7 +179,11 @@ Useful methods:
 
 Expected-version writes protect reviewed promotion workflows from silent overwrites. Stale selector writes throw `SelectorRegistryConflictError`; stale promotion-status transitions throw `PromotionStatusConflictError`.
 
+Current writes emit `schemaVersion: '1.0.0'`. Reads upgrade legacy unversioned records in memory and hard-reject unknown future versions. `npm run self-heal:repair` audits persistent schema/index drift in dry-run mode; pass `-- --apply` only after review and backup.
+
 Use `createRedisSelectorStore(getRedisClient())` to back the repository with Redis. Use `createMemorySelectorStore()` for a non-durable, process-local store suitable for unit tests, local experiments, and fixture-scoped selector state.
+
+Redis operations, durability, backups, capacity, retention, and incidents are consumer/operator-owned. `AURORAFLOW_REDIS_KEY_PREFIX` is namespace hygiene for qualified keys and scans; it is not authorization. See the [Redis production runbook](./operations/redis-production-runbook.md) before using Redis as shared or durable selector storage.
 
 ### `MemorySelectorStore`
 
