@@ -64,8 +64,11 @@ jobs:
             observability_stack:
               - '.github/workflows/quality.yml'
               - 'docker-compose.observability*.yml'
+              - 'docs/adr/0007-durable-trend-export.md'
               - 'docs/architecture/observability-stack.md'
               - 'docs/operations/observability-contract.md'
+              - 'docs/operations/observability-support-tiers.md'
+              - 'docs/operations/trend-durable-export.md'
               - 'observability/**'
               - 'scripts/observability-*.ts'
               - 'src/framework/observability/**'
@@ -296,7 +299,7 @@ jobs:
         run: echo "No risky browser/runtime changes or full-e2e label detected; risk E2E completed as no-op."
 
   observability-stack:
-    name: Observability Collector Smoke
+    name: Observability Lite Smoke
     runs-on: ubuntu-latest
     needs: [preflight, verify, repository-gates]
     timeout-minutes: 8
@@ -322,11 +325,11 @@ jobs:
         if: env.SHOULD_RUN_OBSERVABILITY == 'true'
         run: npm ci
 
-      - name: Validate collector-only Compose config
+      - name: Validate Lite collector-only Compose config
         if: env.SHOULD_RUN_OBSERVABILITY == 'true'
         run: docker compose -f docker-compose.observability-ci.yml config
 
-      - name: Start collector-only stack
+      - name: Start Lite collector-only stack
         if: env.SHOULD_RUN_OBSERVABILITY == 'true'
         run: docker compose -f docker-compose.observability-ci.yml up -d
 
@@ -361,7 +364,7 @@ jobs:
           docker compose -f docker-compose.observability-ci.yml ps > "${OBSERVABILITY_DIAGNOSTICS_DIR}/compose-ps.txt" || true
           docker compose -f docker-compose.observability-ci.yml logs --no-color otel-collector > "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector.log" || true
 
-      - name: Stop collector-only stack
+      - name: Stop Lite collector-only stack
         if: env.SHOULD_RUN_OBSERVABILITY == 'true' && always()
         run: docker compose -f docker-compose.observability-ci.yml down --remove-orphans
 
@@ -377,7 +380,7 @@ jobs:
 
       - name: Skip observability collector smoke when not requested
         if: env.SHOULD_RUN_OBSERVABILITY != 'true'
-        run: echo "No observability-relevant changes detected; collector smoke completed as no-op."
+        run: echo "No observability-relevant changes detected; Lite collector smoke completed as no-op."
 
   observability-full-stack:
     name: Observability Full Stack Smoke
@@ -426,27 +429,12 @@ jobs:
       - name: Wait for full-stack backends
         if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
         run: |
-          wait_for_url() {
-            service_name="$1"
-            url="$2"
-            for attempt in $(seq 1 60); do
-              if curl --fail --silent --show-error "${url}" >/dev/null; then
-                return 0
-              fi
-              echo "Waiting for ${service_name} (${attempt}/60)"
-              sleep 3
-            done
-            docker compose -f docker-compose.yml -f docker-compose.observability.yml ps
-            docker compose -f docker-compose.yml -f docker-compose.observability.yml logs --no-color "${service_name}" || true
-            return 1
-          }
-
-          wait_for_url otel-collector http://localhost:13133/
-          wait_for_url prometheus http://localhost:9090/-/ready
-          wait_for_url grafana http://localhost:3000/api/health
-          wait_for_url jaeger http://localhost:16686/
-          wait_for_url elasticsearch http://localhost:9200/_cluster/health
-          wait_for_url kibana http://localhost:5601/api/status
+          npm run observability:validate -- \
+            --mode readiness \
+            --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}" \
+            --max-attempts 60 \
+            --poll-interval-ms 3000 \
+            --timeout-ms 15000
 
       - name: Provision Elasticsearch and Kibana assets
         if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
@@ -493,64 +481,23 @@ jobs:
           }
           EOF
 
-      - name: Capture and validate backend snapshots
+      - name: Validate full-stack backend APIs
         if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
         run: |
-          mkdir -p "${OBSERVABILITY_DIAGNOSTICS_DIR}"
+          npm run observability:validate -- \
+            --mode smoke \
+            --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}" \
+            --max-attempts 30 \
+            --poll-interval-ms 2000 \
+            --timeout-ms 10000
 
-          for attempt in $(seq 1 30); do
-            curl --fail --silent --show-error http://localhost:9090/api/v1/targets > "${OBSERVABILITY_DIAGNOSTICS_DIR}/prometheus-targets.json" || true
-            if grep -q '"health":"up"' "${OBSERVABILITY_DIAGNOSTICS_DIR}/prometheus-targets.json"; then
-              break
-            fi
-            echo "Waiting for Prometheus target health (${attempt}/30)"
-            sleep 2
-          done
-          grep -q '"health":"up"' "${OBSERVABILITY_DIAGNOSTICS_DIR}/prometheus-targets.json"
-          for attempt in $(seq 1 30); do
-            curl --fail --silent --show-error 'http://localhost:9090/api/v1/query?query=auroraflow_test_runs_total' > "${OBSERVABILITY_DIAGNOSTICS_DIR}/prometheus-auroraflow-test-runs.json" || true
-            if grep -q 'auroraflow_test_runs_total' "${OBSERVABILITY_DIAGNOSTICS_DIR}/prometheus-auroraflow-test-runs.json"; then
-              break
-            fi
-            echo "Waiting for Prometheus metric scrape (${attempt}/30)"
-            sleep 2
-          done
-          grep -q 'auroraflow_test_runs_total' "${OBSERVABILITY_DIAGNOSTICS_DIR}/prometheus-auroraflow-test-runs.json"
+      - name: Validate Prometheus labels and rules
+        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
+        run: npm run observability:live-assert -- --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}"
 
-          curl --fail --silent --show-error http://localhost:3000/api/health > "${OBSERVABILITY_DIAGNOSTICS_DIR}/grafana-health.json"
-          curl --fail --silent --show-error http://localhost:3000/api/datasources > "${OBSERVABILITY_DIAGNOSTICS_DIR}/grafana-datasources.json"
-          grep -q '"type":"prometheus"' "${OBSERVABILITY_DIAGNOSTICS_DIR}/grafana-datasources.json"
-          grep -q '"type":"elasticsearch"' "${OBSERVABILITY_DIAGNOSTICS_DIR}/grafana-datasources.json"
-          grep -q '"type":"jaeger"' "${OBSERVABILITY_DIAGNOSTICS_DIR}/grafana-datasources.json"
-
-          for attempt in $(seq 1 30); do
-            curl --fail --silent --show-error 'http://localhost:16686/api/traces?service=auroraflow&limit=20' > "${OBSERVABILITY_DIAGNOSTICS_DIR}/jaeger-traces.json" || true
-            if grep -q '"traceID"' "${OBSERVABILITY_DIAGNOSTICS_DIR}/jaeger-traces.json"; then
-              break
-            fi
-            echo "Waiting for Jaeger trace export (${attempt}/30)"
-            sleep 2
-          done
-          grep -q '"traceID"' "${OBSERVABILITY_DIAGNOSTICS_DIR}/jaeger-traces.json"
-
-          for attempt in $(seq 1 30); do
-            curl --silent --show-error 'http://localhost:9200/_cat/indices/auroraflow-*?format=json' > "${OBSERVABILITY_DIAGNOSTICS_DIR}/elasticsearch-indices.json" || true
-            if grep -q 'auroraflow-logs' "${OBSERVABILITY_DIAGNOSTICS_DIR}/elasticsearch-indices.json"; then
-              break
-            fi
-            echo "Waiting for Elasticsearch log indexing (${attempt}/30)"
-            sleep 2
-          done
-          curl --fail --silent --show-error http://localhost:9200/_cluster/health > "${OBSERVABILITY_DIAGNOSTICS_DIR}/elasticsearch-health.json"
-          grep -q 'auroraflow-logs' "${OBSERVABILITY_DIAGNOSTICS_DIR}/elasticsearch-indices.json"
-
-          curl --fail --silent --show-error http://localhost:5601/api/status > "${OBSERVABILITY_DIAGNOSTICS_DIR}/kibana-status.json"
-          curl --fail --silent --show-error -H 'kbn-xsrf: auroraflow' 'http://localhost:5601/api/saved_objects/_find?type=index-pattern&search_fields=title&search=auroraflow*' > "${OBSERVABILITY_DIAGNOSTICS_DIR}/kibana-data-views.json"
-          grep -q 'auroraflow-logs-*' "${OBSERVABILITY_DIAGNOSTICS_DIR}/kibana-data-views.json"
-
-          npm run observability:live-assert -- --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}"
-          test -s "${OBSERVABILITY_DIAGNOSTICS_DIR}/observability-label-snapshot.json"
-          npm run observability:snapshot -- --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}"
+      - name: Capture backend snapshots
+        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true' && always()
+        run: npm run observability:snapshot -- --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}" --allow-partial
 
       - name: Capture full-stack service logs
         if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true' && always()

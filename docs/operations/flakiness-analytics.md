@@ -48,6 +48,8 @@ In `.github/workflows/ci.yml`:
 - Trend reads skip malformed non-empty JSONL lines by default, preserve valid points, and report `skippedMalformedLines`; callers can opt into strict parsing through the library API.
 - CI caches are evictable, branch-scoped history—not a durable analytics store.
 
+Longer-lived history uses the optional [operator-owned durable export handoff](./trend-durable-export.md). AuroraFlow does not configure or upload to a destination.
+
 Use this artifact to identify:
 
 - flaky cases (`failed attempt(s)` followed by `passed` final status),

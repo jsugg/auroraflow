@@ -15,10 +15,13 @@ Observability remains artifact-first:
 
 - JSON/Markdown artifacts are the deterministic merge-gate evidence;
 - live telemetry is opt-in and no-op by default;
+- artifact-only operation is the supported default;
+- the collector-only Lite tier is opt-in and best effort;
 - the full Collector/Prometheus/Grafana/Jaeger/ELK stack is local/reference only;
-- observability-lite is best effort when added;
 - production deployment requires environment-specific ownership for credentials, TLS, storage, retention, networking, capacity, and on-call support;
 - raw selectors and sensitive data stay suppressed unless an explicit opt-in permits them.
+
+The executable topology, commands, ownership, and smoke boundary for each tier are documented in [`../operations/observability-support-tiers.md`](../operations/observability-support-tiers.md).
 
 ## Consequences
 

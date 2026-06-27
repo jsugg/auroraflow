@@ -2,6 +2,14 @@
 
 This local stack extends the existing JSON and Markdown artifacts with live OpenTelemetry signals. Telemetry remains opt-in; package consumers get no live export unless they enable it explicitly.
 
+## Support Tiers
+
+- **Artifact-only** is the supported default and needs no services.
+- **Lite** is best effort and starts only the OpenTelemetry Collector with `npm run observability:lite:up`.
+- **Full** is local/reference only and uses the complete stack below.
+
+See [`docs/operations/observability-support-tiers.md`](../docs/operations/observability-support-tiers.md) for ownership and validation boundaries. Starting either topology does not enable runtime telemetry automatically.
+
 ## Start
 
 ```bash
@@ -92,14 +100,15 @@ Shared environments need stronger upstream redaction, TLS, authentication, and r
 
 ## CI Collector Smoke
 
-Pull-request CI runs a lightweight collector-only smoke lane for observability-related changes unless the repository variable `AURORAFLOW_OBSERVABILITY_CI_ENABLED` is set to `false`. The lane uses `docker-compose.observability-ci.yml` and `observability/otel-collector/ci-config.yaml`, emits one synthetic trace/metric/log event, and uploads collector health, metrics, logs, and the local NDJSON log as diagnostics.
+Pull-request CI runs the best-effort Lite collector-only smoke lane for observability-related changes unless the repository variable `AURORAFLOW_OBSERVABILITY_CI_ENABLED` is set to `false`. The lane uses `docker-compose.observability-ci.yml` and `observability/otel-collector/ci-config.yaml`, emits one synthetic trace/metric/log event, and uploads collector health, metrics, logs, and the local NDJSON log as diagnostics.
 
 The collector-only lane does not start Grafana, Prometheus, Jaeger, Elasticsearch, Logstash, or Kibana. The artifact-based SLO reports remain the merge-gate authority, and remote export secrets are not required.
 
 ## Full-Stack CI
 
-Pull-request CI runs the full-stack smoke job for observability-related changes and on `main`. The job sets `AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED=true`, starts the local stack, applies Elasticsearch templates, imports Kibana data views, emits smoke telemetry, and uploads:
+Scheduled and manually dispatched CI can run the local/reference-only full-stack smoke job. Pull requests and ordinary pushes do not run it. The job sets `AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED=true`, starts the local stack, applies Elasticsearch templates, imports Kibana data views, emits smoke telemetry, and uploads:
 
+- Typed readiness and semantic API diagnostics in `observability-backend-readiness.json` and `observability-backend-validation.json`.
 - Prometheus target and metric API snapshots.
 - Prometheus label, series, query, and rule snapshots plus `observability-label-snapshot.json`.
 - Grafana health and datasource snapshots.
@@ -107,6 +116,8 @@ Pull-request CI runs the full-stack smoke job for observability-related changes 
 - Elasticsearch health and index snapshots.
 - Kibana status and data-view validation output.
 - Compose service logs.
+
+Workflow YAML only orchestrates setup and validator commands. `npm run observability:validate` owns bounded polling and typed JSON checks for backend readiness, Collector target health, metric series, Grafana data sources, Jaeger traces, Elasticsearch indices, and Kibana data views. Failures name the exact missing invariant in the uploaded JSON diagnostics.
 
 ## Remote Export CI
 

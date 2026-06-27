@@ -2,6 +2,14 @@
 
 AuroraFlow telemetry is opt-in. The framework must not export live telemetry unless `AURORAFLOW_OBSERVABILITY_ENABLED=true` is set. When disabled, the telemetry facade stays no-op and the JSON/Markdown artifact pipeline remains authoritative.
 
+## Support tiers
+
+- **Artifact-only:** supported default; no live exporter or observability service is required.
+- **Lite:** best-effort, opt-in collector-only topology.
+- **Full:** local/reference-only stack; production use remains operator-owned and unsupported as a managed AuroraFlow service.
+
+See [Observability support tiers](./observability-support-tiers.md) for commands, ownership, and smoke coverage. Starting optional infrastructure never enables runtime telemetry automatically.
+
 ## Environment Variables
 
 - `AURORAFLOW_OBSERVABILITY_ENABLED`: enables the OpenTelemetry-backed adapter when set to a true-like value.
@@ -90,9 +98,11 @@ Histogram metric names use the Collector's Prometheus unit suffix. For example, 
 
 Raw selectors, URLs, request bodies, passwords, tokens, and cookies must not be emitted by default. Action spans use `auroraflow.action.target_hash` plus `auroraflow.action.target_kind`; the raw target is present only when `AURORAFLOW_OBSERVABILITY_EXPORT_RAW_SELECTORS=true`.
 
-## Export validation tiers
+## Validation by tier
 
 - Routine verification uses a process-local OTLP/HTTP protobuf receiver. It exercises the real trace and metric exporters and asserts representative span names, metric names, attributes, and resource metadata without starting the reference stack.
-- The collector-only smoke remains path-filtered for observability changes and `main` runs.
+- The Lite collector-only smoke remains path-filtered for observability changes and `main` runs.
 - Full-stack and secret-gated remote-export smokes are scheduled or manually dispatched. They are intentionally excluded from pull-request execution because their service startup cost is disproportionate to the focused export contract.
+- Full-stack workflow YAML orchestrates `npm run observability:validate`; typed Node checks own polling, JSON parsing, and Prometheus/Grafana/Jaeger/Elasticsearch/Kibana invariants.
+- Readiness writes `observability-backend-readiness.json`; semantic smoke writes `observability-backend-validation.json`. Failed checks identify the exact service, query, series, data source, trace, index, or data view after bounded retries.
 - Artifact-only/no-op behavior remains the supported default; these tests do not create a production observability support claim.

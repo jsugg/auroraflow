@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -226,6 +228,80 @@ function createFlakinessSummary(overrides: Partial<FlakinessSummary> = {}): Flak
     testCases: [],
     ...overrides,
   };
+}
+
+function observabilityBackendPayload(pathname: string, missingMetric: boolean): unknown {
+  if (pathname.endsWith('/api/v1/status/buildinfo')) {
+    return { status: 'success', data: { version: '3.0.1' } };
+  }
+  if (pathname.endsWith('/api/v1/targets')) {
+    return {
+      status: 'success',
+      data: { activeTargets: [{ labels: { job: 'otel-collector' }, health: 'up' }] },
+    };
+  }
+  if (pathname.endsWith('/api/v1/query')) {
+    return {
+      status: 'success',
+      data: {
+        result: missingMetric
+          ? []
+          : [{ metric: { __name__: 'auroraflow_test_runs_total' }, value: [1, '1'] }],
+      },
+    };
+  }
+  if (pathname.endsWith('/api/health')) {
+    return { database: 'ok' };
+  }
+  if (pathname.endsWith('/api/datasources')) {
+    return [{ type: 'prometheus' }, { type: 'elasticsearch' }, { type: 'jaeger' }];
+  }
+  if (pathname.endsWith('/api/services')) {
+    return { data: ['auroraflow'] };
+  }
+  if (pathname.endsWith('/api/traces')) {
+    return { data: [{ traceID: 'trace-1' }] };
+  }
+  if (pathname.endsWith('/_cluster/health')) {
+    return { status: 'yellow' };
+  }
+  if (pathname.endsWith('/_cat/indices/auroraflow-*')) {
+    return [{ index: 'auroraflow-logs-2026.06.26' }];
+  }
+  if (pathname.endsWith('/api/status')) {
+    return { status: { overall: { level: 'available' } } };
+  }
+  if (pathname.endsWith('/api/saved_objects/_find')) {
+    return { saved_objects: [{ attributes: { title: 'auroraflow-logs-*' } }] };
+  }
+  return { status: 'ok' };
+}
+
+function observabilityValidatorArgs(baseUrl: string, outputDir: string): readonly string[] {
+  return [
+    '--mode',
+    'smoke',
+    '--output-dir',
+    outputDir,
+    '--max-attempts',
+    '1',
+    '--poll-interval-ms',
+    '1',
+    '--timeout-ms',
+    '1000',
+    '--collector-url',
+    baseUrl,
+    '--prometheus-url',
+    baseUrl,
+    '--grafana-url',
+    baseUrl,
+    '--jaeger-url',
+    baseUrl,
+    '--elasticsearch-url',
+    baseUrl,
+    '--kibana-url',
+    baseUrl,
+  ];
 }
 
 function createDashboard(overrides: Partial<SloDashboard> = {}): SloDashboard {
@@ -634,6 +710,76 @@ describe('workflow script process boundaries', () => {
       expect(failure.stderr).toContain(
         'SELF_HEAL_REGISTRY_CLEANUP_LIMIT must be a positive integer.',
       );
+    },
+    BOUNDARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'observability backend validator writes JSON diagnostics on process success and failure',
+    async () => {
+      const successOutput = createTempDir('auroraflow-observability-validator-success-');
+      const failureOutput = createTempDir('auroraflow-observability-validator-failure-');
+      const server = createServer((request, response) => {
+        const url = new URL(request.url ?? '/', 'http://localhost');
+        const missingMetric = url.pathname.startsWith('/failure/');
+        const payload = observabilityBackendPayload(url.pathname, missingMetric);
+        response.writeHead(200, { 'content-type': 'application/json' });
+        response.end(`${JSON.stringify(payload)}\n`);
+      });
+      await new Promise<void>((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(0, '127.0.0.1', resolve);
+      });
+
+      try {
+        const address = server.address();
+        if (address === null || typeof address === 'string') {
+          throw new Error('Observability validator fixture server did not bind a TCP port.');
+        }
+        const port = (address as AddressInfo).port;
+        const [success, failure] = await Promise.all([
+          runTypeScriptScript(
+            'scripts/observability-validate-backends.ts',
+            observabilityValidatorArgs(`http://127.0.0.1:${port}/success`, successOutput),
+          ),
+          runTypeScriptScript(
+            'scripts/observability-validate-backends.ts',
+            observabilityValidatorArgs(`http://127.0.0.1:${port}/failure`, failureOutput),
+          ),
+        ]);
+
+        expect(
+          success.status,
+          `validator success child failed\nstdout: ${success.stdout}\nstderr: ${success.stderr}`,
+        ).toBe(0);
+        expect(success.stdout).toContain(
+          'Observability backend validation passed: mode=smoke passed=12 failed=0',
+        );
+        expect(success.stderr).toBe('');
+        expect(
+          JSON.parse(
+            readFileSync(path.join(successOutput, 'observability-backend-validation.json'), 'utf8'),
+          ) as unknown,
+        ).toMatchObject({ status: 'passed', summary: { failed: 0, passed: 12, total: 12 } });
+
+        expect(
+          failure.status,
+          `validator failure child exited unexpectedly\nstdout: ${failure.stdout}\nstderr: ${failure.stderr}`,
+        ).toBe(1);
+        expect(failure.stdout).toBe('');
+        expect(failure.stderr).toContain(
+          'prometheus.test-runs-series: Prometheus query is missing series auroraflow_test_runs_total.',
+        );
+        expect(
+          JSON.parse(
+            readFileSync(path.join(failureOutput, 'observability-backend-validation.json'), 'utf8'),
+          ) as unknown,
+        ).toMatchObject({ status: 'failed', summary: { failed: 1, passed: 11, total: 12 } });
+      } finally {
+        await new Promise<void>((resolve, reject) => {
+          server.close((error) => (error === undefined ? resolve() : reject(error)));
+        });
+      }
     },
     BOUNDARY_TEST_TIMEOUT_MS,
   );
