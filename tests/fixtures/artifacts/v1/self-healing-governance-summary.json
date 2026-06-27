@@ -1,0 +1,34 @@
+{
+  "generatedAt": "2026-06-05T12:00:00.000Z",
+  "status": "pass",
+  "requireAcknowledgement": false,
+  "acknowledged": false,
+  "triageRequired": false,
+  "artifactsDir": "test-results/self-healing",
+  "totalArtifacts": 0,
+  "parsedArtifacts": 0,
+  "malformedArtifacts": [],
+  "guardedArtifacts": 0,
+  "guardedAcceptedCount": 0,
+  "guardedAccepted": [],
+  "pendingPromotionCount": 0,
+  "pendingPromotions": [],
+  "registryPersistenceFailureCount": 0,
+  "registryPersistenceFailures": [],
+  "telemetry": {
+    "modes": {},
+    "actions": {},
+    "errorCodes": {},
+    "guardedAutoHeal": {
+      "attempted": 0,
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 0
+    },
+    "pendingPromotionWrites": {
+      "succeeded": 0,
+      "failed": 0,
+      "skipped": 0
+    }
+  }
+}

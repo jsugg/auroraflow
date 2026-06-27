@@ -59,6 +59,7 @@
     "self-heal:governance": "node scripts/self-healing-governance.mjs",
     "self-heal:promotions": "node -r ts-node/register scripts/self-healing-promotions.ts",
     "self-heal:cleanup": "node -r ts-node/register scripts/self-healing-registry-cleanup.ts",
+    "self-heal:repair": "node -r ts-node/register scripts/self-healing-registry-repair.ts",
     "flakiness:report": "node -r ts-node/register scripts/flakiness-report.ts",
     "slo:dashboard": "node -r ts-node/register scripts/slo-dashboard.ts",
     "slo:alerts": "node -r ts-node/register scripts/slo-alerts.ts",

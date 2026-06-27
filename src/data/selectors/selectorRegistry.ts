@@ -28,7 +28,10 @@ export class SelectorRegistryConflictError extends Error {
   }
 }
 
+export const SELECTOR_RECORD_SCHEMA_VERSION = '1.0.0' as const;
+
 export interface SelectorRecord {
+  schemaVersion: typeof SELECTOR_RECORD_SCHEMA_VERSION;
   id: string;
   pageObjectName: string;
   actionType: string;
@@ -38,6 +41,11 @@ export interface SelectorRecord {
   notes?: string;
   updatedAt: string;
   version: number;
+}
+
+export interface ParsedSelectorRecord {
+  compatibility: 'current' | 'legacy';
+  record: SelectorRecord;
 }
 
 export interface SelectorUpsertInput {
@@ -235,27 +243,116 @@ function validateOptionalText(value: string | undefined, fieldName: string): str
   return normalized;
 }
 
-function validateRecordShape(record: SelectorRecord, key: string): SelectorRecord {
-  const parsedDate = Date.parse(record.updatedAt);
+function toRecord(value: unknown, key: string): Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new SelectorRegistryDataError('Selector record must be a JSON object.', key);
+  }
+  return value as Record<string, unknown>;
+}
+
+function readString(
+  record: Readonly<Record<string, unknown>>,
+  fieldName: string,
+  key: string,
+): string {
+  const value = record[fieldName];
+  if (typeof value !== 'string') {
+    throw new SelectorRegistryDataError(`Selector record ${fieldName} must be a string.`, key);
+  }
+  return value;
+}
+
+function readOptionalString(
+  record: Readonly<Record<string, unknown>>,
+  fieldName: string,
+  key: string,
+): string | undefined {
+  const value = record[fieldName];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== 'string') {
+    throw new SelectorRegistryDataError(`Selector record ${fieldName} must be a string.`, key);
+  }
+  return value;
+}
+
+function readOptionalNumber(
+  record: Readonly<Record<string, unknown>>,
+  fieldName: string,
+  key: string,
+): number | undefined {
+  const value = record[fieldName];
+  if (value === undefined) {
+    return undefined;
+  }
+  if (typeof value !== 'number') {
+    throw new SelectorRegistryDataError(`Selector record ${fieldName} must be a number.`, key);
+  }
+  return value;
+}
+
+/** Parses current records and upgrades unversioned legacy records in memory. */
+export function parseSelectorRecord(raw: unknown, key: string): ParsedSelectorRecord {
+  const record = toRecord(raw, key);
+  const rawSchemaVersion = record.schemaVersion;
+  const compatibility = rawSchemaVersion === undefined ? 'legacy' : 'current';
+  if (rawSchemaVersion !== undefined && rawSchemaVersion !== SELECTOR_RECORD_SCHEMA_VERSION) {
+    throw new SelectorRegistryDataError(
+      `Unsupported selector record schemaVersion: ${String(rawSchemaVersion)}.`,
+      key,
+    );
+  }
+
+  const updatedAt = readString(record, 'updatedAt', key);
+  const parsedDate = Date.parse(updatedAt);
   if (!Number.isFinite(parsedDate)) {
     throw new SelectorRegistryDataError('Selector record has invalid updatedAt value.', key);
   }
 
-  if (!Number.isInteger(record.version) || record.version <= 0) {
+  const version = record.version;
+  if (typeof version !== 'number' || !Number.isInteger(version) || version <= 0) {
     throw new SelectorRegistryDataError('Selector record version must be a positive integer.', key);
   }
 
   return {
-    id: validateIdentifier(record.id, 'id'),
-    pageObjectName: validateIdentifier(record.pageObjectName, 'pageObjectName'),
-    actionType: validateIdentifier(record.actionType, 'actionType'),
-    locator: validateLocator(record.locator),
-    strategy: validateOptionalText(record.strategy, 'strategy'),
-    confidence: validateConfidence(record.confidence),
-    notes: validateOptionalText(record.notes, 'notes'),
-    updatedAt: new Date(parsedDate).toISOString(),
-    version: record.version,
+    compatibility,
+    record: {
+      schemaVersion: SELECTOR_RECORD_SCHEMA_VERSION,
+      id: validateIdentifier(readString(record, 'id', key), 'id'),
+      pageObjectName: validateIdentifier(
+        readString(record, 'pageObjectName', key),
+        'pageObjectName',
+      ),
+      actionType: validateIdentifier(readString(record, 'actionType', key), 'actionType'),
+      locator: validateLocator(readString(record, 'locator', key)),
+      strategy: validateOptionalText(readOptionalString(record, 'strategy', key), 'strategy'),
+      confidence: validateConfidence(readOptionalNumber(record, 'confidence', key)),
+      notes: validateOptionalText(readOptionalString(record, 'notes', key), 'notes'),
+      updatedAt: new Date(parsedDate).toISOString(),
+      version,
+    },
   };
+}
+
+/** Parses a serialized selector record with legacy compatibility and actionable errors. */
+export function parseSelectorRecordPayload(payload: string, key: string): ParsedSelectorRecord {
+  try {
+    return parseSelectorRecord(JSON.parse(payload) as unknown, key);
+  } catch (error: unknown) {
+    if (
+      error instanceof SelectorRegistryDataError ||
+      error instanceof SelectorRegistryValidationError
+    ) {
+      throw error;
+    }
+    throw new SelectorRegistryDataError('Failed to parse selector record payload.', key, error);
+  }
+}
+
+/** Serializes a current selector record for registry persistence. */
+export function serializeSelectorRecord(record: SelectorRecord): string {
+  return `${JSON.stringify(record)}\n`;
 }
 
 /** Selector registry backed by a key-value store. */
@@ -436,6 +533,7 @@ export class SelectorRegistryRepository {
 
   private buildRecord(input: SelectorUpsertInput, version: number): SelectorRecord {
     return {
+      schemaVersion: SELECTOR_RECORD_SCHEMA_VERSION,
       id: input.id,
       pageObjectName: input.pageObjectName,
       actionType: input.actionType,
@@ -557,21 +655,10 @@ export class SelectorRegistryRepository {
   }
 
   private serializeRecord(record: SelectorRecord): string {
-    return `${JSON.stringify(record)}\n`;
+    return serializeSelectorRecord(record);
   }
 
   private deserializeRecord(payload: string, key: string): SelectorRecord {
-    try {
-      const parsed = JSON.parse(payload) as SelectorRecord;
-      return validateRecordShape(parsed, key);
-    } catch (error: unknown) {
-      if (
-        error instanceof SelectorRegistryDataError ||
-        error instanceof SelectorRegistryValidationError
-      ) {
-        throw error;
-      }
-      throw new SelectorRegistryDataError('Failed to parse selector record payload.', key, error);
-    }
+    return parseSelectorRecordPayload(payload, key).record;
   }
 }

@@ -1,0 +1,16 @@
+{
+  "generatedAt": "2026-06-05T12:00:00.000Z",
+  "status": "no-input",
+  "sourceFiles": 0,
+  "totalTests": 0,
+  "flakyTests": 0,
+  "failedTests": 0,
+  "passedTests": 0,
+  "skippedTests": 0,
+  "interruptedTests": 0,
+  "totalAttempts": 0,
+  "totalFailedAttempts": 0,
+  "projectBreakdown": [],
+  "topFlakyCases": [],
+  "testCases": []
+}

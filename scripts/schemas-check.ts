@@ -10,6 +10,7 @@ export const ARTIFACT_SCHEMA_FILES = {
   observabilityTrendPoint: 'observability-trend-point.schema.json',
   pendingSelectorPromotion: 'pending-selector-promotion.schema.json',
   selectorCandidateHistory: 'selector-candidate-history.schema.json',
+  selectorRegistryRecord: 'selector-registry-record.schema.json',
   selfHealingFailureEvent: 'self-healing-failure-event.schema.json',
   selfHealingGovernanceSummary: 'self-healing-governance-summary.schema.json',
   sloAlertEvaluation: 'slo-alert-evaluation.schema.json',

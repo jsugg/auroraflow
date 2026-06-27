@@ -10,6 +10,7 @@ import { StorePendingSelectorPromotionRepository } from '../../../../../src/fram
 import { SelfHealingPromotionWorkflow } from '../../../../../src/framework/selfHealing/promotionWorkflow';
 import type { RankedSelfHealingCandidate } from '../../../../../src/framework/selfHealing/types';
 import { RedisClient } from '../../../../../src/utils/redisClient';
+import { repairSelfHealingRegistry } from '../../../../../scripts/self-healing-registry-repair';
 import { defineSelectorStoreConformanceSuite } from '../../../../helpers/selectorStoreConformance';
 
 interface IntegrationRuntime {
@@ -284,6 +285,54 @@ describe('RedisClient integration', () => {
 });
 
 describe('SelectorRegistryRepository integration', () => {
+  it('upgrades legacy records and repairs Redis indexes after a dry-run', async (context) => {
+    const client = requireClient(context);
+    const store = createRedisSelectorStore(client);
+    const namespace = 'selector-registry-repair-int';
+    const activeKey = `${namespace}:legacy.submit`;
+    const expectedIndexKey = `${namespace}-index:LegacyPage:click:legacy.submit`;
+    const staleIndexKey = `${namespace}-index:OldPage:click:legacy.submit`;
+    await store.set(
+      activeKey,
+      JSON.stringify({
+        id: 'legacy.submit',
+        pageObjectName: 'LegacyPage',
+        actionType: 'click',
+        locator: '#legacy-submit',
+        updatedAt: '2026-05-01T12:00:00.000Z',
+        version: 2,
+      }),
+    );
+    await store.set(staleIndexKey, activeKey);
+
+    await expect(
+      repairSelfHealingRegistry({ store, activeNamespace: namespace }),
+    ).resolves.toMatchObject({
+      dryRun: true,
+      legacyRecords: 1,
+      missingIndexes: 1,
+      staleIndexes: 1,
+      recordsUpgraded: 0,
+    });
+    await expect(store.get(expectedIndexKey)).resolves.toBeNull();
+
+    await expect(
+      repairSelfHealingRegistry({ store, activeNamespace: namespace, dryRun: false }),
+    ).resolves.toMatchObject({
+      recordsUpgraded: 1,
+      indexesCreated: 1,
+      indexesDeleted: 1,
+    });
+    expect(JSON.parse((await store.get(activeKey)) ?? '{}')).toMatchObject({
+      schemaVersion: '1.0.0',
+      version: 2,
+    });
+    await expect(store.get(expectedIndexKey)).resolves.toBe(activeKey);
+    await expect(store.get(staleIndexKey)).resolves.toBeNull();
+    await store.del(activeKey);
+    await store.del(expectedIndexKey);
+  });
+
   it('persists versioned selector records and lists by page object', async (context) => {
     const client = requireClient(context);
     const store = createRedisSelectorStore(client);
@@ -313,6 +362,7 @@ describe('SelectorRegistryRepository integration', () => {
     const deleted = await repository.delete('profile.menu');
 
     expect(created.version).toBe(1);
+    expect(created.schemaVersion).toBe('1.0.0');
     expect(updated.version).toBe(2);
     expect(loaded?.locator).toBe("page.getByRole('button', { name: 'My Profile' })");
     expect(byPageObject).toHaveLength(1);

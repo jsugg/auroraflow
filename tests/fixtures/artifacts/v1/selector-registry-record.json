@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "checkout.submit",
+  "pageObjectName": "CheckoutPage",
+  "actionType": "click",
+  "locator": "#submit",
+  "strategy": "cssFallback",
+  "confidence": 0.95,
+  "notes": "Reviewed v1 fixture.",
+  "updatedAt": "2026-06-05T12:00:00.000Z",
+  "version": 1
+}

@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://auroraflow.dev/schemas/selector-registry-record.schema.json",
+  "title": "AuroraFlow selector registry record",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "schemaVersion",
+    "id",
+    "pageObjectName",
+    "actionType",
+    "locator",
+    "updatedAt",
+    "version"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "1.0.0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[a-zA-Z0-9._:-]+$"
+    },
+    "pageObjectName": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[a-zA-Z0-9._:-]+$"
+    },
+    "actionType": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 160,
+      "pattern": "^[a-zA-Z0-9._:-]+$"
+    },
+    "locator": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2048
+    },
+    "strategy": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "notes": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 512
+    },
+    "updatedAt": {
+      "$ref": "https://auroraflow.dev/schemas/_shared.schema.json#/$defs/isoDateTime"
+    },
+    "version": {
+      "type": "integer",
+      "minimum": 1
+    }
+  }
+}
