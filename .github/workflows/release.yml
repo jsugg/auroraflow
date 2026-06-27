@@ -22,7 +22,6 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
-  NPM_VERSION: '11.17.0'
 
 jobs:
   playwright-peer-matrix:
@@ -50,9 +49,11 @@ jobs:
           node-version: '22'
           cache: npm
 
-      - name: Install npm with SBOM support
+      - name: Activate repo npm version
         run: |
-          npm install --global "npm@${NPM_VERSION}"
+          npm_version=$(node -p "require('./package.json').packageManager.replace(/^npm@/, '')")
+          corepack enable
+          corepack prepare "npm@${npm_version}" --activate
           npm --version
           npm sbom --help > /dev/null
 
