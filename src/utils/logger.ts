@@ -240,10 +240,15 @@ export function createConfiguredLogger({
   return pino(loggerOptions, pino.transport({ targets: transportTargets }));
 }
 
-const mainLogger: pino.Logger = createConfiguredLogger();
+let mainLogger: pino.Logger | undefined;
 
-export function getMainLogger(logger: pino.Logger = mainLogger): pino.Logger {
-  return logger;
+function getOrCreateMainLogger(): pino.Logger {
+  mainLogger ??= createConfiguredLogger();
+  return mainLogger;
+}
+
+export function getMainLogger(logger?: pino.Logger): pino.Logger {
+  return logger === undefined ? getOrCreateMainLogger() : logger;
 }
 
 export interface Logger {
@@ -273,7 +278,7 @@ export function createChildLogger(
   name: string,
   metadata: Readonly<Record<string, string | undefined>> = {},
 ): Logger {
-  return mainLogger.child(
+  return getOrCreateMainLogger().child(
     buildChildBindings({
       component: name,
       metadata,
@@ -282,5 +287,5 @@ export function createChildLogger(
 }
 
 export function setLogLevel(level: string): void {
-  mainLogger.level = normalizeLogLevel(level);
+  getOrCreateMainLogger().level = normalizeLogLevel(level);
 }
