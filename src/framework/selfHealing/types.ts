@@ -81,7 +81,7 @@ export interface SelfHealingSuggestion {
   rationale: string;
   signals: SelfHealingSuggestionSignals;
   /**
-   * Structured locator backing `locator` (`AUR-IMPL-020`). Present for candidates
+   * Structured locator backing `locator`. Present for candidates
    * the framework synthesizes; absent for legacy/arbitrary strings, which the
    * guarded path resolves through the legacy string read path.
    */
@@ -206,7 +206,7 @@ export interface RankedSelfHealingCandidate {
   registryRecordId?: string;
   registryRecordVersion?: number;
   history?: SelectorCandidateHistorySummary;
-  /** Structured locator backing `locator` (`AUR-IMPL-020`), when known. */
+  /** Structured locator backing `locator`, when known. */
   candidateLocator?: CandidateLocator;
 }
 
@@ -277,7 +277,7 @@ export interface GuardedValidationCandidate {
   status: GuardedValidationStatus;
   message?: string;
   /**
-   * Structured locator resolved by the guarded path (`AUR-IMPL-020`). Present when
+   * Structured locator resolved by the guarded path. Present when
    * the candidate carried a structured locator; absent when it was resolved
    * through the legacy string read path.
    */

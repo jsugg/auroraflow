@@ -125,7 +125,7 @@ describe('domSnapshot utilities', () => {
   });
 });
 
-describe('domSnapshot node-reachable helpers (AUR-QE-109)', () => {
+describe('domSnapshot node-reachable helpers', () => {
   it('redacts every sensitive attribute name pattern', () => {
     for (const attributeName of [
       'data-password',

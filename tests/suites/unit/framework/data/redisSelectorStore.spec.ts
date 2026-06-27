@@ -8,7 +8,7 @@ import type {
 import type { RedisClient } from '../../../../../src/utils/redisClient';
 
 /**
- * AUR-QE-109: the Redis-backed selector store is a thin adapter over `RedisClient`.
+ * The Redis-backed selector store is a thin adapter over `RedisClient`.
  * These tests pin that every store method delegates to the matching client method
  * with the expected argument shape, including the merge-options spread and the
  * `compareAndSet` -> `compareAndSetJsonVersion` mapping.

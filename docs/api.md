@@ -200,7 +200,7 @@ await store.close();
 
 ## Package lifecycle
 
-The lifecycle contract is implemented under `AUR-IMPL-023`. See [Lifecycle contract](./operations/lifecycle.md).
+The lifecycle contract is implemented. See [Lifecycle contract](./operations/lifecycle.md).
 
 Current APIs remain explicit:
 

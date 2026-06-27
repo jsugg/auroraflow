@@ -1,6 +1,6 @@
 # Failure-path performance baseline
 
-`AUR-IMPL-032` records failure-path cost before any performance budget becomes enforceable. The machine-readable observation is [`failure-path-baseline.json`](./failure-path-baseline.json).
+This document records failure-path cost before any performance budget becomes enforceable. The machine-readable observation is [`failure-path-baseline.json`](./failure-path-baseline.json).
 
 ## Reproduce
 

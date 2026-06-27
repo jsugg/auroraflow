@@ -1,5 +1,5 @@
 /**
- * Minimal, dependency-free deterministic property-testing utilities (AUR-QE-110).
+ * Minimal, dependency-free deterministic property-testing utilities.
  *
  * The quality plan requires a bounded property/mutation baseline for
  * calibration-critical code without adding a new test dependency (no

@@ -36,7 +36,7 @@ Machine-readable surfaces that consumers and dashboards depend on are versioned 
 
 Every root export appears in exactly one row below. `Kind` distinguishes runtime values from type-only exports. The package-surface contract test enforces that this inventory and `src/index.ts` stay identical.
 
-The self-healing engine rows are experimental because candidate scoring calibration (`AUR-IMPL-020`) and the page-action pipeline restructuring (`AUR-IMPL-022`) are expected to reshape those signatures; depend on the artifact contracts instead where possible.
+The self-healing engine rows are experimental because candidate scoring calibration and the page-action pipeline restructuring are expected to reshape those signatures; depend on the artifact contracts instead where possible.
 
 ### Page objects, factory, and helpers
 
@@ -55,7 +55,7 @@ The self-healing engine rows are experimental because candidate scoring calibrat
 
 ### Runtime context
 
-The runtime dependency container (`AUR-IMPL-021`, `DID-09`) is experimental because the page-action pipeline (`AUR-IMPL-022`) and lifecycle helper (`AUR-IMPL-023`) are expected to extend it with additional ports. `createAuroraFlowContext()` with no options preserves the env-backed default behavior, so existing constructors keep working without depending on these exports. `PageFactory.getPage()` remains the stable page-only constructor path; context-aware factory creation must opt in through a registered `PageObjectProvider`.
+The runtime dependency container is experimental because the page-action pipeline and lifecycle helper are expected to extend it with additional ports. `createAuroraFlowContext()` with no options preserves the env-backed default behavior, so existing constructors keep working without depending on these exports. `PageFactory.getPage()` remains the stable page-only constructor path; context-aware factory creation must opt in through a registered `PageObjectProvider`.
 
 | Export                     | Kind    | Tier         |
 | -------------------------- | ------- | ------------ |
@@ -68,7 +68,7 @@ The runtime dependency container (`AUR-IMPL-021`, `DID-09`) is experimental beca
 
 ### Lifecycle
 
-The lifecycle helpers (`AUR-IMPL-023`) are experimental while the page-action pipeline and subsystem auto-registration continue to land. `closeAuroraFlow()` runs owned disposers once, in reverse registration order, and is a no-op for a context with no registered disposers; it never closes consumer-owned Playwright objects and installs no process-exit hooks. The `auroraflow/playwright` fixture (separate entrypoint) builds on these helpers.
+The lifecycle helpers are experimental while the page-action pipeline and subsystem auto-registration continue to land. `closeAuroraFlow()` runs owned disposers once, in reverse registration order, and is a no-op for a context with no registered disposers; it never closes consumer-owned Playwright objects and installs no process-exit hooks. The `auroraflow/playwright` fixture (separate entrypoint) builds on these helpers.
 
 | Export                                  | Kind    | Tier         |
 | --------------------------------------- | ------- | ------------ |
@@ -239,7 +239,7 @@ The lifecycle helpers (`AUR-IMPL-023`) are experimental while the page-action pi
 
 ### Structured candidate model
 
-The discriminated `CandidateLocator` model (`AUR-IMPL-020`) is experimental: the guarded path resolves these structurally without parsing display strings, and the shape may be reshaped as locator-first APIs (`AUR-IMPL-027`) land.
+The discriminated `CandidateLocator` model is experimental: the guarded path resolves these structurally without parsing display strings, and the shape may be reshaped as locator-first APIs land.
 
 | Export                             | Kind    | Tier         |
 | ---------------------------------- | ------- | ------------ |

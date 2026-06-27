@@ -26,7 +26,7 @@ AuroraFlow classifies reads by boundary instead of silently coercing incompatibl
 | Case | Required behavior | Reason |
 | --- | --- | --- |
 | Current published v1 fixture | **Must read** | Patch/minor releases must not strand supported CI/report artifacts. |
-| Unversioned selector registry record created before `AUR-IMPL-029` | **Must read and upgrade in memory** | Existing active selectors remain usable; new writes always emit current schema. |
+| Unversioned selector registry record created before schema versioning | **Must read and upgrade in memory** | Existing active selectors remain usable; new writes always emit current schema. |
 | Unknown future version in a tolerant multi-record stream | **Skip with warning** | One future/corrupt trend line must not hide readable historical points. |
 | Unknown future version at a direct parser, registry, schema, or strict stream boundary | **Hard reject** | Callers asked for one authoritative object; guessing could produce incorrect governance or repair decisions. |
 | Malformed current-version object | **Hard reject**, except tolerant streams | Matching version does not permit invalid types or missing required fields. |

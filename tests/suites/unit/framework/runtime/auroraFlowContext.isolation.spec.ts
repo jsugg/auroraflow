@@ -70,7 +70,7 @@ function createPageMock(): PageMock {
 }
 
 // Builds a real config from an explicit env map so the test never touches
-// `process.env` for self-healing configuration (the AUR-IMPL-021 seam). SAT is
+// `process.env` for self-healing configuration seam. SAT is
 // disabled to keep the failure path off the DOM-capture/guarded-resolution code
 // the isolation contract does not exercise.
 function buildConfig(env: Readonly<Record<string, string | undefined>>): SelfHealingConfig {

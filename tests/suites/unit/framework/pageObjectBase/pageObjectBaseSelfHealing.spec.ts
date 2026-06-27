@@ -130,8 +130,8 @@ describe('PageObjectBase self-healing integration', () => {
   // all injected, so a test never reads or writes `process.env`. The telemetry
   // sink is registered on both the context (page-action facade) and the module
   // singleton, because the downstream capture and registry-persistence
-  // subsystems still record through the singleton until AUR-IMPL-022 threads the
-  // context through them.
+  // subsystems still record through the singleton until the context is threaded
+  // through them.
   function setupSelfHealing(
     options: {
       configEnv?: Readonly<Record<string, string | undefined>>;

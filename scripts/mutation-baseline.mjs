@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// AUR-QE-110 — scoped mutation baseline with the smallest deterministic footprint.
+// Scoped mutation baseline with the smallest deterministic footprint.
 //
 // No new test dependency (no Stryker): this applies a curated set of source
 // mutations in place, runs the scoped unit specs, and records whether each

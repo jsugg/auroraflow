@@ -3,7 +3,7 @@ import { retry } from '../../../../../src/helpers/helpers';
 import { createSeededRandom, randomFrom, randomInt } from '../../../../helpers/propertyTesting';
 
 /**
- * AUR-QE-110 scoped property baseline for the retry helper.
+ * Property baseline for the retry helper.
  *
  * Control-flow invariants must hold regardless of jitter/randomness: the function
  * is invoked exactly as many times as needed and never more than `retries`, and

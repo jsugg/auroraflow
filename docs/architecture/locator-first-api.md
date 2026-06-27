@@ -2,18 +2,18 @@
 
 - Status: Draft for API review; no prototypes shipped.
 - Date: 2026-06-24
-- Related: `AUR-IMPL-027`, `AUR-IMPL-020`, `AUR-IMPL-022`, `AUR-ARCH-027`
+- Related: ADR 0002, ADR 0009
 - Owners: runtime/API maintainers
 
 ## Context
 
 Modern Playwright code favors `Locator` objects, but AuroraFlow's stable page-object actions accept string selectors. Users who call `locator.click()` directly bypass the AuroraFlow page-action envelope, so failures lose framework telemetry, screenshots, self-healing artifacts, guarded retry evidence, and registry context.
 
-`AUR-IMPL-020` added the structured `CandidateLocator` model, and `AUR-IMPL-022` moved `PageObjectBase.click()` and `PageObjectBase.type()` behind the internal `PageActionPipeline`. Those seams make locator-first ergonomics possible without rewriting the public facade.
+The structured `CandidateLocator` model and the internal `PageActionPipeline` behind `PageObjectBase.click()` and `PageObjectBase.type()` make locator-first ergonomics possible without rewriting the public facade.
 
 ## Design status
 
-This document is the API-review package for `AUR-IMPL-027`. It deliberately ships no runtime prototype, no declaration change, and no root export. Locator overloads may be implemented only after maintainers approve this design or a successor ADR.
+This document is the API-review package for locator-first ergonomics. It deliberately ships no runtime prototype, no declaration change, and no root export. Locator overloads may be implemented only after maintainers approve this design or a successor ADR.
 
 Rule: add prototypes only after API review.
 
@@ -30,7 +30,7 @@ Rule: add prototypes only after API review.
 - Do not remove, rename, or weaken string-selector APIs.
 - Do not wrap every Playwright `Locator` method.
 - Do not infer selectors from `Locator` internals.
-- Do not change selector registry schemas in this task; schema-versioned registry records remain `AUR-IMPL-029`.
+- Do not change selector registry schemas in this task; schema-versioned registry records remain a future registry hardening task.
 - Do not add source-code rewrites or selector mutation.
 
 ## Proposed public overloads

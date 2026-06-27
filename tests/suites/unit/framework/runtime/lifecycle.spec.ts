@@ -13,7 +13,7 @@ afterEach(() => {
   resetDefaultAuroraFlowContextForTests();
 });
 
-describe('closeAuroraFlow (AUR-IMPL-023 / AUR-QE-113)', () => {
+describe('closeAuroraFlow', () => {
   it('runs owned disposers once, in reverse registration order', async () => {
     const context = createAuroraFlowContext();
     const order: string[] = [];

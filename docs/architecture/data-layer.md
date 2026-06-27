@@ -119,6 +119,12 @@ await memoryStore.close();
 - Candidate-history TTL follows shortest-useful retention: default and hard cap are both `2,592,000` seconds (30 days), and higher custom TTLs are clamped.
 - The memory store advertises `durability: 'non-durable'`; closing or process exit loses all records.
 
+## Store Support Tiers and Extensibility
+
+`MemorySelectorStore` is a supported non-durable tier for unit tests, fixture-scoped state, process-boundary CLI checks, and local experiments. It is not a durable CI, team, or shared-registry backend. Use Redis when selector records must survive process exit or be shared across workers, jobs, or machines.
+
+New selector-store backends remain evidence-gated. They require user demand, a named owner, shared `SelectorStore` conformance, real-backend consistency proof, security and operations documentation, compatibility planning, and release validation before implementation. See [Adoption Readiness and Extensibility Gates](./adoption-readiness.md) for the backend-extensibility criteria and memory-store tier decision.
+
 ## Integration Testing
 
 - Integration suite location: `tests/suites/integration/framework/data/redisIntegration.spec.ts`
@@ -141,7 +147,7 @@ Redis is the first durable selector-store backend, but deployments are consumer/
 
 Use `AURORAFLOW_REDIS_KEY_PREFIX` and `SELF_HEAL_REGISTRY_NAMESPACE` to keep key spaces understandable and cleanup-safe. These prefixes are namespace hygiene, not authorization. Production isolation must come from Redis credentials, ACLs, network policy, database/instance separation, and reviewed promotion controls.
 
-See [Redis Selector Registry Production Runbook](../operations/redis-production-runbook.md) for the `AUR-IMPL-028` TLS/auth/ACL/prefix/backup/restore/eviction/retention/capacity/incident checklist.
+See [Redis Selector Registry Production Runbook](../operations/redis-production-runbook.md) for the TLS/auth/ACL/prefix/backup/restore/eviction/retention/capacity/incident checklist.
 
 Shared registries should run `npm run self-heal:repair` after restore or suspected index drift. Command scans at most 1,000 active records and index keys by default, reports truncation, and does not mutate data unless `--apply` is explicit. Large registries require repeated bounded passes or operator-approved higher limit; this CLI is repair tooling, not an unbounded online migration framework.
 

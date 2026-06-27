@@ -12,7 +12,7 @@ import {
 } from '../../../../helpers/propertyTesting';
 
 /**
- * AUR-QE-110 scoped property baseline for candidate scoring/ranking.
+ * Property baseline for candidate scoring/ranking.
  *
  * Coverage proves these lines execute; these seeded, bounded properties pin the
  * invariants assertions must catch (bounds, ordering, dedup, determinism), which

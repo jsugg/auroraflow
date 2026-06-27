@@ -1,6 +1,6 @@
 # Redis Selector Registry Production Runbook
 
-This runbook completes `AUR-IMPL-028` for Redis-backed selector registry operations. AuroraFlow can use Redis as an optional durable selector-store backend, but Redis is always consumer/operator-owned. AuroraFlow does not provision, patch, back up, monitor, scale, or incident-manage consumer Redis.
+This runbook documents Redis-backed selector registry operations. AuroraFlow can use Redis as an optional durable selector-store backend, but Redis is always consumer/operator-owned. AuroraFlow does not provision, patch, back up, monitor, scale, or incident-manage consumer Redis.
 
 ## Scope and Ownership
 

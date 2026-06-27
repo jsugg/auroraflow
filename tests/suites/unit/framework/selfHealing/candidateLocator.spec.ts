@@ -81,7 +81,7 @@ describe('resolveCandidateLocator (structured guarded path)', () => {
     expect(page.getByRole).toHaveBeenNthCalledWith(3, 'button', { name: /save changes/i });
   });
 
-  it('enters a frame via frameLocator and resolves the inner candidate (AUR-QE-112)', () => {
+  it('enters a frame via frameLocator and resolves the inner candidate', () => {
     const innerLocator = { inner: true };
     const frame = { getByTestId: vi.fn().mockReturnValue(innerLocator) };
     const page = { frameLocator: vi.fn().mockReturnValue(frame) };
@@ -166,7 +166,7 @@ describe('parseLegacyLocatorString (legacy string read path)', () => {
     );
   });
 
-  it('reads same-origin frame candidates into the structured frame model (AUR-QE-112)', () => {
+  it('reads same-origin frame candidates into the structured frame model', () => {
     expect(
       parseLegacyLocatorString(
         "page.frameLocator('iframe[title=\"Checkout iframe\"]').getByTestId('iframe-submit')",
@@ -329,7 +329,7 @@ function randomNonFrameCandidateLocator(random: Random): CandidateLocator {
 
 function randomCandidateLocator(random: Random): CandidateLocator {
   // 1-in-4 runs wrap a non-frame candidate in a same-origin frame so the
-  // describe -> parse round trip also exercises AUR-QE-112 frame candidates.
+  // describe -> parse round trip also exercises frame candidates.
   if (randomInt(random, 0, 3) === 0) {
     return frameLocator(
       `iframe[title="${randomSafeString(random)}"]`,
@@ -339,7 +339,7 @@ function randomCandidateLocator(random: Random): CandidateLocator {
   return randomNonFrameCandidateLocator(random);
 }
 
-describe('structured locator round-trip property (AUR-IMPL-020)', () => {
+describe('structured locator round-trip property', () => {
   it('describe -> parseLegacyLocatorString recovers the structured locator', () => {
     forAll<CandidateLocator>({
       seed: 0x5eed_020,

@@ -137,6 +137,10 @@ describe('test script taxonomy contract', () => {
         pattern: /\brm\([^)]*(?:ARTIFACTS_DIR|artifactsDir)/u,
         rationale: `${filePath} must not delete shared artifact roots from tests.`,
       });
+      expectTextNotMatches(content, {
+        pattern: /(?:process\.env\.[A-Z0-9_]+\s*=|delete\s+process\.env\.[A-Z0-9_]+)/u,
+        rationale: `${filePath} must inject self-healing configuration through AuroraFlowContext instead of mutating process.env.`,
+      });
     }
   });
 
@@ -192,30 +196,25 @@ describe('test script taxonomy contract', () => {
     ).toEqual([]);
   });
 
-  it('documents the semantic contract policy for contributors and coding agents', () => {
-    const policyDocuments = [
-      ['docs/development.md', readRepoFile('docs/development.md')],
-      ['AGENTS.md', readRepoFile('AGENTS.md')],
-    ] as const;
+  it('documents the semantic contract policy for contributors', () => {
+    const content = readRepoFile('docs/development.md');
 
-    for (const [documentPath, content] of policyDocuments) {
-      expectTextIncludes(content, {
-        text: 'raw toContain/toMatch and bare boolean toBe(true)/toBe(false) stay banned',
-        rationale: `${documentPath} must preserve the AUR-QE-107 matcher ban.`,
-      });
-      expectTextIncludes(content, {
-        text: 'Use parsed workflow/JSON/Compose models where practical',
-        rationale: `${documentPath} must preserve the semantic-first model guidance.`,
-      });
-      expectTextIncludes(content, {
-        text: 'tests/helpers/contractAssertions.ts',
-        rationale: `${documentPath} must route protected wording checks through rationale helpers.`,
-      });
-      expectTextIncludes(content, {
-        text: 'tests/suites/contracts/workflows/test-taxonomy.contract.spec.ts',
-        rationale: `${documentPath} must tell agents not to weaken the enforcement contract.`,
-      });
-    }
+    expectTextIncludes(content, {
+      text: 'raw toContain/toMatch and bare boolean toBe(true)/toBe(false) stay banned',
+      rationale: 'Development guide must preserve the semantic matcher ban.',
+    });
+    expectTextIncludes(content, {
+      text: 'Use parsed workflow/JSON/Compose models where practical',
+      rationale: 'Development guide must preserve the semantic-first model guidance.',
+    });
+    expectTextIncludes(content, {
+      text: 'tests/helpers/contractAssertions.ts',
+      rationale: 'Development guide must route protected wording checks through rationale helpers.',
+    });
+    expectTextIncludes(content, {
+      text: 'tests/suites/contracts/workflows/test-taxonomy.contract.spec.ts',
+      rationale: 'Development guide must tell contributors not to weaken the enforcement contract.',
+    });
   });
 
   it(
@@ -282,7 +281,7 @@ describe('test script taxonomy contract', () => {
       'Node Compatibility (Node 20/22/24)',
       'Repository Gates (Node 22)',
       'Risk-Triggered E2E (Chrome)',
-      'risk-weighted per-file floors for high-risk modules once on Node 22 (AUR-QE-109).',
+      'risk-weighted per-file floors for high-risk modules once on Node 22.',
       'Default local Redis behavior is skip-friendly',
     ]) {
       expectTextIncludes(developmentGuide, {

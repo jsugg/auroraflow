@@ -303,7 +303,7 @@ describe('evaluateGuardedSuggestionsDryRun', () => {
   });
 });
 
-describe('structured candidate guarded path (AUR-IMPL-020)', () => {
+describe('structured candidate guarded path', () => {
   afterEach(() => {
     resetTelemetryForTests();
   });
@@ -419,7 +419,7 @@ describe('structured candidate guarded path (AUR-IMPL-020)', () => {
   });
 });
 
-describe('resolveLocatorExpression AUR-IMPL-020 regression safety net', () => {
+describe('resolveLocatorExpression regression safety net', () => {
   it.each([
     {
       expression: 'page.getByText("It\'s saved")',
@@ -476,7 +476,7 @@ describe('resolveLocatorExpression AUR-IMPL-020 regression safety net', () => {
     expect(pageMock.getByRole).toHaveBeenNthCalledWith(2, 'button', { name: /save changes/i });
   });
 
-  it('resolves same-origin frame test-id candidates through the structured path (AUR-QE-112)', () => {
+  it('resolves same-origin frame test-id candidates through the structured path', () => {
     const pageMock = createGuardedPageMock();
 
     const locator = resolveLocatorExpression(

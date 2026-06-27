@@ -6,6 +6,6 @@ export interface SelfHealingCandidateSeed {
   strategy: SelfHealingSuggestionStrategy;
   rationale: string;
   evidence: CandidateEvidence;
-  /** Structured locator backing `locator` (`AUR-IMPL-020`), when the producer knows it. */
+  /** Structured locator backing `locator`, when the producer knows it. */
   candidateLocator?: CandidateLocator;
 }

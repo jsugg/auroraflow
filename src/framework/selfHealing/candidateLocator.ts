@@ -2,7 +2,7 @@ import type { FrameLocator, Locator, Page } from 'playwright';
 import { SelfHealingArtifactSchemaError } from './artifactSchema';
 
 /**
- * Schema version for the structured {@link CandidateLocator} model (`AUR-IMPL-020`).
+ * Schema version for the structured {@link CandidateLocator} model.
  *
  * Stored alongside every serialized locator so the legacy string read path and
  * future upgraders can tell a structured locator from a pre-1.0.0 display string.
@@ -89,7 +89,7 @@ export function cssLocator(selector: string): CandidateLocator {
 }
 
 /**
- * Wraps an inner candidate inside `page.frameLocator(frameSelector)` (`AUR-QE-112`).
+ * Wraps an inner candidate inside `page.frameLocator(frameSelector)`.
  * Lets the structured guarded path resolve and auto-apply candidates that live in a
  * same-origin iframe without the guarded path ever parsing a display string. `inner`
  * may itself be a frame candidate, so nested frames compose.
@@ -184,9 +184,9 @@ export function describeCandidateLocator(locator: CandidateLocator): string | nu
 
 /**
  * Resolves a structured locator into a Playwright {@link Locator} without parsing
- * any display string. This is the guarded-path resolver introduced by
- * `AUR-IMPL-020`; it switches on the discriminant and forwards raw values, so
- * quote- and apostrophe-bearing names round-trip exactly.
+ * any display string. This is the guarded-path resolver; it switches on the
+ * discriminant and forwards raw values, so quote- and apostrophe-bearing names
+ * round-trip exactly.
  */
 export function resolveCandidateLocator(page: Page, locator: CandidateLocator): Locator {
   return resolveCandidateLocatorAgainst(page, locator);
@@ -302,7 +302,7 @@ function readLeadingQuotedLiteral(input: string): { value: string; rest: string 
 }
 
 /**
- * Legacy string read path for `page.frameLocator('<sel>').<inner>` (`AUR-QE-112`).
+ * Legacy string read path for `page.frameLocator('<sel>').<inner>`.
  * Reads the frame selector, then reparses the inner expression as a top-level
  * `page.<inner>` so the existing leaf parsers and nested frames are reused. Returns
  * `null` when the frame selector or inner expression is not a supported shape.
@@ -323,7 +323,7 @@ function parseFrameLocatorExpression(expression: string): CandidateLocator | nul
 }
 
 /**
- * Legacy string read path (`AUR-IMPL-020`): converts a pre-1.0.0 Playwright-like
+ * Legacy string read path: converts a pre-1.0.0 Playwright-like
  * locator string into the structured model, or `null` when the expression is not
  * one of the supported `page.getBy*`/`page.locator` shapes. This is the only
  * place that parses locator strings; the guarded path consumes structured

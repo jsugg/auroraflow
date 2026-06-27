@@ -2,7 +2,7 @@
 
 - Status: Accepted
 - Date: 2026-06-26
-- Related: `AUR-ARCH-018`, `AUR-ARCH-037`, `AUR-DEC-005`, `AUR-DEC-013`, `AUR-IMPL-018`, `AUR-IMPL-030`
+- Related: `AUR-DEC-005`, `AUR-DEC-013`
 - Owners: maintainer / observability and SRE reviewers
 
 ## Context
