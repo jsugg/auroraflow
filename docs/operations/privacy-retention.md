@@ -56,7 +56,7 @@ Retention below is operational guidance unless marked **enforced**. Use the shor
 | Trend JSONL and CI trend artifacts | Keep only the bounded window needed for flakiness/SLO review; target 30 days or less for copied/exported files. | Point-count bounds apply; CI cache eviction is not a deletion SLA. Durable export remains optional and operator-owned. |
 | Release dry-run evidence | 30 days in this repository; should not contain page captures or test credentials. | **Enforced** by the repository release workflow artifact setting. |
 
-CI, Redis, log, telemetry, and observability storage are consumer-owned. AuroraFlow does not operate production Redis, CI artifact storage, or an observability backend.
+CI, Redis, log, telemetry, and observability storage are consumer-owned. AuroraFlow does not operate production Redis, CI artifact storage, or an observability backend. Redis prefixes are namespace hygiene, not authorization; see the [Redis production runbook](./redis-production-runbook.md) for TLS, auth, ACL, backup/restore, eviction, capacity, retention, and incident guidance.
 
 ## Required Operating Practices
 

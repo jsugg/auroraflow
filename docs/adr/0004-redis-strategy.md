@@ -23,8 +23,8 @@ Redis remains optional and consumer/operator-owned:
 
 ## Consequences
 
-The package can offer useful durable registry primitives without becoming a managed data service. Operators remain responsible for TLS, ACLs, backups, restore, eviction, capacity, retention, and incident response.
+The package can offer useful durable registry primitives without becoming a managed data service. Operators remain responsible for TLS, ACLs, backups, restore, eviction, capacity, retention, and incident response. The `AUR-IMPL-028` runbook in [`../operations/redis-production-runbook.md`](../operations/redis-production-runbook.md) documents these responsibilities without shifting ownership to AuroraFlow.
 
 ## Revisit triggers
 
-Revisit if a shared-registry policy, operator owner, Redis runbook, and protected promotion workflow are approved.
+Revisit if a shared-registry policy, operator owner, and protected promotion workflow are approved for a durable multi-team registry.
