@@ -28,7 +28,7 @@ AuroraFlow keeps contribution process lightweight: small scoped changes, source-
 - Do not add dependencies, generated files, lockfile changes, release credentials, or infrastructure ownership claims unless the active task explicitly requires them.
 - Do not broaden self-healing, Redis, telemetry, privacy, or release behavior from "planned" to "implemented" in docs unless source and tests already support the claim.
 
-For architecture-roadmap tasks, update the implementation journal in [`docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md`](docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md) before work starts, after meaningful changes, after validation, and before handoff.
+For architecture-roadmap tasks, keep durable records current: update the owning ADR, the [architecture decision log](docs/architecture/decision-log.md), the [traceability registry](docs/architecture/traceability.md), and task-specific docs before handoff. Record validation evidence in the PR description or other surviving task evidence instead of relying on removable planning notes.
 
 ## Validation matrix
 
