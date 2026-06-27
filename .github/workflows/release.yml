@@ -1,6 +1,6 @@
 name: Release Dry-Run
 
-# AUR-IMPL-010: auditable release dry-run only. Publishing is intentionally
+# Auditable release dry-run only. Publishing is intentionally
 # disabled in this workflow revision per AUR-DEC-012 (npm provenance + SBOM
 # baseline, signing deferred). See docs/operations/release-process.md.
 
@@ -22,6 +22,7 @@ permissions:
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+  NPM_VERSION: '11.17.0'
 
 jobs:
   playwright-peer-matrix:
@@ -48,6 +49,12 @@ jobs:
         with:
           node-version: '22'
           cache: npm
+
+      - name: Install npm with SBOM support
+        run: |
+          npm install --global "npm@${NPM_VERSION}"
+          npm --version
+          npm sbom --help > /dev/null
 
       - name: Install dependencies
         run: npm ci
@@ -155,7 +162,7 @@ jobs:
       - name: Refuse to publish
         run: |
           echo "Publish was requested via the confirmation input, but publishing is"
-          echo "intentionally disabled: AUR-IMPL-010 ships this workflow dry-run only."
+          echo "intentionally disabled: this workflow ships dry-run only."
           echo "Enabling publish requires a future task that adds the npm provenance"
           echo "publish path (OIDC id-token write permission), required reviewers on"
           echo "the protected 'release' environment, and maintainer sign-off."

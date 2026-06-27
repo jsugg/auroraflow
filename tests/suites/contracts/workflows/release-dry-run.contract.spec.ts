@@ -17,6 +17,9 @@ const releaseWorkflowModel = readWorkflowModel('.github/workflows/release.yml');
 
 const RELEASE_PROCESS_DOC_PATH = path.join(process.cwd(), 'docs/operations/release-process.md');
 const releaseProcessDoc = readFileSync(RELEASE_PROCESS_DOC_PATH, 'utf8');
+const packageJson = JSON.parse(readFileSync(path.join(process.cwd(), 'package.json'), 'utf8')) as {
+  readonly packageManager?: string;
+};
 
 describe('release dry-run workflow contract', () => {
   it('triggers only on manual workflow_dispatch', () => {
@@ -81,8 +84,32 @@ describe('release dry-run workflow contract', () => {
 
   it('produces verify, schema, build, pack, SBOM, provenance, and changelog evidence', () => {
     const releaseJob = getWorkflowJob(releaseWorkflowModel, 'release-dry-run');
+    const npmInstallIndex = releaseJob.steps.findIndex(
+      (step) => step.name === 'Install npm with SBOM support',
+    );
+    const dependencyInstallIndex = releaseJob.steps.findIndex(
+      (step) => step.name === 'Install dependencies',
+    );
+    const sbomIndex = releaseJob.steps.findIndex(
+      (step) => step.name === 'Generate SBOMs (runtime dependencies)',
+    );
+    const npmInstallCommand =
+      getWorkflowStep(releaseJob, 'Install npm with SBOM support').run ?? '';
 
     expect(getWorkflowStep(releaseJob, 'Run quality gates').run).toBe('npm run verify');
+    expect(releaseWorkflowModel.env.get('NPM_VERSION')).toBe('11.17.0');
+    expect(packageJson.packageManager).toBe('npm@11.17.0');
+    expectInvariant(
+      npmInstallCommand.includes('npm install --global "npm@${NPM_VERSION}"') &&
+        npmInstallCommand.includes('npm sbom --help > /dev/null'),
+      'Release dry-run workflow must install and verify an npm CLI version that supports SBOM generation before npm ci and SBOM steps.',
+    );
+    expectInvariant(
+      npmInstallIndex >= 0 &&
+        dependencyInstallIndex > npmInstallIndex &&
+        sbomIndex > dependencyInstallIndex,
+      'Release dry-run workflow must install the pinned npm CLI before dependency installation and SBOM generation.',
+    );
     expectInvariant(
       (getWorkflowStep(releaseJob, 'Validate artifact schemas').run ?? '').includes(
         'npm run schemas:check 2>&1 | tee release-evidence/schema-validation.txt',

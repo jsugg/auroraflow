@@ -1,6 +1,7 @@
 {
   "name": "auroraflow",
   "version": "1.0.0",
+  "packageManager": "npm@11.17.0",
   "description": "TypeScript Playwright test automation framework with resilient page objects, Redis-backed selector data, self-healing diagnostics, and CI observability artifacts.",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
