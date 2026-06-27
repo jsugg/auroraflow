@@ -4,7 +4,9 @@ import {
   LoggerConfigError,
   createChildLogger,
   createConfiguredLogger,
+  getMainLogger,
   resolveLoggerRuntimeConfig,
+  setLogLevel,
 } from '../../../../../src/utils/logger';
 import { SYNTHETIC_SECRET } from '../../../../fixtures/privacy/syntheticSecrets';
 
@@ -116,6 +118,29 @@ describe('createConfiguredLogger', () => {
     expect(payload.safeValue).toBe('visible');
     expect(payload.msg).toBe('user login attempted');
     expect(chunks[0]).not.toContain(SYNTHETIC_SECRET);
+  });
+});
+
+describe('main logger compatibility', () => {
+  it('returns one lazy singleton while preserving explicit logger injection', () => {
+    const { destination } = createMemoryDestination();
+    const injected = createConfiguredLogger({
+      config: resolveLoggerRuntimeConfig({ AURORAFLOW_LOG_DESTINATION: 'silent' }),
+      destination,
+    });
+
+    expect(getMainLogger(injected)).toBe(injected);
+    expect(getMainLogger()).toBe(getMainLogger());
+  });
+
+  it('updates the lazy singleton log level', () => {
+    const logger = getMainLogger();
+    const previousLevel = logger.level;
+
+    setLogLevel('debug');
+    expect(getMainLogger().level).toBe('debug');
+
+    setLogLevel(previousLevel);
   });
 });
 

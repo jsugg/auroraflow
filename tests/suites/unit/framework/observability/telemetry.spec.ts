@@ -11,7 +11,7 @@ import {
 } from '../../../../../src/framework/observability/telemetry';
 
 describe('resolveTelemetryConfig', () => {
-  it('keeps observability disabled by default with local resource attributes', () => {
+  it('keeps the artifact-only tier disabled by default with local resource attributes', () => {
     const config = resolveTelemetryConfig({});
 
     expect(config.enabled).toBe(false);
@@ -105,7 +105,7 @@ describe('NoopTelemetry', () => {
 });
 
 describe('initializeTelemetry', () => {
-  it('returns no-op telemetry while observability is disabled', () => {
+  it('returns no-op telemetry for the default artifact-only tier', () => {
     const telemetry = initializeTelemetry({ env: {} });
 
     expect(telemetry.isEnabled()).toBe(false);

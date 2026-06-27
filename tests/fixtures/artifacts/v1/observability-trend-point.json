@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "1.0.0",
+  "generatedAt": "2026-06-05T12:00:00.000Z",
+  "source": "flakiness-report",
+  "runId": "run-v1",
+  "branch": "main",
+  "commit": "abc123",
+  "workflow": "Quality",
+  "project": "auroraflow",
+  "status": "no-input",
+  "totals": {
+    "sourceFiles": 0,
+    "tests": 0,
+    "passedTests": 0,
+    "failedTests": 0,
+    "flakyTests": 0,
+    "skippedTests": 0,
+    "interruptedTests": 0,
+    "attempts": 0,
+    "failedAttempts": 0,
+    "retryAttempts": 0
+  },
+  "rates": {
+    "passRate": null,
+    "failureRate": null,
+    "flakeRate": null,
+    "retryFailureRate": null
+  },
+  "guardedAutoHeal": {
+    "attempted": 0,
+    "succeeded": 0,
+    "failed": 0,
+    "skipped": 0,
+    "successRate": null,
+    "failureRate": null
+  },
+  "governance": {
+    "status": null,
+    "triageRequired": false,
+    "pendingPromotionCount": 0,
+    "guardedAcceptedCount": 0,
+    "registryPersistenceFailureCount": 0
+  },
+  "slo": {
+    "overallStatus": null,
+    "alertBreachCount": 0,
+    "blockingAlertBreachCount": 0
+  }
+}

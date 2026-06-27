@@ -1,0 +1,13 @@
+{
+  "promotionId": "promotion:event-v1:candidate-v1",
+  "eventId": "event-v1",
+  "candidateId": "candidate-v1",
+  "selectorId": "checkout.submit",
+  "proposedLocator": "#submit-primary",
+  "locator": "#submit-primary",
+  "baseSelectorVersion": 1,
+  "confidence": 0.95,
+  "status": "pending",
+  "requestedAt": "2026-06-05T12:00:00.000Z",
+  "acknowledged": false
+}

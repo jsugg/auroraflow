@@ -1,0 +1,67 @@
+{
+  "benchmark": "auroraflow-failure-path",
+  "environment": {
+    "architecture": "x64",
+    "browserVersion": "149.0.7827.53",
+    "cpuModel": "Intel(R) Core(TM) i3 CPU       M 350  @ 2.27GHz",
+    "logicalCpuCount": 4,
+    "nodeVersion": "v22.22.1",
+    "operatingSystem": "linux",
+    "operatingSystemRelease": "6.18.33.2-microsoft-standard-WSL2",
+    "totalMemoryBytes": 1996087296
+  },
+  "fixture": {
+    "componentCount": 180,
+    "maxDomNodes": 500,
+    "maxTextLength": 120,
+    "registry": "memory",
+    "screenshotCapture": true,
+    "satCandidateCount": 625,
+    "artifactBytes": 13753
+  },
+  "generatedAt": "2026-06-27T04:11:26.131Z",
+  "policy": {
+    "approvalStatus": "pending",
+    "enforcement": "warning_only",
+    "hardThresholds": null
+  },
+  "results": {
+    "aggregateFailurePathDurationMs": {
+      "maximum": 1040.43,
+      "mean": 652.144,
+      "median": 564.249,
+      "minimum": 524.311,
+      "p95": 1040.43,
+      "sampleCount": 12
+    },
+    "domSnapshotDurationMs": {
+      "maximum": 493.699,
+      "mean": 298.632,
+      "median": 275.715,
+      "minimum": 251.293,
+      "p95": 493.699,
+      "sampleCount": 12
+    },
+    "satCandidateExtractionDurationMs": {
+      "maximum": 17.499,
+      "mean": 6.636,
+      "median": 6.022,
+      "minimum": 3.173,
+      "p95": 17.499,
+      "sampleCount": 12
+    },
+    "artifactWriteDurationMs": {
+      "maximum": 10.677,
+      "mean": 4.465,
+      "median": 3.266,
+      "minimum": 2.087,
+      "p95": 10.677,
+      "sampleCount": 12
+    }
+  },
+  "run": {
+    "iterations": 12,
+    "warmupIterations": 3
+  },
+  "schemaVersion": 2
+}

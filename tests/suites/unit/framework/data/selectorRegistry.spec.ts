@@ -4,6 +4,7 @@ import {
   SelectorRegistryDataError,
   SelectorRegistryRepository,
   SelectorRegistryValidationError,
+  SELECTOR_RECORD_SCHEMA_VERSION,
   buildSelectorRegistryNamespaces,
   type SelectorRecord,
   type SelectorStore,
@@ -122,6 +123,7 @@ describe('SelectorRegistryRepository', () => {
     });
 
     expect(first).toMatchObject({
+      schemaVersion: SELECTOR_RECORD_SCHEMA_VERSION,
       id: 'login.button',
       pageObjectName: 'LoginPage',
       actionType: 'click',
@@ -404,6 +406,43 @@ describe('SelectorRegistryRepository', () => {
     const repository = new SelectorRegistryRepository({ store, namespace: 'selectors' });
 
     await expect(repository.get('broken')).rejects.toThrow(SelectorRegistryDataError);
+  });
+
+  it('reads unversioned legacy records and rejects unknown future schemas', async () => {
+    const store = new InMemorySelectorStore();
+    store.rawSetUnsafe(
+      'selectors:legacy',
+      JSON.stringify({
+        id: 'legacy',
+        pageObjectName: 'LegacyPage',
+        actionType: 'click',
+        locator: '#legacy',
+        updatedAt: '2026-05-01T12:00:00.000Z',
+        version: 2,
+      }),
+    );
+    store.rawSetUnsafe(
+      'selectors:future',
+      JSON.stringify({
+        schemaVersion: '2.0.0',
+        id: 'future',
+        pageObjectName: 'FuturePage',
+        actionType: 'click',
+        locator: '#future',
+        updatedAt: '2026-06-01T12:00:00.000Z',
+        version: 1,
+      }),
+    );
+    const repository = new SelectorRegistryRepository({ store, namespace: 'selectors' });
+
+    await expect(repository.get('legacy')).resolves.toMatchObject({
+      schemaVersion: SELECTOR_RECORD_SCHEMA_VERSION,
+      id: 'legacy',
+      version: 2,
+    });
+    await expect(repository.get('future')).rejects.toThrow(
+      'Unsupported selector record schemaVersion: 2.0.0.',
+    );
   });
 
   it('deletes existing records and reports deletion status', async () => {

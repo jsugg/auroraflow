@@ -1,0 +1,9 @@
+{
+  "id": "checkout.legacy-submit",
+  "pageObjectName": "CheckoutPage",
+  "actionType": "click",
+  "locator": "#legacy-submit",
+  "confidence": 0.9,
+  "updatedAt": "2026-05-01T12:00:00.000Z",
+  "version": 3
+}

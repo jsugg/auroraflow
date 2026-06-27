@@ -1,0 +1,24 @@
+{
+  "artifactVersion": "1.0.0",
+  "eventId": "event-v1",
+  "timestamp": "2026-06-05T12:00:00.000Z",
+  "runId": "run-v1",
+  "component": "CheckoutPage",
+  "errorCode": "page_action_error",
+  "mode": "suggest",
+  "minConfidence": 0.92,
+  "safetyPolicy": {
+    "allowedActions": ["click"],
+    "allowedDomains": ["example.test"]
+  },
+  "pageObjectName": "CheckoutPage",
+  "action": {
+    "type": "click",
+    "description": "click submit"
+  },
+  "error": {
+    "name": "TimeoutError",
+    "message": "locator timed out"
+  },
+  "suggestions": []
+}

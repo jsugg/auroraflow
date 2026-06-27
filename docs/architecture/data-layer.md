@@ -14,13 +14,17 @@ This document defines the current selector-store data layer primitives available
   - atomic JSON merge through Redis `EVAL` for selector-candidate-history counters.
   - explicit connection lifecycle with `connect()` and `disconnect()`.
 - `src/data/selectors/selectorRegistry.ts`
-  - typed selector record schema.
+  - typed `1.0.0` selector record schema and read-time upgrader for unversioned legacy records.
   - Redis-agnostic repository contract (`SelectorStore`).
   - deterministic `upsert`, `get`, `listAll`, `listByPageObject`, `listByPageObjectAndAction`, and `delete` behavior.
   - optional `expectedVersion` concurrency checks for reviewed selector promotion workflows.
   - page/action index keys for bounded runtime lookup without scanning all active selectors.
   - distinct namespaces for active records, indexes, candidate history, pending promotions, and audit records.
   - large-registry listing via cursor key scans plus bounded batched payload reads.
+- `scripts/self-healing-registry-repair.ts`
+  - bounded schema/index audit with dry-run default.
+  - compare-and-set legacy upgrades plus idempotent missing/stale/mismatched index repair.
+  - retains malformed or otherwise unverifiable index targets instead of guessing.
 - `src/data/selectors/redisSelectorStore.ts`
   - Redis-backed `SelectorStore` adapter with TTL, compare-and-set, and atomic JSON merge support.
 - `src/data/selectors/memorySelectorStore.ts`
@@ -109,6 +113,7 @@ await memoryStore.close();
 - Connection setup failures throw `RedisConnectionError`.
 - Exhausted operation retries throw `RedisOperationError` with operation name and attempts.
 - Invalid selector payload/schema throws `SelectorRegistryValidationError` or `SelectorRegistryDataError`.
+- Unknown future selector record versions hard-fail reads; unversioned legacy records remain readable and are normalized to current schema in memory.
 - Stale expected-version writes throw `SelectorRegistryConflictError` and do not overwrite active records.
 - Candidate-history writes require `SelectorStore.atomicJsonMerge`; Redis implements this as one Lua `EVAL`, and the memory store implements it within one process. Missing atomic merge support fails write paths explicitly.
 - Candidate-history TTL follows shortest-useful retention: default and hard cap are both `2,592,000` seconds (30 days), and higher custom TTLs are clamped.
@@ -129,6 +134,16 @@ Behavior notes:
 - When Docker is available, tests validate real Redis connectivity, namespaced key behavior, TTL handling, selector registry versioning, Redis-backed CAS, atomic candidate-history counters, store conformance, and indexed selector lookup.
 - When Docker/Testcontainers is unavailable, tests skip with an explicit reason rather than hanging.
 - Unit tests run the same store conformance suite against `MemorySelectorStore`.
+
+## Production Operations Boundary
+
+Redis is the first durable selector-store backend, but deployments are consumer/operator-owned. AuroraFlow owns client behavior and store contracts; it does not own Redis provisioning, TLS termination, ACLs, backups, restore drills, eviction policy, capacity, retention outside live-key TTLs, or incidents.
+
+Use `AURORAFLOW_REDIS_KEY_PREFIX` and `SELF_HEAL_REGISTRY_NAMESPACE` to keep key spaces understandable and cleanup-safe. These prefixes are namespace hygiene, not authorization. Production isolation must come from Redis credentials, ACLs, network policy, database/instance separation, and reviewed promotion controls.
+
+See [Redis Selector Registry Production Runbook](../operations/redis-production-runbook.md) for the `AUR-IMPL-028` TLS/auth/ACL/prefix/backup/restore/eviction/retention/capacity/incident checklist.
+
+Shared registries should run `npm run self-heal:repair` after restore or suspected index drift. Command scans at most 1,000 active records and index keys by default, reports truncation, and does not mutate data unless `--apply` is explicit. Large registries require repeated bounded passes or operator-approved higher limit; this CLI is repair tooling, not an unbounded online migration framework.
 
 ## Local Redis Orchestration (Docker Compose)
 

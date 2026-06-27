@@ -2,6 +2,8 @@
 
 AuroraFlow now has a local observability stack configuration that routes opt-in OpenTelemetry signals to version-controlled development backends. The stack extends the existing artifact pipeline; JSON and Markdown reports remain the deterministic merge-gate source.
 
+The [support-tier contract](../operations/observability-support-tiers.md) separates the supported artifact-only default, best-effort collector-only Lite topology, and local/reference-only Full stack. Production deployment is operator-owned reference use, not an AuroraFlow support tier.
+
 ## Scope
 
 Implemented in source:
@@ -40,6 +42,16 @@ flowchart LR
 The Collector receives OTLP over HTTP and gRPC, batches signals, exposes metrics for Prometheus scrape, and exports traces to Jaeger. Logstash tails local JSON logs and self-healing artifacts, applies recursive redaction for known secret-shaped fields, routes malformed log records to a dead-letter index, and writes local Elasticsearch indices.
 
 ## Local Operation
+
+Routine local development requires no observability command and keeps telemetry no-op. To opt into the Lite collector-only topology:
+
+```bash
+npm run observability:lite:up
+npm run observability:lite:smoke
+npm run observability:lite:down
+```
+
+To opt into the Full local/reference stack:
 
 Start the stack:
 
@@ -94,6 +106,8 @@ Run `npm run observability:live-assert` against the local stack to poll Promethe
 - `observability/logstash/pipeline/auroraflow.conf`: local log and self-healing artifact ingestion.
 - `observability/elastic/elasticsearch.yml` and `observability/kibana/kibana.yml`: local single-node settings.
 - `observability/production`: reference production manifests that enable TLS/auth and persistent storage.
+- `src/framework/observability/backendValidation.ts`: typed readiness and smoke API validators with bounded retries and JSON diagnostics.
+- `scripts/observability-validate-backends.ts`: workflow-facing validator CLI used through `npm run observability:validate`.
 - `docs/operations/observability-production.md`: production storage budgets plus backup and restore guidance.
 - `docs/operations/observability-runbooks.md`: operational triage paths for telemetry gaps, backpressure, cardinality, storage pressure, trace gaps, and dashboard drift.
 - `docs/operations/observability-dashboard-review.md`: dashboard and alert review checklist.

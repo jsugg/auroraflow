@@ -13,6 +13,12 @@ import { REQUIRED_METRIC_NAMES } from '../../../../src/framework/observability/m
 import { RESOURCE_ATTRIBUTE_NAMES } from '../../../../src/framework/observability/telemetryConfig';
 
 const CONTRACT_PATH = path.join(process.cwd(), 'docs', 'operations', 'observability-contract.md');
+const SUPPORT_TIERS_PATH = path.join(
+  process.cwd(),
+  'docs',
+  'operations',
+  'observability-support-tiers.md',
+);
 const OBSERVABILITY_ROOT = path.join(process.cwd(), 'observability');
 const DOCS_OPERATIONS_ROOT = path.join(process.cwd(), 'docs', 'operations');
 
@@ -145,6 +151,57 @@ describe('observability contract documentation', () => {
     }
   });
 
+  it('enforces artifact-only, Lite, and Full support-tier boundaries', () => {
+    const supportTiers = readFileSync(SUPPORT_TIERS_PATH, 'utf8');
+    const liteCompose = readComposeModel('docker-compose.observability-ci.yml');
+    const fullCompose = readComposeModel('docker-compose.observability.yml');
+    const workflow = readWorkflowModel('.github/workflows/quality.yml');
+    const packageJson = readPackageJson();
+
+    expect([...liteCompose.services.keys()]).toEqual(['otel-collector']);
+    expect([...fullCompose.services.keys()].sort()).toEqual(
+      [
+        'elasticsearch',
+        'grafana',
+        'jaeger',
+        'kibana',
+        'logstash',
+        'otel-collector',
+        'prometheus',
+      ].sort(),
+    );
+    expect(getWorkflowJob(workflow, 'observability-stack').name).toBe('Observability Lite Smoke');
+    expect(getWorkflowJob(workflow, 'observability-full-stack').name).toBe(
+      'Observability Full Stack Smoke',
+    );
+    expect(packageJson.scripts).toEqual(
+      expect.objectContaining({
+        'observability:lite:up': 'docker compose -f docker-compose.observability-ci.yml up -d',
+        'observability:lite:down':
+          'docker compose -f docker-compose.observability-ci.yml down --remove-orphans',
+        'observability:lite:smoke': expect.any(String),
+        'observability:up': expect.any(String),
+        'observability:down': expect.any(String),
+        'observability:smoke': expect.any(String),
+      }),
+    );
+
+    for (const text of [
+      'Artifact-only',
+      'Supported default',
+      'Lite',
+      'Best effort, opt-in',
+      'Full',
+      'Local/reference only',
+      'Production is not a fourth supported tier',
+    ]) {
+      expectTextIncludes(supportTiers, {
+        text,
+        rationale: 'Support-tier docs must preserve the public ownership and support boundary.',
+      });
+    }
+  });
+
   it('provides collector, Prometheus, Grafana, and ELK configuration files', () => {
     const requiredPaths = [
       'otel-collector/config.yaml',
@@ -231,7 +288,7 @@ describe('observability contract documentation', () => {
     });
   });
 
-  it('provides a collector-only CI smoke lane with diagnostics', () => {
+  it('provides a collector-only Lite CI smoke lane with diagnostics', () => {
     const ciCompose = readComposeModel('docker-compose.observability-ci.yml');
     const workflow = readWorkflowModel('.github/workflows/quality.yml');
     const packageJson = readPackageJson();
@@ -261,6 +318,8 @@ describe('observability contract documentation', () => {
     expect(packageJson.scripts).toEqual(
       expect.objectContaining({
         'observability:ci:smoke': expect.any(String),
+        'observability:validate':
+          'node -r ts-node/register scripts/observability-validate-backends.ts',
         'observability:snapshot': expect.any(String),
         'observability:live-assert': expect.any(String),
       }),
@@ -280,24 +339,27 @@ describe('observability contract documentation', () => {
     expect(fullStackJob.env.get('OBSERVABILITY_DIAGNOSTICS_DIR')).toBe(
       'observability-output/full-stack',
     );
-    for (const text of [
-      'prometheus-targets.json',
-      'observability:live-assert',
-      'observability-label-snapshot.json',
-      'grafana-datasources.json',
-      'jaeger-traces.json',
-      'elasticsearch-indices.json',
-      'Observability full-stack smoke log seed.',
-      'kibana-data-views.json',
-    ]) {
-      expectTextIncludes(fullStackJob.steps.map((step) => step.run ?? '').join('\n'), {
-        text,
-        rationale: 'Full-stack observability lane must capture backend validation diagnostics.',
-      });
-    }
-    expect(getWorkflowStep(fullStackJob, 'Upload full-stack diagnostics').with.get('name')).toBe(
-      'observability-full-stack-diagnostics',
-    );
+    const readinessStep = getWorkflowStep(fullStackJob, 'Wait for full-stack backends');
+    const validationStep = getWorkflowStep(fullStackJob, 'Validate full-stack backend APIs');
+    const workflowCommands = fullStackJob.steps.map((step) => step.run ?? '').join('\n');
+    expectTextIncludes(readinessStep.run ?? '', {
+      text: 'npm run observability:validate',
+      rationale: 'Full-stack readiness must delegate API checks to the typed Node validator.',
+    });
+    expectTextIncludes(validationStep.run ?? '', {
+      text: 'npm run observability:validate',
+      rationale: 'Full-stack smoke must delegate backend checks to the typed Node validator.',
+    });
+    expectTextExcludes(workflowCommands, {
+      text: 'grep -q',
+      rationale: 'Observability workflow must orchestrate typed validators, not grep API payloads.',
+    });
+    const diagnosticsUpload = getWorkflowStep(fullStackJob, 'Upload full-stack diagnostics');
+    expect(diagnosticsUpload.with.get('name')).toBe('observability-full-stack-diagnostics');
+    expectTextIncludes(diagnosticsUpload.with.get('path') ?? '', {
+      text: 'observability-output/full-stack/',
+      rationale: 'Full-stack workflow must upload validator JSON diagnostics.',
+    });
 
     expect(remoteExportJob.name).toBe('Observability Remote Export Smoke');
     expect(remoteExportJob.env.get('AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED')).toBe('true');

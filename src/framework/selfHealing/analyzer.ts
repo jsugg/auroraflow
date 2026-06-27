@@ -1,4 +1,8 @@
+import { performance } from 'node:perf_hooks';
 import type { Page } from 'playwright';
+import { buildSelfHealingDurationMetricAttributes } from '../observability/attributes';
+import { METRIC_NAMES } from '../observability/metricNames';
+import { getTelemetry, type AuroraFlowTelemetry } from '../observability/telemetry';
 import { buildSelfHealingCandidateId, rankSelfHealingCandidates } from './candidateScoring';
 import { extractDomCandidateSeeds } from './domCandidateExtraction';
 import { captureDomSnapshot, summarizeDomSnapshot } from './domSnapshot';
@@ -24,6 +28,8 @@ export interface SelfHealingFailureContext {
   existingSuggestions?: readonly SelfHealingSuggestion[];
   registryRuntime?: SelfHealingRegistryRuntime;
   privacyPolicy?: ArtifactPrivacyPolicy;
+  telemetry?: AuroraFlowTelemetry;
+  now?: () => number;
 }
 
 export interface SelfHealingAnalysisResult {
@@ -213,7 +219,10 @@ export async function analyzeSelfHealingFailure({
   existingSuggestions,
   registryRuntime,
   privacyPolicy = DEFAULT_ARTIFACT_PRIVACY_POLICY,
+  telemetry: inputTelemetry,
+  now = () => performance.now(),
 }: SelfHealingFailureContext): Promise<SelfHealingAnalysisResult> {
+  const telemetry = inputTelemetry ?? getTelemetry();
   const suggestions =
     existingSuggestions ??
     generateRankedLocatorSuggestions({
@@ -244,13 +253,32 @@ export async function analyzeSelfHealingFailure({
 
   if (config.sat.captureDom) {
     try {
+      const captureStartedAt = now();
+      let captureStatus: 'succeeded' | 'failed' = 'failed';
       const snapshot = await captureDomSnapshot(page, {
         maxDomNodes: config.sat.maxDomNodes,
         maxTextLength: config.sat.maxTextLength,
         allowedAttributes: config.sat.allowedAttributes,
         currentUrl,
         privacyPolicy,
-      });
+      })
+        .then((capturedSnapshot) => {
+          captureStatus = 'succeeded';
+          return capturedSnapshot;
+        })
+        .finally(() => {
+          telemetry.recordHistogram(
+            METRIC_NAMES.selfHealingDomSnapshotDurationMs,
+            Math.max(0, now() - captureStartedAt),
+            buildSelfHealingDurationMetricAttributes({
+              mode: config.mode,
+              actionType: action.type,
+              operation: 'dom_snapshot',
+              status: captureStatus,
+              pageObjectName,
+            }),
+          );
+        });
       snapshotSummary = summarizeDomSnapshot(snapshot);
       domCandidates.push(
         ...extractDomCandidateSeeds({

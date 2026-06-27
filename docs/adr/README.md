@@ -12,6 +12,7 @@ This directory contains durable architecture decision records for AuroraFlow. Ke
 | [ADR 0004](0004-redis-strategy.md)            | Accepted | Redis strategy            |
 | [ADR 0005](0005-observability-boundary.md)    | Accepted | Observability boundary    |
 | [ADR 0006](0006-release-policy.md)            | Accepted | Release policy            |
+| [ADR 0007](0007-durable-trend-export.md)      | Accepted | Durable trend export      |
 
 ## Lightweight process
 

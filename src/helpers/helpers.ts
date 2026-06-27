@@ -1,6 +1,5 @@
-import { Logger, getMainLogger } from '../utils/logger';
+import { getMainLogger, type Logger } from '../utils/logger';
 
-const mainLogger: Logger = getMainLogger();
 const MAX_WAIT_MS = 60_000;
 const MAX_RETRIES = 20;
 const MAX_BACKOFF_FACTOR = 10;
@@ -59,7 +58,7 @@ function applyJitter(
  * @returns A promise that resolves after the specified delay, returning void.
  * @throws RangeError when the wait duration is outside the bounded range.
  */
-export function wait(ms: number, logger: Logger | null = mainLogger): Promise<void> {
+export function wait(ms: number, logger: Logger | null = getMainLogger()): Promise<void> {
   validateIntegerOption(ms, 'ms', 0, MAX_WAIT_MS);
 
   if (logger) {
@@ -93,7 +92,7 @@ export async function retry<T>({
   maxDelay = 30_000,
   jitterRatio = 0,
   random = Math.random,
-  logger = mainLogger, // Use `null` to disable logging
+  logger = getMainLogger(), // Use `null` to disable logging
 }: RetryOptions<T>): Promise<T> {
   validateIntegerOption(retries, 'retries', 1, MAX_RETRIES);
   validateIntegerOption(initialDelay, 'initialDelay', 0, MAX_WAIT_MS);

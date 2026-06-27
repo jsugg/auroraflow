@@ -169,5 +169,16 @@ describe('PageObjectBase telemetry integration', () => {
         errorCode: 'page_action_type_failed',
       }),
     });
+    expect(telemetry.histograms).toContainEqual({
+      name: METRIC_NAMES.selfHealingFailurePathDurationMs,
+      value: expect.any(Number) as number,
+      attributes: {
+        'auroraflow.self_heal.mode': 'off',
+        'auroraflow.self_heal.operation': 'failure_path',
+        'auroraflow.self_heal.status': 'failed',
+        'auroraflow.action.type': 'type',
+        'auroraflow.page_object': 'TelemetryPageObject',
+      },
+    });
   });
 });

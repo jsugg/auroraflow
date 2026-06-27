@@ -63,6 +63,8 @@ const DEFAULT_TIMEOUT_MS = 5_000;
 const HISTOGRAM_PROMETHEUS_METRICS = [
   `${METRIC_NAMES.testCaseDurationMs}_milliseconds_bucket`,
   `${METRIC_NAMES.pageActionDurationMs}_milliseconds_bucket`,
+  `${METRIC_NAMES.selfHealingDomSnapshotDurationMs}_milliseconds_bucket`,
+  `${METRIC_NAMES.selfHealingFailurePathDurationMs}_milliseconds_bucket`,
   `${METRIC_NAMES.redisOperationDurationMs}_milliseconds_bucket`,
 ] as const;
 const CORE_PROMETHEUS_METRICS = [

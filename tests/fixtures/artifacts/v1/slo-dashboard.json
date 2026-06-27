@@ -1,0 +1,25 @@
+{
+  "generatedAt": "2026-06-05T12:00:00.000Z",
+  "status": "no-input",
+  "overallStatus": "insufficient_data",
+  "sourceFiles": 0,
+  "totals": {
+    "tests": 0,
+    "attempts": 0,
+    "failedAttempts": 0,
+    "passedTests": 0,
+    "failedTests": 0,
+    "flakyTests": 0
+  },
+  "selfHealing": {
+    "triageRequired": false,
+    "pendingPromotionCount": 0,
+    "guardedAcceptedCount": 0,
+    "registryPersistenceFailureCount": 0,
+    "guardedAutoHealAttempts": 0,
+    "guardedAutoHealSucceeded": 0,
+    "guardedAutoHealFailed": 0,
+    "guardedAutoHealSkipped": 0
+  },
+  "metrics": []
+}

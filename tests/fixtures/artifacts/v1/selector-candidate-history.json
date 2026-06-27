@@ -1,0 +1,12 @@
+{
+  "candidateId": "candidate-v1",
+  "attempts": 1,
+  "validated": 1,
+  "guardedApplySucceeded": 0,
+  "guardedApplyFailed": 0,
+  "promoted": 0,
+  "rejected": 0,
+  "rolledBack": 0,
+  "lastSeenAt": "2026-06-05T12:00:00.000Z",
+  "expiresAt": "2026-07-05T12:00:00.000Z"
+}

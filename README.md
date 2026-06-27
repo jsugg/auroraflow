@@ -33,8 +33,8 @@ Not implemented yet:
 | Package surface | Root package metadata, declaration output, curated publish files, broad typed exports, API docs, operations docs, and artifact schemas are contract-tested. | Repository examples, tests, scripts, workflow files, and observability stack assets are not part of the package API. | `package.json`, `src/index.ts`, `tsconfig.build.json`, `tests/suites/contracts/package/packageSurface.contract.spec.ts` |
 | Page objects | `PageObjectBase` wraps navigation, click, type, read, wait, screenshot, and close actions with initialization, logging, screenshots, self-healing analysis, and telemetry metrics. `PageFactory` caches page object instances. | Protected helpers that call Playwright directly should be reviewed before treating them as instrumented public actions. | `src/pageObjects/pageObjectBase.ts`, `src/helpers/pageFactory.ts` |
 | Self-healing diagnostics | `off`, `suggest`, and `guarded` modes are parsed and enforced. Invalid `SELF_HEAL_*` values warn with the applied fallback by default and throw in opt-in strict mode (`AURORAFLOW_CONFIG_STRICT=true`); diagnostics never echo received values. Failure capture can include ranked suggestions, DOM-derived candidates, registry-backed history, guarded validation, one guarded retry for click/type/read/wait, history observations, reviewable pending promotion records, and audited approve/reject/rollback workflows. | Reviewed promotion scope is registry mutation only; no source-code rewrites or blind unreviewed selector mutation occur. | `src/framework/selfHealing/config.ts`, `src/framework/selfHealing/analyzer.ts`, `src/framework/selfHealing/guardedValidation.ts`, `src/framework/selfHealing/promotionWorkflow.ts`, `docs/architecture/self-healing.md` |
-| Redis data layer | Runtime config validation, namespaced keys, bounded retry with jitter, SCAN-based listing, batched reads, selector record validation, CAS, page/action indexes, TTL-capable stores, SAT history records, pending promotions, audited selector updates, and Testcontainers coverage are implemented. | Production rollout still needs operator-owned Redis retention/backup policy and review process controls. | `src/utils/redisClient.ts`, `src/data/selectors/selectorRegistry.ts`, `docs/architecture/data-layer.md` |
-| Observability | The telemetry facade is no-op by default, can export OpenTelemetry spans/metrics when enabled, and keeps JSON/Markdown report artifacts as deterministic merge-gate evidence. Local Collector, Prometheus, Grafana, Jaeger, Elasticsearch, Logstash, and Kibana configuration exists. Dashboard and alert labels are asserted against live Prometheus label/series/query/rule snapshots. | Production deployment remains reference-only and requires environment-specific ownership, credentials, storage, DNS, TLS, capacity, and network controls. | `src/framework/observability/*`, `scripts/observability-live-export-assert.ts`, `docs/operations/observability-contract.md`, `docs/architecture/observability-stack.md`, `observability/README.md` |
+| Redis data layer | Runtime config validation, namespaced keys, bounded retry with jitter, SCAN-based listing, batched reads, selector record validation, CAS, page/action indexes, TTL-capable stores, SAT history records, pending promotions, audited selector updates, Testcontainers coverage, and operator-owned production runbook guidance are implemented. | Redis remains consumer/operator-owned; prefixes are namespace hygiene, not authorization. | `src/utils/redisClient.ts`, `src/data/selectors/selectorRegistry.ts`, `docs/architecture/data-layer.md`, `docs/operations/redis-production-runbook.md` |
+| Observability | Artifact-only/no-op is the supported default. Opt-in Lite collector smoke is best effort; the Full local stack and production manifests are reference-only. Dashboard and alert labels are asserted against live Prometheus label/series/query/rule snapshots. | Live telemetry is never enabled implicitly. Shared or production deployment remains consumer/operator-owned and requires credentials, storage, DNS, TLS, capacity, retention, and network controls. | `src/framework/observability/*`, `docs/operations/observability-support-tiers.md`, `docs/operations/observability-contract.md`, `docs/architecture/observability-stack.md`, `observability/README.md` |
 | CI and security | Pull requests run quality and security gates. Example and smoke lanes are path-filtered. The full E2E matrix runs on `main`, schedule, and manual dispatch. | Some optional observability and remote-export paths need repository variables/secrets and enough runner capacity. | `.github/workflows/quality.yml`, `.github/workflows/examples.yml`, `.github/workflows/security.yml`, `.github/workflows/ci.yml` |
 
 ## Getting started
@@ -142,11 +142,13 @@ Core environment variables:
 - `AURORAFLOW_REDIS_TLS`
 - `AURORAFLOW_REDIS_KEY_PREFIX`
 
-See [`docs/architecture/data-layer.md`](docs/architecture/data-layer.md).
+See [`docs/architecture/data-layer.md`](docs/architecture/data-layer.md) and the operator-owned [`Redis production runbook`](docs/operations/redis-production-runbook.md).
 
 ## Observability
 
 Live telemetry is opt-in. Without `AURORAFLOW_OBSERVABILITY_ENABLED=true`, the telemetry facade stays no-op and report artifacts remain the primary evidence source.
+
+Support tiers are artifact-only (supported default), Lite collector-only (best effort), and Full local/reference (reference only). Start Lite with `npm run observability:lite:up`; `npm run observability:up` starts the Full stack. Neither command enables application telemetry automatically. See [Observability support tiers](docs/operations/observability-support-tiers.md).
 
 Start the local stack:
 
@@ -216,8 +218,11 @@ scripts/                   Report generation, workflow linting, governance, and 
 - [Phase 0 validation baseline](docs/architecture/phase-0-validation-baseline.md)
 - [Self-healing foundation](docs/architecture/self-healing.md)
 - [Data layer foundation](docs/architecture/data-layer.md)
+- [Redis production runbook](docs/operations/redis-production-runbook.md)
 - [Observability stack architecture](docs/architecture/observability-stack.md)
 - [Observability contract](docs/operations/observability-contract.md)
+- [Observability support tiers](docs/operations/observability-support-tiers.md)
+- [Durable trend export](docs/operations/trend-durable-export.md)
 - [Artifact schemas](docs/operations/artifact-schemas.md)
 - [SLO dashboard and alerting](docs/operations/slo-dashboard-alerting.md)
 - [Security and secrets](docs/operations/security-secrets.md)

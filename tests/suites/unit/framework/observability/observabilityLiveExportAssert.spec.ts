@@ -99,6 +99,26 @@ function labelsForMetric(metricName: string): Readonly<Record<string, string>> {
       auroraflow_self_heal_mode: 'guarded',
     };
   }
+  if (metricName.includes('self_healing_dom_snapshot_duration')) {
+    return {
+      auroraflow_action_type: 'click',
+      auroraflow_page_object: 'ObservabilitySmokePage',
+      auroraflow_self_heal_mode: 'guarded',
+      auroraflow_self_heal_operation: 'dom_snapshot',
+      auroraflow_self_heal_status: 'succeeded',
+      ...(metricName.endsWith('_bucket') ? { le: '50' } : {}),
+    };
+  }
+  if (metricName.includes('self_healing_failure_path_duration')) {
+    return {
+      auroraflow_action_type: 'click',
+      auroraflow_page_object: 'ObservabilitySmokePage',
+      auroraflow_self_heal_mode: 'guarded',
+      auroraflow_self_heal_operation: 'failure_path',
+      auroraflow_self_heal_status: 'failed',
+      ...(metricName.endsWith('_bucket') ? { le: '50' } : {}),
+    };
+  }
   if (metricName === 'auroraflow_guarded_validation_candidates_total') {
     return {
       auroraflow_self_heal_status: 'accepted',

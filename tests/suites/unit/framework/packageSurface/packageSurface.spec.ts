@@ -215,6 +215,7 @@ describe('public package surface', () => {
       ): PromotionAuthorizationDecision | Promise<PromotionAuthorizationDecision>;
     }>();
     expectTypeOf<SelectorRecord>().toMatchTypeOf<{
+      schemaVersion: '1.0.0';
       id: string;
       locator: string;
       version: number;

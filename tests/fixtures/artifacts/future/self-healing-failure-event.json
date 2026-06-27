@@ -1,0 +1,24 @@
+{
+  "artifactVersion": "2.0.0",
+  "eventId": "future-event",
+  "timestamp": "2026-06-06T12:00:00.000Z",
+  "runId": "future-run",
+  "component": "CheckoutPage",
+  "errorCode": "page_action_error",
+  "mode": "suggest",
+  "minConfidence": 0.92,
+  "safetyPolicy": {
+    "allowedActions": ["click"],
+    "allowedDomains": []
+  },
+  "pageObjectName": "CheckoutPage",
+  "action": {
+    "type": "click",
+    "description": "future action"
+  },
+  "error": {
+    "name": "Error",
+    "message": "future artifact"
+  },
+  "suggestions": []
+}

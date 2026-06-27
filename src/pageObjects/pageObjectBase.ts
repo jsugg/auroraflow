@@ -32,6 +32,7 @@ import {
   buildGuardedAutoHealMetricAttributes,
   buildPageActionMetricAttributes,
   buildPageActionSpanAttributes,
+  buildSelfHealingDurationMetricAttributes,
   type GuardedAutoHealMetricStatus,
   type PageActionMetricStatus,
 } from '../framework/observability/attributes';
@@ -250,6 +251,8 @@ export abstract class PageObjectBase {
     let guardedValidation: Awaited<ReturnType<typeof evaluateGuardedSuggestionsDryRun>> | undefined;
     let guardedAutoHeal: GuardedAutoHealSummary | undefined;
     let registryPersistence: SelfHealingRegistryPersistenceSummary | undefined;
+    let failurePathStartedAt: number | undefined;
+    let selfHealingConfig: SelfHealingConfig | undefined;
 
     try {
       if (requiresInitialization) {
@@ -260,12 +263,18 @@ export abstract class PageObjectBase {
       this.logger.info(successMessage, { result });
       return result;
     } catch (error) {
+      failurePathStartedAt = this.context.clock.now();
       actionError = error instanceof Error ? error : new Error(String(error));
       errorCode = `page_action_${actionContext.type}_failed`;
       span.recordException(actionError);
       this.logger.error(errorMessage, { error });
-      const selfHealingConfig = this.context.resolveSelfHealingConfig();
-      const runBudget = consumeSelfHealingRunBudget(this.context, selfHealingConfig, this.logger);
+      const activeSelfHealingConfig = this.context.resolveSelfHealingConfig();
+      selfHealingConfig = activeSelfHealingConfig;
+      const runBudget = consumeSelfHealingRunBudget(
+        this.context,
+        activeSelfHealingConfig,
+        this.logger,
+      );
       span.setAttribute('auroraflow.self_heal.mode', selfHealingConfig.mode);
       span.setAttribute('auroraflow.self_heal.run_budget.mode', runBudget.mode);
       span.setAttribute(
@@ -336,6 +345,8 @@ export abstract class PageObjectBase {
             existingSuggestions: rankedSuggestions,
             registryRuntime,
             privacyPolicy: artifactPrivacyPolicy,
+            telemetry,
+            now: this.context.clock.now,
           });
           if (selfHealingAnalysis.sat) {
             span.setAttribute(
@@ -453,10 +464,10 @@ export abstract class PageObjectBase {
             }
             if (
               runBudget.shouldRunHealing &&
-              selfHealingConfig.sat.registryMode === 'write_pending'
+              activeSelfHealingConfig.sat.registryMode === 'write_pending'
             ) {
               registryPersistence = await persistSelfHealingRegistryTelemetry({
-                config: selfHealingConfig,
+                config: activeSelfHealingConfig,
                 event,
                 registryRuntime,
                 telemetry,
@@ -516,6 +527,19 @@ export abstract class PageObjectBase {
       });
       telemetry.recordCounter(METRIC_NAMES.pageActionsTotal, 1, metricAttributes);
       telemetry.recordHistogram(METRIC_NAMES.pageActionDurationMs, durationMs, metricAttributes);
+      if (failurePathStartedAt !== undefined && selfHealingConfig !== undefined) {
+        telemetry.recordHistogram(
+          METRIC_NAMES.selfHealingFailurePathDurationMs,
+          Math.max(0, this.context.clock.now() - failurePathStartedAt),
+          buildSelfHealingDurationMetricAttributes({
+            mode: selfHealingConfig.mode,
+            actionType: actionContext.type,
+            operation: 'failure_path',
+            status: actionStatus,
+            pageObjectName: this.pageObjectName,
+          }),
+        );
+      }
       if (actionStatus === 'failed') {
         telemetry.recordCounter(METRIC_NAMES.pageActionFailuresTotal, 1, metricAttributes);
       }

@@ -736,12 +736,12 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 | `AUR-IMPL-025` | Add promotion authorization and expected-status updates | 2 | P1 | security | Complete | `014`, `015`, `029`, `040` | security/data | L | `017`, `001` | none; consumer-owned Redis and promotion auth model resolved | Unauthorized/racing promotion updates denied or conflicted. |
 | `AUR-IMPL-026` | Add audit retention cleanup | 2 | P2 | governance | Complete | `030`, `007`, `037` | governance/data | M | `011`, `025` | none; shortest-useful retention resolved | Audit TTL/cleanup documented and tested. |
 | `AUR-IMPL-027` | Add locator-first API ergonomics design | 2 | P2 | architecture | Complete | `027`, `010`, `002` | runtime/API | S | `020`, `022` | API review before prototypes | Design/API review doc preserves string-selector API; prototypes deferred. |
-| `AUR-IMPL-028` | Add Redis production runbook and selector-store strategy | 3 | P2 | docs | Not started | `016`, `029`, `037`, `042` | data/SRE | S | `001`, `017` | none; consumer/operator ownership resolved | Runbook covers TLS/auth/ACL/backup/restore/eviction/retention. |
-| `AUR-IMPL-029` | Add selector registry schema versioning and repair tooling | 3 | P2 | data | Not started | `017`, `016`, `037` | data | L | `009`, `017`, `028` | scale decision if optimizing indexes | schemaVersion, upgraders, repair tests exist. |
-| `AUR-IMPL-030` | Add trend durable export decision/path | 3 | P2 | observability | Deferred | `018`, `037` | observability/reporting | M | `018`, `011` | none; shortest-useful retention and baseline-first policy resolved | Durable export remains optional and operator-owned. |
-| `AUR-IMPL-031` | Add observability-lite support boundary | 3 | P2 | observability | Not started | `019`, `041`, `042` | observability/platform | M | `019` | none; artifact-only/lite/full-reference support resolved | Docs/smoke distinguish artifact-only, lite, full reference. |
-| `AUR-IMPL-032` | Add failure-path benchmark and DOM latency metrics | 3 | P2 | observability | Not started | `028`, `013` | performance/observability | M | `024` | none; baseline-first warning-only resolved | Baseline recorded; no hard gate before baseline. |
-| `AUR-IMPL-033` | Make logger initialization lazy | 3 | P2 | refactor | Monitor | `023`, `011`, `012` | runtime/devex | S | `021`, `023` | none | Import-side-effect test passes. |
+| `AUR-IMPL-028` | Add Redis production runbook and selector-store strategy | 3 | P2 | docs | Complete | `016`, `029`, `037`, `042` | data/SRE | S | `001`, `017` | none; consumer/operator ownership resolved | Runbook covers TLS/auth/ACL/backup/restore/eviction/retention/capacity/incidents and states prefix boundaries. |
+| `AUR-IMPL-029` | Add selector registry schema versioning and repair tooling | 3 | P2 | data | Complete | `017`, `016`, `037` | data | L | `009`, `017`, `028` | none; bounded scans preserve scale limits | Versioned writes, legacy upgrader, schema, dry-run/apply repair, and Redis tests exist. |
+| `AUR-IMPL-030` | Add trend durable export decision/path | 3 | P2 | observability | Complete | `018`, `037` | observability/reporting | M | `018`, `011` | none; shortest-useful retention and baseline-first policy resolved | ADR/runbook keep durable export optional, operator-owned, and separate from local JSONL. |
+| `AUR-IMPL-031` | Add observability-lite support boundary | 3 | P2 | observability | Complete | `019`, `041`, `042` | observability/platform | M | `019` | none; artifact-only/lite/full-reference support resolved | Docs, commands, contracts, and CI smoke distinguish artifact-only, Lite, and Full reference. |
+| `AUR-IMPL-032` | Add failure-path benchmark and DOM latency metrics | 3 | P2 | observability | Complete | `028`, `013` | performance/observability | M | `024` | none; baseline-first warning-only resolved | Baseline recorded; no hard gate before baseline. |
+| `AUR-IMPL-033` | Make logger initialization lazy | 3 | P2 | refactor | Complete | `023`, `011`, `012` | runtime/devex | S | `021`, `023` | none | Package/logger imports create no logger, transport, or environment validation; public logger APIs remain compatible. |
 | `AUR-IMPL-034` | Add adoption-readiness assessment | 4 | P3 | governance | Deferred | `036`, `037`, `031`, `039` | product/architecture | S | Phases 0-3 | adoption evidence | Report states target market, scale, support needs. |
 | `AUR-IMPL-035` | Add backend extensibility decision criteria | 4 | P3 | governance | Deferred | `026`, `031`, `039` | architecture/data | S | `034`, `017` | demand evidence | Store additions require demand, owner, conformance. |
 | `AUR-IMPL-036` | Add store conformance and memory-store adoption path | 4 | P3 | data | Deferred | `026`, `017` | data/devex | M | `017`, `035` | adoption evidence for more stores | Memory store adoption measured; extra stores gated. |
@@ -1764,7 +1764,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 - **Risks:** Users treat examples as production policy.
 - **Non-goals:** Owning consumer Redis.
 - **Dependencies:** `AUR-DEC-006`.
-- **Completion evidence:** Runbook and review.
+- **Completion evidence:** `docs/operations/redis-production-runbook.md` ships the `AUR-IMPL-028` runbook and is linked from README/configuration/API/development/data-layer/privacy/ADR docs; it states Redis is consumer/operator-owned and prefixes are namespace hygiene, not authorization.
 - **Journal update required:** Yes
 
 ### `AUR-IMPL-029 — Add selector registry schema versioning and repair tooling`
@@ -1776,8 +1776,8 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 - **Related source designs/cards:** Current-to-target gap, Phase 3 card 20
 - **Objective:** Add selector record `schemaVersion`, read-time upgraders, and index audit/repair tooling.
 - **Why this matters:** Registry records need migration metadata and stale index repair before larger shared registries.
-- **Current behavior:** Records lack `schemaVersion`; index update is separate; listing can scan all records.
-- **Target behavior:** Versioned records with migration tests and repair CLI.
+- **Current behavior:** Writes emit selector record `schemaVersion: '1.0.0'`; reads normalize unversioned legacy records in memory and reject unknown future versions. Bounded repair audits/upgrades records and repairs proven page/action index drift, with dry-run default and compare-and-set upgrade conflicts.
+- **Target behavior:** Implemented by `AUR-IMPL-029`.
 - **Likely files/directories to inspect:** `selectorRegistry.ts`, `redisSelectorStore.ts`, schemas, cleanup scripts.
 - **Likely files/directories to modify:** Registry, schemas, repair script/tests/docs.
 - **Files/directories out of scope:** Changing selector IDs without migration.
@@ -1789,7 +1789,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 - **Risks:** Data migration bug.
 - **Non-goals:** Full database migration framework.
 - **Dependencies:** `AUR-IMPL-009`, `017`, `028`.
-- **Completion evidence:** Migration/repair test output.
+- **Completion evidence:** Current/legacy/future fixtures, selector record JSON Schema, unit dry-run/apply/idempotency coverage, Redis integration repair coverage, and CLI dry-run smoke.
 - **Journal update required:** Yes
 
 ### `AUR-IMPL-030 — Add trend durable export decision/path`
@@ -1801,12 +1801,12 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 - **Related source designs/cards:** `DID-15`
 - **Objective:** Decide and, if approved, add optional durable trend export while keeping artifact-first reporting.
 - **Why this matters:** Cache-backed trend files may be evicted; long-horizon history requires explicit operator-owned destination.
-- **Current behavior:** Trends are local/cache JSONL.
-- **Target behavior:** Optional export path is documented/implemented without managed-service ownership.
+- **Current behavior:** Trends remain bounded local/cache JSONL. ADR 0007 and the durable-export runbook define a separate, optional operator-owned handoff to a destination chosen and secured outside AuroraFlow.
+- **Target behavior:** Implemented by `AUR-IMPL-030`; no managed-service or destination-adapter ownership was added.
 - **Likely files/directories to inspect:** `trends.ts`, scripts, docs/operations.
 - **Likely files/directories to modify:** Trends scripts/docs/tests if approved.
 - **Files/directories out of scope:** Hosted analytics backend.
-- **Implementation outline:** Record decision; add export interface/path if approved; surface warnings; keep local JSONL default.
+- **Implementation outline:** Recorded the operator-owned export decision and safe artifact handoff. A package-owned adapter stays deferred until a concrete backend, owner, and support requirement exist; local JSONL remains the default.
 - **Test plan:** Unit export path/malformed resilience; docs review.
 - **Validation commands:** `npm run test:unit -- --run tests/suites/unit/framework/observability/trends.spec.ts`, `npm run typecheck`
 - **Acceptance criteria:** Durable export is optional and owner is consumer/operator.
@@ -1814,7 +1814,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 - **Risks:** Data retention/privacy expansion.
 - **Non-goals:** Service-owned trend storage.
 - **Dependencies:** `AUR-IMPL-018`, `AUR-DEC-005`, `013`.
-- **Completion evidence:** Decision record and tests/docs if implemented.
+- **Completion evidence:** `docs/adr/0007-durable-trend-export.md`, `docs/operations/trend-durable-export.md`, privacy/flakiness/SLO cross-links, docs contract, and unchanged trend unit/schema coverage.
 - **Journal update required:** Yes
 
 ### `AUR-IMPL-031 — Add observability-lite support boundary`
@@ -1826,8 +1826,8 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 - **Related source designs/cards:** `DID-16`
 - **Objective:** Define artifact-only, lite, full local/reference, and production-reference support levels.
 - **Why this matters:** Full stack is valuable but heavy; users must not assume production support unless promised.
-- **Current behavior:** Full local/reference stack exists; support boundary needs clearer tiering.
-- **Target behavior:** Docs and optional compose/profile or smoke distinguish lite from full.
+- **Current behavior:** Artifact-only/no-op is the supported default; the existing collector-only Compose file is the best-effort Lite topology; the Full stack is local/reference only and production assets remain operator-owned references.
+- **Target behavior:** Implemented by `AUR-IMPL-031`; docs, commands, contract tests, and path-filtered/scheduled smoke lanes distinguish all tiers.
 - **Likely files/directories to inspect:** `docker-compose.observability.yml`, `observability/**`, docs/architecture/observability-stack.md, docs/operations/observability-\*.md.
 - **Likely files/directories to modify:** Observability docs/compose/workflows/tests.
 - **Files/directories out of scope:** Removing full stack; making observability mandatory.
@@ -1839,7 +1839,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 - **Risks:** Optional assets become mandatory.
 - **Non-goals:** Production observability ownership.
 - **Dependencies:** `AUR-DEC-008`.
-- **Completion evidence:** Docs/smoke output.
+- **Completion evidence:** `docs/operations/observability-support-tiers.md`, Lite package commands, renamed Lite CI smoke, scheduled/manual Full smoke, no-op unit coverage, semantic observability contract coverage, and successful local Lite smoke.
 - **Journal update required:** Yes
 
 ### `AUR-IMPL-032 — Add failure-path benchmark and DOM latency metrics`
@@ -1851,8 +1851,8 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 - **Related source designs/cards:** Phase 3 card 23
 - **Objective:** Measure aggregate failure-path cost and DOM snapshot latency before hard performance gates.
 - **Why this matters:** Self-healing diagnostics can be expensive during failure storms.
-- **Current behavior:** Individual operations bounded; aggregate cost unmeasured.
-- **Target behavior:** Benchmark smoke and optional metrics record baseline.
+- **Current behavior:** Aggregate post-error and DOM snapshot histograms are emitted through optional telemetry; a deterministic manual Chrome benchmark records the pending baseline.
+- **Target behavior:** Implemented by `AUR-IMPL-032`; benchmark smoke and optional metrics record a warning-only baseline.
 - **Likely files/directories to inspect:** self-healing DOM capture, page action failure path, telemetry metrics.
 - **Likely files/directories to modify:** Bench/test scripts, metrics, docs.
 - **Files/directories out of scope:** Hard SLO gate before baseline.
@@ -1864,7 +1864,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 - **Risks:** Benchmark instability.
 - **Non-goals:** Micro-optimization without data.
 - **Dependencies:** `AUR-IMPL-024`, `AUR-DEC-013`.
-- **Completion evidence:** Benchmark output and baseline note.
+- **Completion evidence:** `benchmark:failure-path`, fixed 500-node-bound fixture, two duration histograms, metric assertions, [`docs/quality/failure-path-baseline.json`](quality/failure-path-baseline.json), and the warning-only [baseline note](quality/failure-path-performance-baseline.md).
 - **Journal update required:** Yes
 
 ### `AUR-IMPL-033 — Make logger initialization lazy`
@@ -1876,8 +1876,8 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 - **Related source designs/cards:** Phase 3 card 22
 - **Objective:** Prevent import-time logger side effects if context/lifecycle work has not already solved them.
 - **Why this matters:** Library imports should not open transports or validate env unexpectedly.
-- **Current behavior:** Source plan reports `mainLogger` created at module load.
-- **Target behavior:** Logger initializes on first use or via context.
+- **Current behavior:** Implemented. Direct logger and package-root imports create no logger or Pino transport and do not validate logger environment values. The shared logger initializes on first `getMainLogger()`, `createChildLogger()`, or `setLogLevel()` use.
+- **Target behavior:** Implemented with the existing logger API preserved.
 - **Likely files/directories to inspect:** `src/utils/logger.ts`, logger tests, runtime context.
 - **Likely files/directories to modify:** Logger module/tests.
 - **Files/directories out of scope:** Replacing Pino.
@@ -1889,7 +1889,7 @@ Handoff notes: do not implement Phase 5 expansion from this plan alone.
 - **Risks:** Logging behavior changes.
 - **Non-goals:** New logging backend.
 - **Dependencies:** `AUR-IMPL-021`, `023` preferred.
-- **Completion evidence:** Logger tests.
+- **Completion evidence:** Import-first tests failed against eager initialization, then passed after the lazy singleton change. Tests cover direct-module and package-root imports, invalid import-time logger config, singleton identity, explicit logger injection, log-level updates, child bindings, and redaction.
 - **Journal update required:** Yes
 
 ### `AUR-IMPL-034 — Add adoption-readiness assessment`
@@ -2275,14 +2275,14 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 
 | Field | Value |
 | --- | --- |
-| Current phase | Phase 2 |
-| Current task | Phase 2 closeout follow-up for `AUR-IMPL-020`-`027` |
-| Branch | `fix/phase-2-followup-hardening` |
-| Latest commit | Based on `4ab624b` (Phase 2 self-healing pipeline and governance merged to `main`) |
-| Working tree status | Closeout follow-up docs/tests plus self-healing, promotion-audit, page-factory, and guarded E2E rough-edge fixes validated and queued for commit/PR |
+| Current phase | Phase 3 |
+| Current task | Phase 3 closeout: task-scoped review branch and PR validation |
+| Branch | `phase-3/data-observability-runtime` |
+| Latest commit | Based on `f6efaf5` |
+| Working tree status | Phase 3 `AUR-IMPL-028`-`033` and `AUR-QE-116`-`118` are prepared for a single review PR with task-scoped commits |
 | Blocked decision gates | None; `AUR-DEC-001`-`AUR-DEC-013` resolved by operator on 2026-06-10 |
-| Last validation run | 2026-06-25 closeout validation passed: `npm run verify` (format, lint, typecheck, unit 56 files / 361 tests, contracts 19 / 93, integration 2 / 16, schemas, ShellCheck, workflow lint), `npm run build`, `npm run test:coverage:critical` (7 files / 75 tests), and guarded E2E (5 tests / 2 workers). |
-| Next recommended action | Commit/push closeout PR, then begin Phase 3 with `AUR-IMPL-028` after merge. |
+| Last validation run | 2026-06-27 `npm run verify` passed: unit 61 files / 394 tests; contracts 20 / 97; integration 2 / 17; 11 schemas; format, lint, typecheck, ShellCheck, and workflow lint clean. `npm run build` passed. |
+| Next recommended action | Open/review the Phase 3 PR, keep the failure-path baseline warning-only for Phase 3, and start `AUR-IMPL-034` only after adoption evidence is available. |
 
 ### 15.3 Task Progress Log
 
@@ -2317,6 +2317,14 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | 2026-06-24 | Automation | `AUR-IMPL-027` | Completed the design-first locator-first API review package. The design proposes additive `Locator` overloads for `click()` and `type()` behind `PageActionPipeline`, preserves all string-selector signatures/behavior, keeps metadata in `ActionOptions`, avoids Playwright private locator internals, and explicitly defers prototypes until API review approval. | `docs/architecture/locator-first-api.md`, `tests/suites/contracts/docs/documentationSurface.contract.spec.ts`, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk date +%F`; Serena `get_symbols_overview` / `find_referencing_symbols`; `rtk rg` / `rtk sed` task and API inspection; `rtk npm run format:check`; `rtk npx prettier --write docs/architecture/locator-first-api.md tests/suites/contracts/docs/documentationSurface.contract.spec.ts`; `rtk npm run test:contracts -- --run tests/suites/contracts/docs/documentationSurface.contract.spec.ts`; `rtk npm run typecheck`; `rtk npm run lint` | Passed after docs fixes. Initial format check flagged the new design doc; targeted Prettier fixed it. Initial docs contract caught a missing exact API-review gate phrase; explicit rule added, then docs contract passed 19 files / 93 tests. Typecheck and lint passed. | Submit API review; add overload prototypes only after review acceptance. |
 | 2026-06-25 | Automation | `AUR-IMPL-025`, `AUR-IMPL-026` | Added policy-authorized reviewed selector promotions and audit retention cleanup per `AUR-DEC-005`/`006`/`007`. Local mode remains permissive and returns/writes an explicit warning; shared CLI mode requires CODEOWNERS plus protected-workflow evidence. Promotion status changes now use expected-status CAS over store/Redis JSON-field compare-and-set, with race tests proving one winner and explicit `PromotionStatusConflictError` conflicts. Audit writes carry 30-day retention metadata; cleanup scans history, promotions, and audit records in dry-run mode by default, deletes only with `--apply`/env opt-in, and skips `legalHold: true` audit records. | `src/framework/selfHealing/{promotionAuthorization,promotionRepository,promotionWorkflow}.ts`, `src/data/selectors/{selectorRegistry,memorySelectorStore,redisSelectorStore}.ts`, `src/utils/redisClient.ts`, `scripts/self-healing-{promotions,registry-cleanup}.ts`, docs/API/API-stability/config/privacy/self-healing docs, unit/integration tests, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk npx vitest run ...promotionWorkflow.spec.ts ...registryRuntime.spec.ts ...memorySelectorStore.spec.ts ...redisSelectorStore.spec.ts ...redisClient.spec.ts ...workflowScriptsBoundary.spec.ts ...packageSurface.spec.ts`; `rtk npx vitest run tests/suites/integration/framework/data/redisIntegration.spec.ts`; `rtk npm run test:unit`; `rtk npm run test:contracts`; `rtk npm run test:integration`; `rtk npm run test:coverage:critical`; `rtk npm run build`; `rtk npm run verify` | Passed. Targeted unit: 7 files / 61 tests. Full unit: 55 files / 358 tests. Contracts: 19 files / 93 tests. Integration: 2 files / 16 tests. Critical coverage: 7 files / 75 tests. Build and full verify passed; verify stamp skipped because the worktree is not clean. | Continue with `AUR-IMPL-028` Redis runbook/strategy or reconcile `AUR-IMPL-023` lifecycle fixture status. |
 | 2026-06-25 | Automation | Phase 2 closeout follow-up | Closed rough edges found while auditing Phase 2 completion: documented that the run budget aggregates by shared `AuroraFlowContext`, preserved off-mode screenshot evidence while keeping self-healing artifacts disabled, added direct run-budget controller coverage, kept promotion audit records source-backed with authorization evidence without narrowing the exported authorization input contract, clarified `PageFactory` context-provider ownership, and moved guarded E2E self-healing fixtures from global `process.env` mutation to injected context env. | `docs/architecture/self-healing.md`, `src/framework/selfHealing/{promotionAuthorization,promotionWorkflow}.ts`, `src/helpers/pageFactory.ts`, `src/pageObjects/pageObjectBase.ts`, `tests/suites/{unit,e2e}/**`, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk npm run typecheck`; `rtk npm run test:unit -- --run tests/suites/unit/framework/selfHealing/runBudget.spec.ts tests/suites/unit/framework/pageObjectBase/pageObjectBaseSelfHealing.spec.ts tests/suites/unit/framework/selfHealing/promotionWorkflow.spec.ts tests/suites/unit/framework/runtime/lifecycle.spec.ts tests/suites/unit/framework/runtime/auroraFlowFixture.spec.ts tests/suites/unit/framework/pageFactory/pageFactory.spec.ts tests/suites/unit/framework/packageSurface/packageSurface.spec.ts`; `rtk npm run test:e2e:guarded`; `rtk npm run verify`; `rtk npm run build`; `rtk npm run test:coverage:critical` | Passed. Typecheck clean; targeted/full unit invocation ran 56 files / 361 tests; guarded E2E ran 5 tests with two workers; full verify passed format/lint/typecheck/unit/contracts/integration/schemas/ShellCheck/workflow lint; build passed; critical coverage passed 7 files / 75 tests. | Commit/push the closeout branch, open PR, and follow CI. |
+| 2026-06-26 17:32 -03 | Codex | `AUR-IMPL-028` | Added docs-only Redis production runbook/selector-store strategy. Runbook covers TLS, auth, ACL, prefixes, backup/restore, eviction, retention, capacity, and incident guidance; it states Redis is consumer/operator-owned and prefixes are namespace hygiene, not authorization. Cross-linked README, configuration, API, development, data-layer, privacy, and Redis ADR docs. | `docs/operations/redis-production-runbook.md`, `README.md`, `docs/{configuration,development,api}.md`, `docs/architecture/data-layer.md`, `docs/operations/privacy-retention.md`, `docs/adr/0004-redis-strategy.md`, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md` | `rtk npx prettier --write ...`; `rtk npm run format:check`; `rtk npm run test:contracts -- tests/suites/contracts/docs/documentationSurface.contract.spec.ts` | Passed. Format check clean. Contracts ran 19 files / 93 tests. | Commit/push docs-only `AUR-IMPL-028`, then start `AUR-IMPL-029`. |
+| 2026-06-26 | Codex | `AUR-IMPL-029`, `AUR-QE-116` | Added selector record `schemaVersion: '1.0.0'`, validated read-time legacy upgrading, unknown-future rejection, current write serialization, and bounded schema/index repair with dry-run default, compare-and-set upgrades, safe stale-index deletion, apply/idempotency coverage, and Redis proof. Added selector record schema plus v1/legacy/future artifact fixtures and documented must-read, skip-with-warning, and hard-reject policy. | `src/data/selectors/selectorRegistry.ts`, `scripts/self-healing-registry-repair.ts`, `schemas/selector-registry-record.schema.json`, `tests/fixtures/artifacts/**`, registry/repair/artifact compatibility unit tests, Redis integration test, schema/API/data/operations/QE docs | Focused registry/repair/compatibility and existing schema tests; repair CLI memory smoke; `rtk npm run schemas:check`; `rtk npm run typecheck`; `rtk npm run lint`; `rtk npm run build`; `rtk npm run test:integration`; `rtk npm run verify` | Passed. Focused compatibility/registry tests: 27 tests; existing schema/trend tests: 16 tests; full verify: unit 58 files / 377 tests, contracts 19 / 93, integration 2 / 17, 11 schemas compiled, ShellCheck/workflow lint clean; build and repair CLI smoke passed. | Commit/push Phase 3 schema/QE work; continue `AUR-IMPL-031` / `AUR-QE-117` while `AUR-IMPL-030` remains deferred. |
+| 2026-06-26 | Codex | `AUR-IMPL-030`, `AUR-IMPL-031` | Recorded durable trend export as optional and consumer/operator-owned with no built-in backend adapter. Defined artifact-only supported default, best-effort Lite collector, and Full local/reference-only tiers; added Lite commands, path-filtered CI naming/coverage, docs, and semantic contracts while preserving no-op runtime defaults. | `docs/adr/0007-durable-trend-export.md`, `docs/operations/{trend-durable-export,observability-support-tiers}.md`, observability/retention/trend docs, `package.json`, `.github/workflows/quality.yml`, observability/docs contract tests, no-op telemetry test names | Focused observability/trend unit and docs/observability contracts; both Compose config checks; local `observability:lite:smoke`; `rtk npm run typecheck`; `rtk npm run workflows:lint:check`; `rtk npm run verify` | Passed. Focused unit 2 files / 13 tests; focused contracts 2 / 20; Lite collector emitted real OTLP smoke signals; full verify unit 58 / 377, contracts 19 / 95, integration 2 / 17, 11 schemas, format/lint/typecheck/ShellCheck/workflow lint clean. | Commit/push Phase 3 work; continue `AUR-IMPL-032` with baseline-first, warning-only policy. |
+| 2026-06-26 | Codex | `AUR-QE-117` | Replaced full-stack workflow polling/grep payload checks with a typed Node validator. Readiness and smoke modes apply bounded concurrent retries/timeouts and semantic validation across Collector, Prometheus, Grafana, Jaeger, Elasticsearch, and Kibana; every run writes versioned JSON diagnostics with exact check failures. Workflow YAML now orchestrates validator/live-assert/snapshot commands, and contracts assert delegation plus durable configuration invariants instead of backend response strings. | `src/framework/observability/backendValidation.ts`, `scripts/observability-validate-backends.ts`, `package.json`, `.github/workflows/quality.yml`, validator unit/process tests, observability contract, support/operations/configuration docs, QE plan | Focused validator unit, CLI process-boundary, observability contract, typecheck/lint/workflow lint; isolated local Full-stack attempts; `rtk npm run test:unit`; `rtk npm run verify` | Passed code gates: validator unit 5 tests, process boundary 8 tests, observability contract 13 tests, full verify unit 59 / 383, contracts 19 / 95, integration 2 / 17, 11 schemas. Local Full-stack validation could not complete because cold local Elasticsearch became unhealthy under the heavy reference topology; first attempt still proved failed readiness JSON named exact services. Scheduled/manual CI lane remains authoritative full-stack environment evidence. | Commit/push Phase 3/QE work; continue `AUR-IMPL-032`/`AUR-QE-118` baseline-only performance evidence. |
+| 2026-06-26 | Codex | `AUR-IMPL-032` | Added exact DOM snapshot and aggregate post-error duration histograms, a network-free fixed Chrome failure fixture, manual benchmark/record commands, and a machine-readable pending baseline. Aggregate timing includes screenshot, SAT, memory registry/history, guarded probes, artifact write, and pending persistence after the original action fails. Baseline remains warning-only with `hardThresholds: null`; benchmark is absent from `verify` and required CI. | `benchmarks/fixtures/failurePathFixture.ts`, `scripts/failure-path-benchmark{,-lib}.ts`, observability metric/runtime files, focused unit/contract tests, `docs/quality/failure-path-{baseline.json,performance-baseline.md}`, development/observability docs, `package.json` | Focused metric/benchmark/contract tests; `rtk npm run benchmark:failure-path:record`; post-refactor real-Chrome smoke; `rtk npm run typecheck`; `rtk npm run lint`; `rtk npm run verify`; `rtk npm run build` | Passed. Recorded 12 samples after 3 warmups: aggregate median 1161.636 ms / mean 1530.823 ms; DOM median 570.230 ms / mean 684.675 ms. Full verify passed: unit 60 files / 387 tests, contracts 20 / 97, integration 2 / 17, 11 schemas, format/lint/typecheck/ShellCheck/workflow lint clean; build passed. Initial unit contention exposed the existing backend-validator child-process timeout when the benchmark spec imported Playwright; moving pure benchmark helpers into a lightweight module restored deterministic full-suite execution. | Maintainer reviews baseline; no hard performance gate before explicit approval. |
+| 2026-06-27 | Codex | `AUR-QE-118` | Extended the deterministic benchmark with isolated SAT candidate-extraction and representative artifact-write costs, strict baseline parsing, and median trend comparisons. Default output reports every comparison as warning-only; timing changes never affect exit status, `hardThresholds` remains `null`, and the benchmark remains manual-only. | `scripts/failure-path-benchmark{,-lib}.ts`, benchmark unit/contract tests, `docs/quality/failure-path-{baseline.json,performance-baseline.md}`, development/QE/architecture plans | Focused unit/contract tests; real-Chrome record and warning-report smoke; `rtk npm run test:e2e:guarded`; `rtk npm run verify`; `rtk npm run build` | Passed. Schema-v2 baseline recorded 12 samples after 3 warmups: safe-action median 564.249 ms, DOM 275.715 ms, SAT extraction 6.022 ms, artifact write 3.266 ms; fixture held 500 captured nodes, 625 SAT seeds, and 13,753 artifact bytes. Guarded Chrome 5 tests passed; full verify passed unit 60 / 390, contracts 20 / 97, integration 2 / 17, 11 schemas; build passed. | Maintainer reviews baseline before any hard budget or required CI gate. |
+| 2026-06-27 | Codex | `AUR-IMPL-033` | Added import-side-effect tests first; both failed against eager logger construction and environment validation. Replaced module-scope construction with a lazy singleton, deferred helper defaults until function invocation, and preserved `getMainLogger`, explicit logger injection, child logger, and log-level behavior. Direct logger and package-root imports now create no logger or transport and do not validate logging environment. | `src/utils/logger.ts`, `src/helpers/helpers.ts`, logger unit/import tests, configuration and architecture plan docs | Expected-failure import test; focused logger tests; typecheck/lint; isolated workflow-boundary rerun after one load-sensitive timeout; `rtk npm run verify`; `rtk npm run build` | Passed. Focused logger 2 files / 11 tests; full verify unit 61 / 394, contracts 20 / 97, integration 2 / 17, 11 schemas; format/lint/typecheck/ShellCheck/workflow lint clean; build passed. One backend-validator boundary test timed out during an earlier loaded unit run, then passed isolated and in full verify. | Review Phase 3 changes; no logger API migration required. |
+| 2026-06-27 | Codex | Phase 3 closeout | Closed the performance-baseline decision for the Phase 3 merge path: keep the benchmark manual-only and warning-only with `hardThresholds: null`; require a separate maintainer-approved change before any hard gate. Prepared the Phase 3 work for one PR with task-scoped commits instead of artificial PR fan-out because PR-03D metrics, smoke emission, and live-export assertions are coupled. | `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md`, Phase 3 branch/PR metadata | `.serena/phase3-closing.md` review; `rtk git status --short`; `rtk git diff --stat` | Decision recorded; branch/commit/CI execution follows this journal entry. | Open/review the Phase 3 PR; next implementation task remains `AUR-IMPL-034` after adoption evidence. |
 
 ### 15.4 Command Log
 
@@ -2422,7 +2430,7 @@ All 13 decision gates were resolved by operator decision on 2026-06-10. `AUR-IMP
 | `AUR-DEC-010` | 2026-06-10 | Never | Hosted SAT is outside product scope | Hosted SAT remains non-goal; no funded-mandate exception in this plan | `AUR-IMPL-039` |
 | `AUR-DEC-011` | 2026-06-10 | GitHub only until user demand | Avoids speculative CI template maintenance | Non-GitHub docs/templates remain demand-gated | `AUR-IMPL-037` |
 | `AUR-DEC-012` | 2026-06-10 | npm provenance + SBOM for public library; signing deferred until product demonstrates release readiness | Provides public-library supply-chain baseline without premature signing ceremony | Release workflow should dry-run provenance/SBOM; signing stays deferred | `AUR-IMPL-010` |
-| `AUR-DEC-013` | 2026-06-10 | Baseline first; warning-only until measured | Avoids hard performance gates before data exists | Budget/benchmark tasks should warn and record baseline before blocking | `AUR-IMPL-024`, `032` |
+| `AUR-DEC-013` | 2026-06-10; reaffirmed 2026-06-27 | Baseline first; keep Phase 3 benchmark warning-only until a later maintainer-approved hard budget | Avoids hard performance gates before environment-normalized budget data and owner sign-off exist | Budget/benchmark tasks warn and record baseline only; no benchmark in `verify` or required CI while `hardThresholds` is `null` | `AUR-IMPL-024`, `032`; future hard-gate decision |
 
 ### 15.6 Deviation Log
 
@@ -2546,6 +2554,16 @@ Current handoff, 2026-06-25 `AUR-IMPL-025`/`AUR-IMPL-026`:
 - **Files changed:** Promotion workflow/repository/authorization, selector store interfaces/adapters, Redis client CAS helper, promotion/cleanup CLIs, package exports/API tiers, docs, and focused unit/integration/contract coverage.
 - **Recommended next task:** `AUR-IMPL-028` Redis production runbook/selector-store strategy, or reconcile `AUR-IMPL-023` lifecycle fixture status if that work should happen first.
 - **Rollback notes:** Use default local authorization if shared evidence is unavailable; cleanup remains non-destructive by default. Revert the JSON-field CAS helper plus workflow status transitions only together to avoid returning to last-writer-wins promotion updates.
+
+Current handoff, 2026-06-26 `AUR-IMPL-028`:
+
+- **What was completed:** Docs-only Redis selector-registry production runbook at `docs/operations/redis-production-runbook.md`, with cross-links from README, configuration, API, development, data-layer, privacy, and Redis strategy ADR docs.
+- **Operations covered:** TLS, authentication, ACL/network policy, prefix and namespace boundaries, backup/restore drills, no-eviction guidance, retention/cleanup, capacity planning, Redis/Lua compatibility, and incident playbooks.
+- **Ownership invariant:** Redis remains consumer/operator-owned. `AURORAFLOW_REDIS_KEY_PREFIX` and registry namespaces are namespace hygiene for scans/cleanup/collision avoidance, not authorization.
+- **Validation status:** 2026-06-26 `npm run format:check` passed and `npm run test:contracts -- tests/suites/contracts/docs/documentationSurface.contract.spec.ts` passed (19 contract files / 93 tests).
+- **Files changed:** Docs only: `README.md`, `docs/ARCHITECTURE_IMPLEMENTATION_PLAN.md`, `docs/adr/0004-redis-strategy.md`, `docs/api.md`, `docs/architecture/data-layer.md`, `docs/configuration.md`, `docs/development.md`, `docs/operations/privacy-retention.md`, and `docs/operations/redis-production-runbook.md`.
+- **Recommended next task:** `AUR-IMPL-029` registry schema versioning and dry-run repair tooling. Treat old-record readability and repair safety as blocked on this runbook now being present.
+- **Rollback notes:** Revert the runbook and cross-links only. No runtime, schema, export, or test behavior changed.
 
 ## 16. Backlog Grooming Rules
 

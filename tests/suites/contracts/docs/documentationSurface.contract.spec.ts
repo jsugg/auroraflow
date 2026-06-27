@@ -40,11 +40,16 @@ describe('documentation surface contract', () => {
       'docs/adr/0004-redis-strategy.md',
       'docs/adr/0005-observability-boundary.md',
       'docs/adr/0006-release-policy.md',
+      'docs/adr/0007-durable-trend-export.md',
       'docs/architecture/locator-first-api.md',
       'docs/architecture/self-healing.md',
+      'docs/operations/artifact-schemas.md',
       'docs/operations/lifecycle.md',
       'docs/operations/privacy-retention.md',
+      'docs/operations/redis-production-runbook.md',
       'docs/operations/observability-contract.md',
+      'docs/operations/observability-support-tiers.md',
+      'docs/operations/trend-durable-export.md',
       'docs/operations/flakiness-analytics.md',
       'docs/operations/slo-dashboard-alerting.md',
     ];
@@ -81,6 +86,26 @@ describe('documentation surface contract', () => {
         text,
         rationale:
           'Privacy guide must preserve safety boundary and consumer-owned retention wording.',
+      });
+    }
+  });
+
+  it('records durable trend export as optional and operator-owned', () => {
+    const decision = readRepoFile('docs/adr/0007-durable-trend-export.md');
+    const runbook = readRepoFile('docs/operations/trend-durable-export.md');
+    const docs = `${decision}\n${runbook}`;
+
+    for (const text of [
+      'Durable trend export is optional and consumer/operator-owned',
+      'bounded local JSONL remains the default',
+      'does not upload trends or provision a durable analytics backend',
+      '30 days or less',
+      'must not delete or corrupt the local JSONL source',
+    ]) {
+      expectTextIncludes(docs, {
+        text,
+        rationale:
+          'Trend export docs must preserve optionality, operator ownership, and source safety.',
       });
     }
   });
