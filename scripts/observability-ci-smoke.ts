@@ -19,6 +19,10 @@ import {
   type AuroraFlowTelemetry,
   type TelemetryDiagnosticLogger,
 } from '../src/framework/observability/telemetry';
+import {
+  buildCollectorReceiptLogMarker,
+  emitCollectorReceiptLog,
+} from './observability-collector-receipt';
 
 interface DiagnosticEvent {
   readonly level: 'error' | 'warn';
@@ -188,8 +192,9 @@ function recordRepresentativeSmokeMetrics(telemetry: AuroraFlowTelemetry): void 
 }
 
 async function writeSmokeLog(): Promise<void> {
+  const telemetryEnvironment = buildTelemetryEnvironment();
   const telemetry = initializeTelemetry({
-    env: buildTelemetryEnvironment(),
+    env: telemetryEnvironment,
     logger: diagnosticLogger,
   });
   const startedAt = performance.now();
@@ -226,6 +231,15 @@ async function writeSmokeLog(): Promise<void> {
 
   await shutdownTelemetry();
 
+  let collectorReceiptLogMarker: string | undefined;
+  if (process.env.AURORAFLOW_OBSERVABILITY_EMIT_OTLP_LOG === 'true') {
+    collectorReceiptLogMarker = buildCollectorReceiptLogMarker(process.env.GITHUB_RUN_ID);
+    await emitCollectorReceiptLog({
+      endpoint: telemetryEnvironment.OTEL_EXPORTER_OTLP_ENDPOINT ?? DEFAULT_COLLECTOR_ENDPOINT,
+      marker: collectorReceiptLogMarker,
+    });
+  }
+
   const diagnosticsDir =
     process.env.AURORAFLOW_OBSERVABILITY_DIAGNOSTICS_DIR ?? DEFAULT_DIAGNOSTICS_DIR;
   await mkdir(diagnosticsDir, { recursive: true });
@@ -234,6 +248,7 @@ async function writeSmokeLog(): Promise<void> {
     `${JSON.stringify(
       {
         emitted: true,
+        collectorReceiptLogMarker,
         durationMs: Math.round(performance.now() - startedAt),
         diagnosticEvents,
       },
