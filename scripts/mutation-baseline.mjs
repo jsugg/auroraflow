@@ -86,8 +86,18 @@ const MUTATIONS = [
     area: 'config',
     file: 'src/framework/selfHealing/config.ts',
     description: 'Stop clamping bounded integers at the hard maximum.',
-    find: 'if (parsedValue > hardMaximum) {',
-    replace: 'if (parsedValue > hardMaximum + 100) {',
+    find: `message: \`\${envVar} must be at least 1. Using default \${defaultValue}.\`,
+      applied: String(defaultValue),
+    });
+    return defaultValue;
+  }
+  if (parsedValue > hardMaximum) {`,
+    replace: `message: \`\${envVar} must be at least 1. Using default \${defaultValue}.\`,
+      applied: String(defaultValue),
+    });
+    return defaultValue;
+  }
+  if (parsedValue > hardMaximum + 100) {`,
   },
   {
     id: 'guarded-confidence-gate-strict',

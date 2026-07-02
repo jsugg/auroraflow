@@ -491,7 +491,7 @@ describe('workflow script process boundaries', () => {
       writeJsonFile(
         failurePolicyJson,
         createAlertPolicy({
-          alerts: [{ ...createAlertPolicy().alerts[0]!, blockOnBreach: true }],
+          alerts: [{ ...createAlertPolicy().alerts[0], blockOnBreach: true }],
         }),
       );
 
