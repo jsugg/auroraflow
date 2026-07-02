@@ -7,7 +7,20 @@ const WORKFLOW_FILES = [
   '.github/workflows/quality.yml',
   '.github/workflows/examples.yml',
   '.github/workflows/security.yml',
+  '.github/workflows/playwright-peer-matrix.yml',
+  '.github/workflows/release.yml',
 ] as const;
+const PR_AND_EVIDENCE_WORKFLOW_FILES = [
+  '.github/workflows/quality.yml',
+  '.github/workflows/examples.yml',
+  '.github/workflows/security.yml',
+] as const;
+const EVIDENCE_ONLY_WORKFLOW_FILES = [
+  '.github/workflows/ci.yml',
+  '.github/workflows/playwright-peer-matrix.yml',
+  '.github/workflows/release.yml',
+] as const;
+const FULL_LENGTH_SHA_ACTION_REFERENCE = /^[^@\s]+@[a-f0-9]{40}$/;
 
 describe('workflow actions runtime contract', () => {
   it('opts JavaScript actions into Node 24 runtime', () => {
@@ -39,6 +52,60 @@ describe('workflow actions runtime contract', () => {
           `${workflowPath} must avoid Node20-target action reference ${actionReference}.`,
         );
       }
+    }
+  });
+
+  it('pins every external workflow action to a full-length immutable SHA', () => {
+    for (const workflowPath of WORKFLOW_FILES) {
+      for (const actionReference of getWorkflowActionReferences(readWorkflowModel(workflowPath))) {
+        if (actionReference.startsWith('./')) {
+          continue;
+        }
+
+        expectInvariant(
+          FULL_LENGTH_SHA_ACTION_REFERENCE.test(actionReference),
+          `${workflowPath} must SHA-pin external action reference ${actionReference}.`,
+        );
+      }
+    }
+  });
+
+  it('keeps local reusable workflows repository-scoped for SHA policy compatibility', () => {
+    const localReferences = WORKFLOW_FILES.flatMap((workflowPath) =>
+      getWorkflowActionReferences(readWorkflowModel(workflowPath))
+        .filter((actionReference) => actionReference.startsWith('./'))
+        .map((actionReference) => ({ actionReference, workflowPath })),
+    );
+
+    expectInvariant(
+      localReferences.length > 0,
+      'At least one local reusable workflow reference must cover repository SHA policy compatibility.',
+    );
+    for (const { actionReference, workflowPath } of localReferences) {
+      expectInvariant(
+        actionReference.startsWith('./.github/workflows/') && !actionReference.includes('@'),
+        `${workflowPath} local reusable workflow reference must stay repository-scoped: ${actionReference}.`,
+      );
+    }
+  });
+
+  it('cancels stale pull-request runs without cancelling main evidence runs', () => {
+    for (const workflowPath of PR_AND_EVIDENCE_WORKFLOW_FILES) {
+      const workflow = readWorkflowModel(workflowPath);
+      expect(
+        workflow.concurrency.get('cancel-in-progress'),
+        `${workflowPath} must cancel only stale pull-request runs.`,
+      ).toBe("${{ github.event_name == 'pull_request' }}");
+    }
+  });
+
+  it('keeps scheduled, manual, and release evidence runs non-cancellable', () => {
+    for (const workflowPath of EVIDENCE_ONLY_WORKFLOW_FILES) {
+      const workflow = readWorkflowModel(workflowPath);
+      expect(
+        workflow.concurrency.get('cancel-in-progress'),
+        `${workflowPath} must preserve evidence runs instead of cancelling in-progress executions.`,
+      ).toBe('false');
     }
   });
 });
