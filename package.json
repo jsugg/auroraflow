@@ -1,6 +1,7 @@
 {
   "name": "auroraflow",
   "version": "1.0.0",
+  "type": "commonjs",
   "packageManager": "npm@11.17.0",
   "description": "TypeScript Playwright test automation framework with resilient page objects, Redis-backed selector data, self-healing diagnostics, and CI observability artifacts.",
   "main": "./dist/index.js",
@@ -23,8 +24,17 @@
     "docs",
     "schemas",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "playwright.js",
+    "playwright.d.ts"
   ],
+  "typesVersions": {
+    "*": {
+      "playwright": [
+        "playwright.d.ts"
+      ]
+    }
+  },
   "scripts": {
     "prepare": "husky",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
