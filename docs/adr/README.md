@@ -15,6 +15,7 @@ This directory contains durable architecture decision records for AuroraFlow. Ke
 | [ADR 0007](0007-durable-trend-export.md)         | Accepted | Durable trend export         |
 | [ADR 0008](0008-adoption-gated-extensibility.md) | Accepted | Adoption-gated extensibility |
 | [ADR 0009](0009-strategic-architecture.md)       | Accepted | Strategic structure          |
+| [ADR 0010](0010-ci-cd-maturity-deferrals.md)     | Accepted | CI/CD maturity deferrals     |
 
 ## Lightweight process
 
