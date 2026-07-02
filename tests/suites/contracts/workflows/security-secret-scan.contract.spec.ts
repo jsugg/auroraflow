@@ -110,12 +110,14 @@ describe('security workflow secret scanning contract', () => {
 
     expect(codeqlJob.name).toBe('CodeQL');
     expect(codeqlJob.if).toBeUndefined();
-    expect(
-      codeqlJob.steps.some((step) => step.uses?.startsWith('github/codeql-action/autobuild@')),
-    ).toBe(false);
-    expect(getWorkflowStep(codeqlJob, 'Perform CodeQL analysis').uses).toMatch(
-      /^github\/codeql-action\/analyze@[a-f0-9]{40}$/u,
+    expectInvariant(
+      !codeqlJob.steps.some((step) => step.uses?.startsWith('github/codeql-action/autobuild@')),
+      'JavaScript/TypeScript CodeQL analysis must not run an unnecessary autobuild step.',
     );
+    expectTextMatches(getWorkflowStep(codeqlJob, 'Perform CodeQL analysis').uses ?? '', {
+      pattern: /^github\/codeql-action\/analyze@[a-f0-9]{40}$/u,
+      rationale: 'CodeQL analysis action must stay pinned to an immutable SHA.',
+    });
   });
 
   it('keeps full-lock npm audit skipped on pull requests and blocking on push/schedule', () => {
