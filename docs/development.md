@@ -68,6 +68,14 @@ npm run schemas:check
 npm run build
 ```
 
+Check manifest/lockfile consistency before Dependabot or dependency PRs:
+
+```bash
+npm run lockfile:check
+```
+
+If it fails, regenerate the lockfile with `npm install --package-lock-only`, commit `package.json` and `package-lock.json` together, then rerun the check.
+
 Run the repository verification target:
 
 ```bash
@@ -122,6 +130,7 @@ Calibration-critical code (scoring, config, guarded validation, retry, Redis CAS
 
 | Gate | Cost tier | Runs | Responsibility |
 | --- | --- | --- | --- |
+| `Lockfile Drift` | Fast dependency check | Manifest/dependabot changes, Dependabot PRs, `main`, scheduled, and manual quality workflow runs | Fails early with clear remediation when `package-lock.json` is not synchronized with `package.json`. |
 | `Node Compatibility (Node 20/22/24)` | Fast matrix | Pull requests, `main`, scheduled, and manual quality workflow runs | `npm ci`, lint, typecheck, and unit tests only; no Docker, Redis, OTLP collector, or browser install. |
 | `Repository Gates (Node 22)` | Static + Docker integration | Pull requests, `main`, scheduled, and manual quality workflow runs | Format, contracts, Redis/OTLP integration with `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true`, schemas, ShellCheck, and workflow lint. |
 | `Coverage (Critical + Global)` | Coverage | Pull requests, `main`, scheduled, and manual quality workflow runs | Enforces critical-module thresholds, global `src/**` coverage, and risk-weighted per-file floors for high-risk modules once on Node 22. |

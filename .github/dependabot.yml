@@ -17,15 +17,21 @@ updates:
           - 'version-update:semver-major'
     groups:
       npm-production:
+        applies-to: 'version-updates'
         dependency-type: 'production'
         update-types:
           - 'minor'
           - 'patch'
       npm-development:
+        applies-to: 'version-updates'
         dependency-type: 'development'
         update-types:
           - 'minor'
           - 'patch'
+      npm-security:
+        applies-to: 'security-updates'
+        patterns:
+          - '*'
 
   - package-ecosystem: 'github-actions'
     directory: '/'
@@ -37,5 +43,10 @@ updates:
     open-pull-requests-limit: 5
     groups:
       github-actions:
+        applies-to: 'version-updates'
+        patterns:
+          - '*'
+      github-actions-security:
+        applies-to: 'security-updates'
         patterns:
           - '*'

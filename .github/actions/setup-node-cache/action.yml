@@ -1,0 +1,83 @@
+name: Setup Node.js with locked npm install
+description: Standardizes Node setup, npm lockfile validation, npm cache, and optional Playwright browser cache/install.
+inputs:
+  node-version:
+    description: Node.js version to install.
+    required: false
+    default: '22'
+  install-browsers:
+    description: Set to true to cache and install one Playwright browser target after npm ci.
+    required: false
+    default: 'false'
+  browser-name:
+    description: Playwright browser install target, for example chrome, chromium, firefox, webkit, or msedge.
+    required: false
+    default: ''
+  cache-namespace:
+    description: Stable cache namespace for this workflow/job/browser lane.
+    required: false
+    default: node
+  cache-version:
+    description: Manual cache version bump for stale cache rollback.
+    required: false
+    default: v1
+  activate-package-manager:
+    description: Set to true when the repo packageManager npm version must be activated before npm ci.
+    required: false
+    default: 'false'
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: npm
+        cache-dependency-path: package-lock.json
+
+    - name: Activate repo npm version
+      if: ${{ inputs.activate-package-manager == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        npm_version=$(node -p "require('./package.json').packageManager.replace(/^npm@/, '')")
+        corepack enable
+        corepack prepare "npm@${npm_version}" --activate
+        npm --version
+        npm sbom --help > /dev/null
+
+    - name: Check lockfile drift
+      shell: bash
+      run: npm run lockfile:check
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Cache Playwright browsers
+      if: ${{ inputs.install-browsers == 'true' }}
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-${{ inputs.cache-version }}-${{ inputs.cache-namespace }}-${{ hashFiles('package-lock.json', 'configs/playwright.config.ts', 'configs/playwright.*.ts') }}
+        restore-keys: |
+          ${{ runner.os }}-playwright-${{ inputs.cache-version }}-${{ inputs.cache-namespace }}-
+
+    - name: Ensure Playwright browser is installed
+      if: ${{ inputs.install-browsers == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        if [ -z "${{ inputs.browser-name }}" ]; then
+          echo "::error::browser-name is required when install-browsers is true"
+          exit 1
+        fi
+        for attempt in 1 2 3; do
+          if timeout 300 npx playwright install --with-deps ${{ inputs.browser-name }}; then
+            exit 0
+          fi
+          echo "::warning::Playwright browser install attempt ${attempt} failed or timed out; retrying"
+          sleep $((attempt * 15))
+        done
+        echo "::error::Playwright browser install failed after 3 attempts"
+        exit 1

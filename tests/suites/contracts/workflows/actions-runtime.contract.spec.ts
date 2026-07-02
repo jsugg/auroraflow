@@ -1,5 +1,7 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { expectInvariant } from '../../../helpers/contractAssertions';
+import { expectInvariant, expectTextIncludes } from '../../../helpers/contractAssertions';
 import { getWorkflowActionReferences, readWorkflowModel } from '../../../helpers/workflowModel';
 
 const WORKFLOW_FILES = [
@@ -20,7 +22,30 @@ const EVIDENCE_ONLY_WORKFLOW_FILES = [
   '.github/workflows/playwright-peer-matrix.yml',
   '.github/workflows/release.yml',
 ] as const;
+const ACTION_FILES = ['.github/actions/setup-node-cache/action.yml'] as const;
 const FULL_LENGTH_SHA_ACTION_REFERENCE = /^[^@\s]+@[a-f0-9]{40}$/;
+const LOCKED_INSTALL_ACTION = './.github/actions/setup-node-cache';
+
+function getCompositeActionReferences(relativePath: string): readonly string[] {
+  const content = readFileSync(path.join(process.cwd(), relativePath), 'utf8');
+  return [...content.matchAll(/^ {6}uses:\s*(.+)$/gm)]
+    .map((match) => parseActionReference(match[1] ?? ''))
+    .filter((reference) => reference.length > 0);
+}
+
+function parseActionReference(value: string): string {
+  const commentIndex = value.search(/\s#/);
+  return (commentIndex === -1 ? value : value.slice(0, commentIndex)).trim();
+}
+
+function getAllActionReferences(): readonly string[] {
+  return [
+    ...WORKFLOW_FILES.flatMap((workflowPath) =>
+      getWorkflowActionReferences(readWorkflowModel(workflowPath)),
+    ),
+    ...ACTION_FILES.flatMap((actionPath) => getCompositeActionReferences(actionPath)),
+  ];
+}
 
 describe('workflow actions runtime contract', () => {
   it('opts JavaScript actions into Node 24 runtime', () => {
@@ -44,33 +69,29 @@ describe('workflow actions runtime contract', () => {
     ];
     const disallowedReferenceSet = new Set<string>(disallowedReferences);
 
-    for (const workflowPath of WORKFLOW_FILES) {
-      for (const actionReference of getWorkflowActionReferences(readWorkflowModel(workflowPath))) {
-        expectInvariant(
-          !disallowedReferenceSet.has(actionReference) &&
-            !actionReference.startsWith('actions/dependency-review-action@'),
-          `${workflowPath} must avoid Node20-target action reference ${actionReference}.`,
-        );
-      }
+    for (const actionReference of getAllActionReferences()) {
+      expectInvariant(
+        !disallowedReferenceSet.has(actionReference) &&
+          !actionReference.startsWith('actions/dependency-review-action@'),
+        `Workflows and local actions must avoid Node20-target action reference ${actionReference}.`,
+      );
     }
   });
 
   it('pins every external workflow action to a full-length immutable SHA', () => {
-    for (const workflowPath of WORKFLOW_FILES) {
-      for (const actionReference of getWorkflowActionReferences(readWorkflowModel(workflowPath))) {
-        if (actionReference.startsWith('./')) {
-          continue;
-        }
-
-        expectInvariant(
-          FULL_LENGTH_SHA_ACTION_REFERENCE.test(actionReference),
-          `${workflowPath} must SHA-pin external action reference ${actionReference}.`,
-        );
+    for (const actionReference of getAllActionReferences()) {
+      if (actionReference.startsWith('./')) {
+        continue;
       }
+
+      expectInvariant(
+        FULL_LENGTH_SHA_ACTION_REFERENCE.test(actionReference),
+        `Workflows and local actions must SHA-pin external action reference ${actionReference}.`,
+      );
     }
   });
 
-  it('keeps local reusable workflows repository-scoped for SHA policy compatibility', () => {
+  it('keeps local reusable workflows and actions repository-scoped for SHA policy compatibility', () => {
     const localReferences = WORKFLOW_FILES.flatMap((workflowPath) =>
       getWorkflowActionReferences(readWorkflowModel(workflowPath))
         .filter((actionReference) => actionReference.startsWith('./'))
@@ -83,10 +104,47 @@ describe('workflow actions runtime contract', () => {
     );
     for (const { actionReference, workflowPath } of localReferences) {
       expectInvariant(
-        actionReference.startsWith('./.github/workflows/') && !actionReference.includes('@'),
-        `${workflowPath} local reusable workflow reference must stay repository-scoped: ${actionReference}.`,
+        (actionReference.startsWith('./.github/workflows/') ||
+          actionReference.startsWith('./.github/actions/')) &&
+          !actionReference.includes('@'),
+        `${workflowPath} local reference must stay repository-scoped: ${actionReference}.`,
       );
     }
+  });
+
+  it('standardizes locked installs and browser cache through the local composite action', () => {
+    const compositeAction = readFileSync(
+      path.join(process.cwd(), '.github/actions/setup-node-cache/action.yml'),
+      'utf8',
+    );
+    const workflowsUsingComposite = WORKFLOW_FILES.filter((workflowPath) =>
+      getWorkflowActionReferences(readWorkflowModel(workflowPath)).includes(LOCKED_INSTALL_ACTION),
+    );
+
+    expect(workflowsUsingComposite.sort()).toEqual([
+      '.github/workflows/ci.yml',
+      '.github/workflows/examples.yml',
+      '.github/workflows/quality.yml',
+      '.github/workflows/release.yml',
+      '.github/workflows/security.yml',
+    ]);
+    expectTextIncludes(compositeAction, {
+      text: 'npm run lockfile:check',
+      rationale: 'Composite locked install must fail early on package-lock drift.',
+    });
+    expectTextIncludes(compositeAction, {
+      text: 'npm ci',
+      rationale: 'Composite locked install must keep reproducible npm ci semantics.',
+    });
+    expectTextIncludes(compositeAction, {
+      text: "hashFiles('package-lock.json', 'configs/playwright.config.ts', 'configs/playwright.*.ts')",
+      rationale: 'Playwright browser cache key must include lockfile and browser config hashes.',
+    });
+    expectTextIncludes(compositeAction, {
+      text: '${{ runner.os }}-playwright-${{ inputs.cache-version }}-${{ inputs.cache-namespace }}-',
+      rationale:
+        'Playwright browser cache must keep namespace restore keys for warm dependency bumps.',
+    });
   });
 
   it('cancels stale pull-request runs without cancelling main evidence runs', () => {

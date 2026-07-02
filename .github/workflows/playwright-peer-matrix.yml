@@ -44,6 +44,9 @@ jobs:
           node-version: '22'
           cache: npm
 
+      - name: Check lockfile drift
+        run: npm run lockfile:check
+
       - name: Install locked dependencies
         run: npm ci
 

@@ -59,35 +59,14 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - name: Setup locked Node.js dependencies and Playwright browser
+        uses: ./.github/actions/setup-node-cache
         with:
           node-version: '22'
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Cache Playwright browsers
-        id: playwright-cache
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ matrix.install_args }}-${{ hashFiles('package-lock.json') }}
-          restore-keys: |
-            ${{ runner.os }}-playwright-${{ matrix.install_args }}-
-
-      - name: Ensure required Playwright browser is installed
-        run: |
-          for attempt in 1 2 3; do
-            if timeout 300 npx playwright install --with-deps ${{ matrix.install_args }}; then
-              exit 0
-            fi
-            echo "::warning::Playwright browser install attempt ${attempt} failed or timed out; retrying"
-            sleep $((attempt * 15))
-          done
-          echo "::error::Playwright browser install failed after 3 attempts"
-          exit 1
+          install-browsers: 'true'
+          browser-name: ${{ matrix.install_args }}
+          cache-namespace: e2e-${{ matrix.install_args }}
+          cache-version: v1
 
       - name: Run full E2E suite
         env:
@@ -118,14 +97,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - name: Setup locked Node.js dependencies
+        uses: ./.github/actions/setup-node-cache
         with:
           node-version: '22'
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
+          cache-namespace: ci-reports
+          cache-version: v1
 
       - name: Download E2E matrix artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -184,14 +161,12 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Setup Node.js
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      - name: Setup locked Node.js dependencies
+        uses: ./.github/actions/setup-node-cache
         with:
           node-version: '22'
-          cache: npm
-
-      - name: Install dependencies
-        run: npm ci
+          cache-namespace: ci-reports
+          cache-version: v1
 
       - name: Download flakiness report artifact
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
