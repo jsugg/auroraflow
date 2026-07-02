@@ -3,14 +3,7 @@ import type { CandidateLocator } from './candidateLocator';
 export type SelfHealingMode = 'off' | 'suggest' | 'guarded';
 
 export type SelfHealingActionType =
-  | 'navigate'
-  | 'click'
-  | 'type'
-  | 'read'
-  | 'wait'
-  | 'screenshot'
-  | 'close'
-  | 'unknown';
+  'navigate' | 'click' | 'type' | 'read' | 'wait' | 'screenshot' | 'close' | 'unknown';
 
 export interface SelfHealingSafetyPolicy {
   allowedActions: SelfHealingActionType[];
@@ -21,12 +14,7 @@ export type SelfHealingRegistryMode = 'off' | 'read' | 'write_pending';
 
 export type SelfHealingPromotionMode = 'manual' | 'ci_acknowledged';
 export type PendingSelectorPromotionStatus =
-  | 'pending'
-  | 'approved'
-  | 'applied'
-  | 'rejected'
-  | 'conflict'
-  | 'rolled_back';
+  'pending' | 'approved' | 'applied' | 'rejected' | 'conflict' | 'rolled_back';
 
 export interface SelfHealingSatConfig {
   enabled: boolean;
@@ -235,14 +223,10 @@ export type GuardedValidationStatus =
   | 'evaluation_error';
 
 export type GuardedValidationPolicyBlockReason =
-  | 'action_not_allowed'
-  | 'domain_not_allowed'
-  | 'missing_or_invalid_url';
+  'action_not_allowed' | 'domain_not_allowed' | 'missing_or_invalid_url';
 
 export type GuardedAutoHealSkipReason =
-  | 'no_accepted_locator'
-  | 'unsupported_action'
-  | 'unsupported_locator_expression';
+  'no_accepted_locator' | 'unsupported_action' | 'unsupported_locator_expression';
 
 export interface GuardedAutoHealSummary {
   attempted: boolean;

@@ -1,9 +1,5 @@
 export type SloMetricKey =
-  | 'passRate'
-  | 'failureRate'
-  | 'flakeRate'
-  | 'retryFailureRate'
-  | 'guardedAutoHealFailureRate';
+  'passRate' | 'failureRate' | 'flakeRate' | 'retryFailureRate' | 'guardedAutoHealFailureRate';
 
 export type SloMetricComparator = 'gte' | 'lte';
 

@@ -3,12 +3,7 @@ import { readFile } from 'node:fs/promises';
 export const PLAYWRIGHT_REPORT_FILE_PREFIX = 'playwright-results-';
 
 export type FinalTestStatus =
-  | 'passed'
-  | 'failed'
-  | 'timedOut'
-  | 'skipped'
-  | 'interrupted'
-  | 'unknown';
+  'passed' | 'failed' | 'timedOut' | 'skipped' | 'interrupted' | 'unknown';
 
 export interface FlakinessTestCase {
   caseId: string;
