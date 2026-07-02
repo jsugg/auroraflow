@@ -28,8 +28,7 @@ export type PageActionMetricStatus = 'succeeded' | 'failed' | 'self_healed';
 export type RedisOperationStatus = 'succeeded' | 'failed';
 export type GuardedAutoHealMetricStatus = 'succeeded' | 'failed' | 'skipped';
 export type GuardedValidationMetricStatus =
-  | GuardedValidationStatus
-  | GuardedValidationPolicyBlockReason;
+  GuardedValidationStatus | GuardedValidationPolicyBlockReason;
 export type SelfHealingRegistryWriteMetricStatus = 'succeeded' | 'failed' | 'skipped';
 export type SelfHealingRegistryWriteOperation = 'history_observation' | 'pending_promotion';
 export type SelfHealingDurationMetricOperation = 'dom_snapshot' | 'failure_path';

@@ -234,31 +234,27 @@ export function buildObservabilitySnapshotTargets(
       fileName: 'prometheus-labels.json',
       url: appendPath(options.prometheusUrl, '/api/v1/labels'),
     },
-    ...PROMETHEUS_SERIES_TARGETS.map(
-      (target): ObservabilitySnapshotTarget => ({
-        backend: 'prometheusUrl',
-        fileName: target.fileName,
-        url: appendPath(
-          options.prometheusUrl,
-          `/api/v1/series?match[]=${encodeURIComponent(target.metricName)}`,
-        ),
-      }),
-    ),
+    ...PROMETHEUS_SERIES_TARGETS.map((target): ObservabilitySnapshotTarget => ({
+      backend: 'prometheusUrl',
+      fileName: target.fileName,
+      url: appendPath(
+        options.prometheusUrl,
+        `/api/v1/series?match[]=${encodeURIComponent(target.metricName)}`,
+      ),
+    })),
     {
       backend: 'prometheusUrl',
       fileName: 'prometheus-rules.json',
       url: appendPath(options.prometheusUrl, '/api/v1/rules'),
     },
-    ...PROMETHEUS_QUERY_TARGETS.map(
-      (target): ObservabilitySnapshotTarget => ({
-        backend: 'prometheusUrl',
-        fileName: target.fileName,
-        url: appendPath(
-          options.prometheusUrl,
-          `/api/v1/query?query=${encodeURIComponent(target.query)}`,
-        ),
-      }),
-    ),
+    ...PROMETHEUS_QUERY_TARGETS.map((target): ObservabilitySnapshotTarget => ({
+      backend: 'prometheusUrl',
+      fileName: target.fileName,
+      url: appendPath(
+        options.prometheusUrl,
+        `/api/v1/query?query=${encodeURIComponent(target.query)}`,
+      ),
+    })),
     {
       backend: 'grafanaUrl',
       fileName: 'grafana-health.json',

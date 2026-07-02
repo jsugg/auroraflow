@@ -9,12 +9,7 @@ export const OBSERVABILITY_BACKEND_VALIDATION_SCHEMA_VERSION = '1.0.0' as const;
 
 export type ObservabilityBackendValidationMode = 'readiness' | 'smoke';
 export type ObservabilityBackend =
-  | 'collector'
-  | 'prometheus'
-  | 'grafana'
-  | 'jaeger'
-  | 'elasticsearch'
-  | 'kibana';
+  'collector' | 'prometheus' | 'grafana' | 'jaeger' | 'elasticsearch' | 'kibana';
 export type ObservabilityBackendCheckStatus = 'passed' | 'failed';
 export type ObservabilityBackendValidationStatus = 'passed' | 'failed';
 
