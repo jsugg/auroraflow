@@ -59,6 +59,14 @@ function normalizeOptionalString(rawValue: string | undefined): string | undefin
   return normalized.length === 0 ? undefined : normalized;
 }
 
+function trimTrailingSlashes(value: string): string {
+  let end = value.length;
+  while (end > 0 && value[end - 1] === '/') {
+    end -= 1;
+  }
+  return value.slice(0, end);
+}
+
 function parseBooleanEnv({
   key,
   value,
@@ -219,7 +227,7 @@ function resolveRepositoryUrl(env: Environment): string | undefined {
     return undefined;
   }
   const serverUrl = normalizeOptionalString(env.GITHUB_SERVER_URL) ?? 'https://github.com';
-  return `${serverUrl.replace(/\/+$/g, '')}/${repository}`;
+  return `${trimTrailingSlashes(serverUrl)}/${repository}`;
 }
 
 export function resolveTelemetryConfig(env: Environment = process.env): TelemetryRuntimeConfig {

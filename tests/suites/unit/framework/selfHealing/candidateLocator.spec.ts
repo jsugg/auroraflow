@@ -166,6 +166,40 @@ describe('parseLegacyLocatorString (legacy string read path)', () => {
     );
   });
 
+  it('parses legacy role locators from adversarial spacing without regex backtracking', () => {
+    const repeatedSpaces = ' '.repeat(2_048);
+
+    expect(
+      parseLegacyLocatorString(`page.getByRole('button', { name: '${repeatedSpaces}Save' })`),
+    ).toEqual(roleLocator('button', stringName(`${repeatedSpaces}Save`)));
+    expect(
+      parseLegacyLocatorString(`page.getByRole('button', ${repeatedSpaces}{ name: /save/i })`),
+    ).toEqual(roleLocator('button', regexName('save', 'i')));
+    expect(
+      parseLegacyLocatorString(`page.getByRole('button', { name: ${repeatedSpaces} })`),
+    ).toBeNull();
+  });
+
+  it('rejects malformed role expressions through the linear legacy parser', () => {
+    expect(parseLegacyLocatorString('page.getByRole()')).toBeNull();
+    expect(parseLegacyLocatorString("page.getByRole('button' { name: 'Save' })")).toBeNull();
+    expect(parseLegacyLocatorString("page.getByRole('button', { label: 'Save' })")).toBeNull();
+    expect(parseLegacyLocatorString("page.getByRole('button', { name 'Save' })")).toBeNull();
+    expect(parseLegacyLocatorString("page.getByRole('button', { name: })")).toBeNull();
+  });
+
+  it('keeps legacy malformed role names as string fallbacks', () => {
+    expect(parseLegacyLocatorString("page.getByRole('button', { name: /save/1 })")).toEqual(
+      roleLocator('button', stringName('/save/1')),
+    );
+    expect(parseLegacyLocatorString("page.getByRole('button', { name: / })")).toEqual(
+      roleLocator('button', stringName('/')),
+    );
+    expect(parseLegacyLocatorString("page.getByRole('button', { name: 'Save })")).toEqual(
+      roleLocator('button', stringName('Save')),
+    );
+  });
+
   it('reads same-origin frame candidates into the structured frame model', () => {
     expect(
       parseLegacyLocatorString(
@@ -184,6 +218,7 @@ describe('parseLegacyLocatorString (legacy string read path)', () => {
   it('returns null for unsupported expressions', () => {
     expect(parseLegacyLocatorString("customResolver('submit')")).toBeNull();
     expect(parseLegacyLocatorString('#submit-order')).toBeNull();
+    expect(parseLegacyLocatorString("page.frameLocator('').getByTestId('submit')")).toBeNull();
     expect(parseLegacyLocatorString("page.frameLocator('iframe')")).toBeNull();
     expect(parseLegacyLocatorString("page.frameLocator('iframe').customResolver('x')")).toBeNull();
   });

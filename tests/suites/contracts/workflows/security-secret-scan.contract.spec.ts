@@ -69,6 +69,8 @@ describe('security workflow secret scanning contract', () => {
 
   it('enforces secret scan results in Security Gate merge blocking logic', () => {
     const securityGateJob = getWorkflowJob(securityWorkflow, 'security-gate');
+    const securityGateRun =
+      getWorkflowStep(securityGateJob, 'Enforce upstream security job results').run ?? '';
 
     expect(securityGateJob.needs).toEqual(
       expect.arrayContaining([
@@ -84,28 +86,41 @@ describe('security workflow secret scanning contract', () => {
         'SECRET_SCAN_RESULT',
       ),
     ).toBe('${{ needs.secret-scan.result }}');
-    expectTextIncludes(
-      getWorkflowStep(securityGateJob, 'Enforce upstream security job results').run ?? '',
-      {
-        text: 'Secret scan failed: $SECRET_SCAN_RESULT',
-        rationale: 'Security gate must fail closed when secret scan does not succeed.',
-      },
-    );
+    expectTextIncludes(securityGateRun, {
+      text: 'require_success "Secret Scan" "$SECRET_SCAN_RESULT"',
+      rationale: 'Security gate must fail closed when secret scan does not succeed.',
+    });
     expect(
       getWorkflowStep(securityGateJob, 'Enforce upstream security job results').env.get(
         'SECRET_SCAN_EFFECT_PROOF_RESULT',
       ),
     ).toBe('${{ needs.secret-scan-effect-proof.result }}');
-    expectTextIncludes(
-      getWorkflowStep(securityGateJob, 'Enforce upstream security job results').run ?? '',
-      {
-        text: 'Secret scan effect proof failed: $SECRET_SCAN_EFFECT_PROOF_RESULT',
-        rationale: 'Security gate must fail closed when the synthetic secret proof does not pass.',
-      },
-    );
+    expectTextIncludes(securityGateRun, {
+      text: 'require_success "Secret Scan Effect Proof" "$SECRET_SCAN_EFFECT_PROOF_RESULT"',
+      rationale: 'Security gate must fail closed when the synthetic secret proof does not pass.',
+    });
+    expectTextIncludes(securityGateRun, {
+      text: 'Security Gate failed closed because one or more required security jobs had an unexpected result.',
+      rationale: 'Security gate must make unexpected skip/failure/cancelled states actionable.',
+    });
   });
 
-  it('keeps full-lock npm audit blocking on push and schedule, not pull requests', () => {
+  it('runs CodeQL on pull requests without an unnecessary JavaScript autobuild', () => {
+    const codeqlJob = getWorkflowJob(securityWorkflow, 'codeql');
+
+    expect(codeqlJob.name).toBe('CodeQL');
+    expect(codeqlJob.if).toBeUndefined();
+    expectInvariant(
+      !codeqlJob.steps.some((step) => step.uses?.startsWith('github/codeql-action/autobuild@')),
+      'JavaScript/TypeScript CodeQL analysis must not run an unnecessary autobuild step.',
+    );
+    expectTextMatches(getWorkflowStep(codeqlJob, 'Perform CodeQL analysis').uses ?? '', {
+      pattern: /^github\/codeql-action\/analyze@[a-f0-9]{40}$/u,
+      rationale: 'CodeQL analysis action must stay pinned to an immutable SHA.',
+    });
+  });
+
+  it('keeps full-lock npm audit skipped on pull requests and blocking on push/schedule', () => {
     const npmAuditJob = getWorkflowJob(securityWorkflow, 'npm-audit');
     const workflowSecurityJob = getWorkflowJob(securityWorkflow, 'workflow-security');
     const securityGateRun =
@@ -127,8 +142,16 @@ describe('security workflow secret scanning contract', () => {
       'NPM audit job must not run workflow security scanning.',
     );
     expectTextIncludes(securityGateRun, {
-      text: 'if [ "${{ github.event_name }}" != "pull_request" ] && [ "$NPM_AUDIT_RESULT" != "success" ]; then',
+      text: 'require_skipped "NPM Audit" "$NPM_AUDIT_RESULT"',
+      rationale: 'Security gate must verify npm audit is the only intentionally skipped PR job.',
+    });
+    expectTextIncludes(securityGateRun, {
+      text: 'require_success "NPM Audit" "$NPM_AUDIT_RESULT"',
       rationale: 'Security gate must block failing npm audit only for trusted push/schedule runs.',
+    });
+    expectTextIncludes(securityGateRun, {
+      text: 'require_success "CodeQL" "$CODEQL_RESULT"',
+      rationale: 'Security gate must require CodeQL on pull requests, push, and schedule.',
     });
   });
 
