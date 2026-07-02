@@ -9,8 +9,7 @@ Policy source: `AUR-DEC-012` (see `docs/architecture/decision-log.md`) — npm p
 The release workflow (`.github/workflows/release.yml`) is manual (`workflow_dispatch`) and **never publishes**. It exists to make the release path auditable before the first publish:
 
 - The workflow has read-only (`contents: read`) permissions in every job.
-- No job invokes `npm publish`; packaging produces a local `npm pack` tarball only for
-  validation and evidence.
+- No job invokes `npm publish`; packaging produces a local `npm pack` tarball only for validation and evidence.
 - The `publish-gate` job is a placeholder. It only runs when the `publish_confirmation` input is non-empty, requires the protected `release` environment, and then refuses with a hard failure. Enabling a real publish is a separate future task and requires maintainer sign-off.
 
 Run it from the repository:

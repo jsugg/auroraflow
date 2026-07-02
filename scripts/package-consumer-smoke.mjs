@@ -51,8 +51,12 @@ function run(command, args, cwd) {
     },
   });
   if (result.status !== 0) {
-    const output = [result.stderr, result.stdout].filter((text) => text.trim().length > 0).join('\n');
-    fail(`${command} ${args.join(' ')} failed in ${cwd} (exit ${result.status ?? 'null'}).\n${output}`);
+    const output = [result.stderr, result.stdout]
+      .filter((text) => text.trim().length > 0)
+      .join('\n');
+    fail(
+      `${command} ${args.join(' ')} failed in ${cwd} (exit ${result.status ?? 'null'}).\n${output}`,
+    );
   }
   return result;
 }
@@ -60,7 +64,9 @@ function run(command, args, cwd) {
 const args = parseArgs(process.argv.slice(2));
 const packReportPath = args.get('pack-report');
 if (packReportPath === undefined) {
-  fail('Usage: node scripts/package-consumer-smoke.mjs --pack-report <release-evidence/pack-report.json>');
+  fail(
+    'Usage: node scripts/package-consumer-smoke.mjs --pack-report <release-evidence/pack-report.json>',
+  );
 }
 
 const tarballPath = readTarballFromPackReport(packReportPath);
