@@ -29,7 +29,7 @@ Raw selectors remain suppressed unless the local-debug-only `AURORAFLOW_OBSERVAB
 ## Smoke policy
 
 - Artifact-only unit coverage proves empty environment configuration is disabled and initializes no-op telemetry.
-- Lite smoke validates the collector-only Compose topology, health endpoint, real OTLP trace/metric export, and diagnostic artifacts.
+- Lite remains best-effort for consumers, but its CI evidence lane is strict: it fails on exporter errors and requires run-scoped Collector receipt for the expected span, metric, and OTLP log marker. Failure artifacts retain health, metrics, detailed Collector logs, smoke output, and `collector-receipt.json`.
 - Full smoke invokes the typed `observability:validate` Node validator for bounded readiness and semantic API checks, then validates live Prometheus labels on schedule or manual dispatch; it is not a routine pull-request or production support promise.
 - Validator runs always write `observability-backend-readiness.json` or `observability-backend-validation.json` with per-check backend, URL, attempts, status, evidence, and exact failure message. Workflow YAML only orchestrates validator and snapshot commands.
 - Secret-gated remote export is operator-provided endpoint validation, not AuroraFlow ownership of that backend.

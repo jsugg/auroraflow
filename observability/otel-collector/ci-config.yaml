@@ -27,7 +27,7 @@ exporters:
   prometheus:
     endpoint: 0.0.0.0:9464
   debug:
-    verbosity: basic
+    verbosity: detailed
 
 extensions:
   health_check:

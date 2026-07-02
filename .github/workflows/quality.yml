@@ -84,6 +84,7 @@ jobs:
               - 'package.json'
               - 'package-lock.json'
               - 'scripts/observability-ci-smoke.ts'
+              - 'scripts/observability-collector-receipt.ts'
               - 'src/framework/observability/**'
               - 'tests/suites/contracts/observability/**'
 
@@ -371,10 +372,31 @@ jobs:
         if: env.SHOULD_RUN_OBSERVABILITY == 'true'
         env:
           AURORAFLOW_OBSERVABILITY_DIAGNOSTICS_DIR: ${{ env.OBSERVABILITY_DIAGNOSTICS_DIR }}
+          AURORAFLOW_OBSERVABILITY_EMIT_OTLP_LOG: 'true'
           AURORAFLOW_OBSERVABILITY_ENABLED: 'true'
           AURORAFLOW_OBSERVABILITY_ENVIRONMENT: ci
+          AURORAFLOW_OBSERVABILITY_STRICT: 'true'
           OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4318
         run: npm run observability:ci:smoke
+
+      - name: Assert Lite collector receipt
+        if: env.SHOULD_RUN_OBSERVABILITY == 'true'
+        run: |
+          mkdir -p "${OBSERVABILITY_DIAGNOSTICS_DIR}"
+          for attempt in $(seq 1 15); do
+            curl --fail --silent --show-error http://localhost:9464/metrics > "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector-metrics.txt" || true
+            docker compose -f docker-compose.observability-ci.yml logs --no-color otel-collector > "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector.log" || true
+            if npm run observability:collector-receipt -- \
+              --metrics-path "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector-metrics.txt" \
+              --collector-log-path "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector.log" \
+              --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}"; then
+              exit 0
+            fi
+            echo "Waiting for Collector receipt evidence (${attempt}/15)"
+            sleep 2
+          done
+          echo "Collector receipt evidence did not become complete."
+          exit 1
 
       - name: Capture observability diagnostics
         if: env.SHOULD_RUN_OBSERVABILITY == 'true' && always()

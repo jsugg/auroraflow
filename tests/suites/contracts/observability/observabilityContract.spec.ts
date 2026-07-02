@@ -293,21 +293,28 @@ describe('observability contract documentation', () => {
     const workflow = readWorkflowModel('.github/workflows/quality.yml');
     const packageJson = readPackageJson();
     const collectorOnlyJob = getWorkflowJob(workflow, 'observability-stack');
+    const collectorConfig = readFileSync(
+      path.join(process.cwd(), 'observability', 'otel-collector', 'ci-config.yaml'),
+      'utf8',
+    );
 
     expect([...ciCompose.services.keys()]).toEqual(['otel-collector']);
     expect(getComposeService(ciCompose, 'otel-collector').volumes).toEqual([
       './observability/otel-collector/ci-config.yaml:/etc/otelcol-contrib/config.yaml:ro',
     ]);
-    expectTextIncludes(
+    const pathFilters =
       getWorkflowStep(
         getWorkflowJob(workflow, 'preflight'),
         'Detect smoke-relevant changes',
-      ).with.get('filters') ?? '',
-      {
-        text: 'observability_stack:',
-        rationale: 'Quality preflight must expose observability_stack path filter.',
-      },
-    );
+      ).with.get('filters') ?? '';
+    expectTextIncludes(pathFilters, {
+      text: 'observability_stack:',
+      rationale: 'Quality preflight must expose observability_stack path filter.',
+    });
+    expectTextIncludes(pathFilters, {
+      text: 'scripts/observability-collector-receipt.ts',
+      rationale: 'Collector receipt changes must trigger the Lite evidence lane.',
+    });
     expectTextIncludes(collectorOnlyJob.env.get('SHOULD_RUN_OBSERVABILITY') ?? '', {
       text: 'AURORAFLOW_OBSERVABILITY_CI_ENABLED',
       rationale: 'Collector smoke lane must support repository-variable opt-out.',
@@ -315,9 +322,41 @@ describe('observability contract documentation', () => {
     expect(collectorOnlyJob.env.get('OBSERVABILITY_DIAGNOSTICS_DIR')).toBe(
       'observability-output/ci',
     );
+
+    const emitStep = getWorkflowStep(collectorOnlyJob, 'Emit smoke telemetry');
+    expect(emitStep.env.get('AURORAFLOW_OBSERVABILITY_STRICT')).toBe('true');
+    expect(emitStep.env.get('AURORAFLOW_OBSERVABILITY_EMIT_OTLP_LOG')).toBe('true');
+    const receiptStep = getWorkflowStep(collectorOnlyJob, 'Assert Lite collector receipt');
+    expectTextIncludes(receiptStep.run ?? '', {
+      text: 'npm run observability:collector-receipt',
+      rationale: 'Lite evidence must use the typed Collector receipt validator.',
+    });
+    expectTextExcludes(receiptStep.run ?? '', {
+      text: 'grep ',
+      rationale: 'Receipt semantics belong in typed code, not workflow text matching.',
+    });
+    const captureStep = getWorkflowStep(collectorOnlyJob, 'Capture observability diagnostics');
+    for (const diagnosticPath of [
+      'collector-health.txt',
+      'collector-metrics.txt',
+      'compose-ps.txt',
+      'collector.log',
+    ]) {
+      expectTextIncludes(captureStep.run ?? '', {
+        text: diagnosticPath,
+        rationale: 'Lite failures must retain actionable Collector diagnostics.',
+      });
+    }
+    expectTextIncludes(collectorConfig, {
+      text: 'verbosity: detailed',
+      rationale: 'Lite receipt evidence requires span names and OTLP log bodies in Collector logs.',
+    });
+
     expect(packageJson.scripts).toEqual(
       expect.objectContaining({
         'observability:ci:smoke': expect.any(String),
+        'observability:collector-receipt':
+          'node -r ts-node/register scripts/observability-collector-receipt.ts',
         'observability:validate':
           'node -r ts-node/register scripts/observability-validate-backends.ts',
         'observability:snapshot': expect.any(String),
