@@ -11,6 +11,7 @@ import {
 
 const qualityWorkflow = readWorkflowModel('.github/workflows/quality.yml');
 const releaseWorkflow = readWorkflowModel('.github/workflows/release.yml');
+const lockedInstallActionPath = './.github/actions/setup-node-cache';
 const packageJson = JSON.parse(readFileSync(path.join(process.cwd(), 'package.json'), 'utf8')) as {
   readonly engines?: { readonly node?: string };
 };
@@ -54,11 +55,15 @@ describe('quality workflow Node compatibility contract', () => {
   it('runs contract, Redis required-mode, schema, shell, and workflow gates once on Node 22', () => {
     const repositoryGatesJob = getWorkflowJob(qualityWorkflow, 'repository-gates');
     const stepNames = repositoryGatesJob.steps.map((step) => step.name);
+    const lockedInstallStep = getWorkflowStep(
+      repositoryGatesJob,
+      'Setup locked Node.js dependencies',
+    );
 
     expect(repositoryGatesJob.name).toBe('Repository Gates (Node 22)');
-    expect(getWorkflowStep(repositoryGatesJob, 'Setup Node.js').with.get('node-version')).toBe(
-      '22',
-    );
+    expect(lockedInstallStep.uses).toBe(lockedInstallActionPath);
+    expect(lockedInstallStep.with.get('node-version')).toBe('22');
+    expect(lockedInstallStep.with.get('cache-namespace')).toBe('repository-gates');
     expect(getWorkflowStep(repositoryGatesJob, 'Run format check').run).toBe(
       'npm run format:check',
     );
@@ -86,10 +91,12 @@ describe('quality workflow Node compatibility contract', () => {
 
   it('enforces critical and global coverage once on Node 22', () => {
     const coverageJob = getWorkflowJob(qualityWorkflow, 'coverage');
-    const setupNodeStep = getWorkflowStep(coverageJob, 'Setup Node.js');
+    const setupNodeStep = getWorkflowStep(coverageJob, 'Setup locked Node.js dependencies');
 
     expect(coverageJob.name).toBe('Coverage (Critical + Global)');
+    expect(setupNodeStep.uses).toBe(lockedInstallActionPath);
     expect(setupNodeStep.with.get('node-version')).toBe('22');
+    expect(setupNodeStep.with.get('cache-namespace')).toBe('coverage');
     expect(
       getWorkflowStep(coverageJob, 'Enforce critical and global coverage thresholds').run,
     ).toBe('npm run test:coverage');
@@ -146,21 +153,14 @@ describe('quality workflow Node compatibility contract', () => {
         rationale: 'Risk E2E gate must respect paths plus explicit maintainer labels.',
       });
     }
-    const riskInstallRun =
-      getWorkflowStep(riskE2eJob, 'Ensure Playwright Chrome is installed').run ?? '';
-    expectTextIncludes(riskInstallRun, {
-      text: 'timeout 300 npx playwright install --with-deps chrome',
-      rationale:
-        'Risk E2E must install Chrome under a bounded per-attempt timeout so network hangs fail fast instead of consuming the job budget.',
-    });
-    expectTextIncludes(riskInstallRun, {
-      text: 'for attempt in 1 2 3',
-      rationale: 'Risk E2E browser install must retry to absorb transient registry/apt failures.',
-    });
-    expect(
-      getWorkflowStep(riskE2eJob, 'Cache Playwright Chrome').with.get('restore-keys'),
-      'Risk E2E browser cache must fall back to a prefix so dependency bumps reuse Chrome instead of cold-downloading.',
-    ).toBe('${{ runner.os }}-playwright-risk-chrome-');
+    const riskSetupStep = getWorkflowStep(
+      riskE2eJob,
+      'Setup locked Node.js dependencies and Playwright browser',
+    );
+    expect(riskSetupStep.uses).toBe(lockedInstallActionPath);
+    expect(riskSetupStep.with.get('install-browsers')).toBe('true');
+    expect(riskSetupStep.with.get('browser-name')).toBe('chrome');
+    expect(riskSetupStep.with.get('cache-namespace')).toBe('risk-chrome');
     expect(getWorkflowStep(riskE2eJob, 'Run full Chrome E2E suite').run).toBe(
       "npm run test:e2e -- --project='Google Chrome'",
     );

@@ -35,6 +35,7 @@
     "format:check": "prettier . --check --cache --cache-location .cache/prettier",
     "lint": "eslint . --cache --cache-location .cache/eslint",
     "lint:fix": "eslint . --fix",
+    "lockfile:check": "node scripts/check-lockfile-drift.mjs",
     "typecheck": "tsc --noEmit --incremental --tsBuildInfoFile .cache/tsconfig.tsbuildinfo",
     "test": "npm run test:unit",
     "test:unit": "vitest run tests/suites/unit --pool=threads --no-isolate --testTimeout=30000",

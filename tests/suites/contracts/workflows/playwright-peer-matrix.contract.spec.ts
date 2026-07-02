@@ -35,6 +35,9 @@ describe('Playwright peer matrix workflow', () => {
           'Peer matrix must keep playwright, playwright-core, and @playwright/test aligned.',
       },
     );
+    expect(getWorkflowStep(peerMatrixJob, 'Check lockfile drift').run).toBe(
+      'npm run lockfile:check',
+    );
   });
 
   it('runs heavy browser coverage only on scheduled, manual, or release calls', () => {

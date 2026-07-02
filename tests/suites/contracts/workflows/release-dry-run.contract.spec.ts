@@ -84,9 +84,12 @@ describe('release dry-run workflow contract', () => {
 
   it('produces verify, schema, build, pack, SBOM, provenance, and changelog evidence', () => {
     const releaseJob = getWorkflowJob(releaseWorkflowModel, 'release-dry-run');
+    const setupStep = getWorkflowStep(releaseJob, 'Setup locked Node.js dependencies');
 
     expect(getWorkflowStep(releaseJob, 'Run quality gates').run).toBe('npm run verify');
     expect(packageJson.packageManager).toBe('npm@11.17.0');
+    expect(setupStep.uses).toBe('./.github/actions/setup-node-cache');
+    expect(setupStep.with.get('activate-package-manager')).toBe('true');
     expectInvariant(
       (getWorkflowStep(releaseJob, 'Validate artifact schemas').run ?? '').includes(
         'npm run schemas:check 2>&1 | tee release-evidence/schema-validation.txt',
