@@ -210,6 +210,40 @@ jobs:
       - name: Enforce critical and global coverage thresholds
         run: npm run test:coverage
 
+  mutation-baseline:
+    name: Mutation Baseline (Advisory)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup locked Node.js dependencies
+        uses: ./.github/actions/setup-node-cache
+        with:
+          node-version: '22'
+          cache-namespace: mutation-baseline
+          cache-version: v1
+
+      - name: Check mutation baseline
+        run: |
+          set -o pipefail
+          mkdir -p mutation-output
+          npm run test:mutation:check 2>&1 | tee mutation-output/baseline-check.txt
+
+      - name: Upload mutation baseline evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: mutation-baseline-${{ github.run_id }}
+          retention-days: 14
+          path: mutation-output/baseline-check.txt
+
   guarded-self-heal:
     name: Guarded Self-Heal Proof (Chrome)
     runs-on: ubuntu-latest

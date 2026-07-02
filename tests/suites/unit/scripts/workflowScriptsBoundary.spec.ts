@@ -565,6 +565,24 @@ describe('workflow script process boundaries', () => {
   );
 
   it(
+    'schema wrapper rejects malformed compiler options with actionable output',
+    async () => {
+      const root = createTempDir('auroraflow-schema-env-boundary-');
+
+      const result = await runNode(['scripts/run-schemas-check.mjs', '--artifacts-root', root], {
+        TS_NODE_COMPILER_OPTIONS: '{not-json',
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toContain('Invalid TS_NODE_COMPILER_OPTIONS');
+      expect(result.stderr).toContain('expected a JSON object');
+      expect(result.stderr).toContain('malformed JSON');
+    },
+    BOUNDARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
     'self-healing governance exits with actionable output for pass and review-required failure',
     async () => {
       const root = createTempDir('auroraflow-governance-boundary-');
