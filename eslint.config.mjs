@@ -4,7 +4,14 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['node_modules/**', 'dist/**', 'test-reports/**', 'test-results/**', '.local/**'],
+    ignores: [
+      'node_modules/**',
+      'dist/**',
+      'test-reports/**',
+      'test-results/**',
+      '.local/**',
+      '.claude/worktrees/**',
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
@@ -55,6 +62,19 @@ export default tseslint.config(
         Buffer: 'readonly',
         module: 'readonly',
         process: 'readonly',
+        require: 'readonly',
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+  {
+    files: ['playwright.js'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        module: 'readonly',
         require: 'readonly',
       },
     },

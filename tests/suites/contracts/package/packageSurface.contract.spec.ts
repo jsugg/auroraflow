@@ -12,10 +12,12 @@ import * as rootExports from '../../../../src';
 const packageJson = JSON.parse(readFileSync(path.join(process.cwd(), 'package.json'), 'utf8')) as {
   name?: string;
   description?: string;
+  type?: string;
   main?: string;
   types?: string;
   exports?: Record<string, unknown>;
   files?: string[];
+  typesVersions?: Record<string, Record<string, string[]>>;
   scripts?: Record<string, string>;
   license?: string;
   dependencies?: Record<string, string>;
@@ -30,6 +32,7 @@ describe('package surface contract', () => {
       text: 'TypeScript Playwright test automation framework',
       rationale: 'npm package description must preserve public discovery wording.',
     });
+    expect(packageJson.type).toBe('commonjs');
     expect(packageJson.main).toBe('./dist/index.js');
     expect(packageJson.types).toBe('./dist/index.d.ts');
     expect(packageJson.exports?.['.']).toEqual({
@@ -37,8 +40,22 @@ describe('package surface contract', () => {
       require: './dist/index.js',
       default: './dist/index.js',
     });
+    expect(packageJson.exports?.['./playwright']).toEqual({
+      types: './dist/playwright.d.ts',
+      require: './dist/playwright.js',
+      default: './dist/playwright.js',
+    });
     expect(packageJson.exports?.['./package.json']).toBe('./package.json');
-    expect(packageJson.files).toEqual(['dist', 'docs', 'schemas', 'README.md', 'LICENSE']);
+    expect(packageJson.files).toEqual([
+      'dist',
+      'docs',
+      'schemas',
+      'README.md',
+      'LICENSE',
+      'playwright.js',
+      'playwright.d.ts',
+    ]);
+    expect(packageJson.typesVersions?.['*']?.playwright).toEqual(['playwright.d.ts']);
     expect(packageJson.license).toBe('MIT');
   });
 

@@ -167,7 +167,7 @@ npm run build
 npm run pack:dry-run
 ```
 
-`tsconfig.build.json` uses `src` as the root and excludes tests, examples, and scripts. Package contracts expect `dist`, `docs`, `schemas`, `README.md`, and `LICENSE` as the packaged files.
+`tsconfig.build.json` uses `src` as the root and excludes tests, examples, and scripts. Package contracts expect `dist`, `docs`, `schemas`, `README.md`, `LICENSE`, and the root `playwright.*` compatibility shims as the packaged files.
 
 ## Redis development
 

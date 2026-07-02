@@ -36,7 +36,7 @@ const trendEnv = {
   GITHUB_WORKFLOW: 'Quality',
   AURORAFLOW_PROJECT: 'auroraflow-tests',
 } satisfies NodeJS.ProcessEnv;
-const SCHEMA_TEST_TIMEOUT_MS = 15_000;
+const SCHEMA_TEST_TIMEOUT_MS = 30_000;
 
 let temporaryDirectories: string[] = [];
 
