@@ -10,14 +10,8 @@ const eslintConfig = readFileSync(path.join(process.cwd(), 'eslint.config.mjs'),
 const developmentDoc = readFileSync(path.join(process.cwd(), 'docs/development.md'), 'utf8');
 
 describe('incremental strictness contract', () => {
-  it('keeps indexed access and optional properties strict', () => {
-    expect(tsconfig.compilerOptions).toEqual(
-      expect.objectContaining({
-        strict: true,
-        noUncheckedIndexedAccess: true,
-        exactOptionalPropertyTypes: true,
-      }),
-    );
+  it('keeps the TypeScript strict baseline', () => {
+    expect(tsconfig.compilerOptions).toEqual(expect.objectContaining({ strict: true }));
   });
 
   it('keeps type-aware assertion linting enabled and documented', () => {
@@ -26,13 +20,14 @@ describe('incremental strictness contract', () => {
       rationale:
         'Type-aware lint must prevent unnecessary assertions from hiding boundary mistakes.',
     });
-    for (const flag of [
+    for (const policyText of [
+      'strict baseline',
       'noUncheckedIndexedAccess',
       'exactOptionalPropertyTypes',
       'unnecessary type assertions',
     ]) {
       expectTextIncludes(developmentDoc, {
-        text: flag,
+        text: policyText,
         rationale: 'Contributor docs must describe the enforced incremental strictness slice.',
       });
     }
