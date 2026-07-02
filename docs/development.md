@@ -90,6 +90,8 @@ npm run verify
 
 `npm run verify` runs repo-local actionlint bootstrap, formatting, linting, typechecking, unit tests, contracts, Redis/OTLP integration, schema validation, ShellCheck, and workflow linting.
 
+TypeScript keeps its strict baseline. The first phased type-aware ESLint slice rejects unnecessary type assertions; validate external values at their boundary instead of casting them to silence the checker. `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` remain deferred to dedicated boundary-hardening migrations rather than a broad drive-by change.
+
 ### Contract assertion policy
 
 Contract specs are semantic-first:
@@ -109,7 +111,7 @@ Contract specs are semantic-first:
 | `npm run test:e2e` | Browser | Playwright browser projects. |
 | `npm run test:e2e:guarded` | Guarded browser proof | Parallel Chrome proof for guarded self-heal at the default gate. |
 | `npm run verify` | Full local gate | Static checks, unit, contracts, integration, schemas, ShellCheck, and workflow lint. |
-| `npm run test:mutation` / `test:mutation:check` | Scheduled/manual | Scoped mutation baseline for calibration-critical code; not part of `verify`. See [mutation & property baseline](quality/mutation-property-baseline.md). |
+| `npm run test:mutation` / `test:mutation:check` | Scheduled/manual advisory | Scoped mutation baseline for calibration-critical code; killed mutants that survive or become inapplicable fail the evidence lane, but it remains outside `verify`. See [mutation & property baseline](quality/mutation-property-baseline.md). |
 | `npm run benchmark:failure-path` | Manual/browser | Warning-only safe-action failure, DOM snapshot, SAT extraction, and artifact-write timing; not part of `verify`. See [failure-path performance baseline](quality/failure-path-performance-baseline.md). |
 
 ### Risk-weighted coverage floors
@@ -120,7 +122,7 @@ Contract specs are semantic-first:
 
 ### Mutation & property baseline
 
-Calibration-critical code (scoring, config, guarded validation, retry, Redis CAS) has a scoped mutation/property baseline that measures assertion catch-rate, not just execution. Property tests run inside `npm run test:unit` with fixed seeds and are reproducible from the seed; the mutation baseline runs manually or on a schedule via `npm run test:mutation` (warning-only) and `npm run test:mutation:check` (no-regression). No new test dependency is used. See [mutation & property baseline](quality/mutation-property-baseline.md).
+Calibration-critical code (scoring, config, guarded validation, retry, Redis CAS) has a scoped mutation/property baseline that measures assertion catch-rate, not just execution. Property tests run inside `npm run test:unit` with fixed seeds and are reproducible from the seed; `Mutation Baseline (Advisory)` runs `npm run test:mutation:check` on scheduled/manual Quality Gates evidence lanes and fails when a previously killed mutant survives or becomes inapplicable. It remains outside `verify` and branch protection. No new test dependency is used. See [mutation & property baseline](quality/mutation-property-baseline.md).
 
 ### Failure-path performance baseline
 

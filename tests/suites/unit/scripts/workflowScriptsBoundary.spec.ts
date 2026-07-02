@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -492,7 +491,7 @@ describe('workflow script process boundaries', () => {
       writeJsonFile(
         failurePolicyJson,
         createAlertPolicy({
-          alerts: [{ ...createAlertPolicy().alerts[0]!, blockOnBreach: true }],
+          alerts: [{ ...createAlertPolicy().alerts[0], blockOnBreach: true }],
         }),
       );
 
@@ -560,6 +559,24 @@ describe('workflow script process boundaries', () => {
       expect(failure.stdout).toBe('');
       expect(failure.stderr).toContain('Schema validation failed:');
       expect(failure.stderr).toContain('flakiness-summary.json does not match');
+    },
+    BOUNDARY_TEST_TIMEOUT_MS,
+  );
+
+  it(
+    'schema wrapper rejects malformed compiler options with actionable output',
+    async () => {
+      const root = createTempDir('auroraflow-schema-env-boundary-');
+
+      const result = await runNode(['scripts/run-schemas-check.mjs', '--artifacts-root', root], {
+        TS_NODE_COMPILER_OPTIONS: '{not-json',
+      });
+
+      expect(result.status).toBe(1);
+      expect(result.stdout).toBe('');
+      expect(result.stderr).toContain('Invalid TS_NODE_COMPILER_OPTIONS');
+      expect(result.stderr).toContain('expected a JSON object');
+      expect(result.stderr).toContain('malformed JSON');
     },
     BOUNDARY_TEST_TIMEOUT_MS,
   );
@@ -736,7 +753,7 @@ describe('workflow script process boundaries', () => {
         if (address === null || typeof address === 'string') {
           throw new Error('Observability validator fixture server did not bind a TCP port.');
         }
-        const port = (address as AddressInfo).port;
+        const port = address.port;
         const [success, failure] = await Promise.all([
           runTypeScriptScript(
             'scripts/observability-validate-backends.ts',

@@ -150,7 +150,7 @@ export async function readSelfHealingArtifactFor<T>(
     );
 
     if (matches.length === 1) {
-      return matches[0] as T;
+      return matches[0];
     }
     matchCount = matches.length;
     if (matches.length > 1) {

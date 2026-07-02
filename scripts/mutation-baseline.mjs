@@ -8,7 +8,8 @@
 //
 // Usage:
 //   node scripts/mutation-baseline.mjs            # refresh + record baseline (warning-only, exit 0)
-//   node scripts/mutation-baseline.mjs --check    # no-regression gate: fail if a killed mutant now survives
+//   node scripts/mutation-baseline.mjs --check    # fail if a killed mutant survives or becomes inapplicable
+//   node scripts/mutation-baseline.mjs --check-report <report> [--baseline <report>]
 //
 // Run manually or on a schedule until runtime/tooling are accepted for PR gating.
 
@@ -20,6 +21,7 @@ import { fileURLToPath } from 'node:url';
 const scriptDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(scriptDir, '..');
 const baselinePath = resolve(repoRoot, 'docs/quality/mutation-baseline.json');
+const MUTATION_STATUSES = new Set(['killed', 'survived', 'inapplicable']);
 
 const SCOPED_TESTS = {
   scoring: [
@@ -84,8 +86,18 @@ const MUTATIONS = [
     area: 'config',
     file: 'src/framework/selfHealing/config.ts',
     description: 'Stop clamping bounded integers at the hard maximum.',
-    find: 'if (parsedValue > hardMaximum) {',
-    replace: 'if (parsedValue > hardMaximum + 100) {',
+    find: `message: \`\${envVar} must be at least 1. Using default \${defaultValue}.\`,
+      applied: String(defaultValue),
+    });
+    return defaultValue;
+  }
+  if (parsedValue > hardMaximum) {`,
+    replace: `message: \`\${envVar} must be at least 1. Using default \${defaultValue}.\`,
+      applied: String(defaultValue),
+    });
+    return defaultValue;
+  }
+  if (parsedValue > hardMaximum + 100) {`,
   },
   {
     id: 'guarded-confidence-gate-strict',
@@ -166,8 +178,102 @@ function runScopedTests(area) {
   return result.status === 0 ? 'survived' : 'killed';
 }
 
+function getOptionValue(argv, optionName) {
+  const optionIndexes = argv.flatMap((argument, index) => (argument === optionName ? [index] : []));
+  if (optionIndexes.length > 1) {
+    throw new Error(`${optionName} may be supplied only once.`);
+  }
+  const optionIndex = optionIndexes[0];
+  if (optionIndex === undefined) {
+    return undefined;
+  }
+  const value = argv[optionIndex + 1];
+  if (value === undefined || value.startsWith('--')) {
+    throw new Error(`${optionName} requires a file path.`);
+  }
+  return value;
+}
+
+function readMutationReport(reportPath, label) {
+  const absolutePath = resolve(repoRoot, reportPath);
+  let parsed;
+  try {
+    parsed = JSON.parse(readFileSync(absolutePath, 'utf8'));
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`${label} must be readable valid JSON (${absolutePath}): ${detail}`);
+  }
+
+  if (parsed === null || typeof parsed !== 'object' || !Array.isArray(parsed.mutations)) {
+    throw new Error(`${label} must be a JSON object with a mutations array (${absolutePath}).`);
+  }
+
+  const seenIds = new Set();
+  for (const [index, entry] of parsed.mutations.entries()) {
+    if (entry === null || typeof entry !== 'object') {
+      throw new Error(`${label} mutations[${index}] must be an object.`);
+    }
+    if (typeof entry.id !== 'string' || entry.id.length === 0) {
+      throw new Error(`${label} mutations[${index}].id must be a non-empty string.`);
+    }
+    if (seenIds.has(entry.id)) {
+      throw new Error(`${label} contains duplicate mutation id: ${entry.id}.`);
+    }
+    seenIds.add(entry.id);
+    if (typeof entry.area !== 'string' || entry.area.length === 0) {
+      throw new Error(`${label} mutation ${entry.id}.area must be a non-empty string.`);
+    }
+    if (!MUTATION_STATUSES.has(entry.status)) {
+      throw new Error(
+        `${label} mutation ${entry.id}.status must be killed, survived, or inapplicable.`,
+      );
+    }
+  }
+
+  return parsed.mutations;
+}
+
+function findMutationRegressions(results, baselineMutations) {
+  const baselineById = new Map(baselineMutations.map((entry) => [entry.id, entry]));
+  return results.filter((entry) => {
+    const previous = baselineById.get(entry.id);
+    return previous?.status === 'killed' && entry.status !== 'killed';
+  });
+}
+
+function reportMutationRegressions(regressions) {
+  if (regressions.length === 0) {
+    process.stdout.write('\nNo mutation regressions against the recorded baseline.\n');
+    return;
+  }
+
+  process.stderr.write(
+    '\nMutation regression: previously-killed mutants now survive or are inapplicable:\n',
+  );
+  for (const entry of regressions) {
+    process.stderr.write(`  - ${entry.id} (${entry.area}): ${entry.status}\n`);
+  }
+  process.stderr.write(
+    'Remediation: restore killing assertions or update stale mutation definitions, then review and record the baseline intentionally.\n',
+  );
+  process.exitCode = 1;
+}
+
 function main() {
-  const checkMode = process.argv.includes('--check');
+  const cliArgs = process.argv.slice(2);
+  const checkMode = cliArgs.includes('--check');
+  const checkReportPath = getOptionValue(cliArgs, '--check-report');
+  const selectedBaselinePath = getOptionValue(cliArgs, '--baseline') ?? baselinePath;
+  if (!checkMode && checkReportPath === undefined && cliArgs.includes('--baseline')) {
+    throw new Error('--baseline requires --check or --check-report.');
+  }
+  if (checkReportPath !== undefined) {
+    const current = readMutationReport(checkReportPath, 'Current mutation report');
+    const baseline = readMutationReport(selectedBaselinePath, 'Mutation baseline');
+    reportMutationRegressions(findMutationRegressions(current, baseline));
+    return;
+  }
+
   const originals = new Map();
   const results = [];
 
@@ -246,20 +352,8 @@ function main() {
   }
 
   if (checkMode) {
-    const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
-    const baselineById = new Map(baseline.mutations.map((entry) => [entry.id, entry]));
-    const regressions = results.filter((entry) => {
-      const previous = baselineById.get(entry.id);
-      return previous?.status === 'killed' && entry.status === 'survived';
-    });
-    if (regressions.length > 0) {
-      process.stderr.write('\nMutation regression: previously-killed mutants now survive:\n');
-      for (const entry of regressions) {
-        process.stderr.write(`  - ${entry.id} (${entry.area})\n`);
-      }
-      process.exit(1);
-    }
-    process.stdout.write('\nNo mutation regressions against the recorded baseline.\n');
+    const baseline = readMutationReport(selectedBaselinePath, 'Mutation baseline');
+    reportMutationRegressions(findMutationRegressions(results, baseline));
     return;
   }
 
@@ -268,4 +362,10 @@ function main() {
   process.stdout.write(`\nRecorded baseline -> ${baselinePath}\n`);
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  const detail = error instanceof Error ? error.message : String(error);
+  process.stderr.write(`Mutation baseline failed: ${detail}\n`);
+  process.exitCode = 1;
+}

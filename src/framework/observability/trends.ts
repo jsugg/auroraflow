@@ -565,7 +565,7 @@ function compareTrendPoints(left: ObservabilityTrendPoint, right: ObservabilityT
 }
 
 function toNodeError(error: unknown): NodeJS.ErrnoException | undefined {
-  return error instanceof Error ? (error as NodeJS.ErrnoException) : undefined;
+  return error instanceof Error ? error : undefined;
 }
 
 export async function readObservabilityTrendPoints(

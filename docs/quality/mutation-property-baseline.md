@@ -7,7 +7,7 @@ This is the scoped assertion-quality baseline for calibration-critical code. It 
 This baseline starts with the **smallest deterministic footprint and no new test dependency** (no Stryker, no fast-check) until runtime and tooling are accepted for PR gating:
 
 - **Property tests** use an in-repo seeded generator, `tests/helpers/propertyTesting.ts` (mulberry32 PRNG + `forAll`). They run inside the normal `npm run test:unit` suite. Failures are reproducible from the seed: every failure reports `seed`, `run`, and the offending `case`.
-- **Mutation tests** use an in-repo runner, `scripts/mutation-baseline.mjs`, that applies a curated set of source mutations in place, runs the scoped specs, and records killed/survived. It runs **manually or on a schedule**, not in `verify`.
+- **Mutation tests** use an in-repo runner, `scripts/mutation-baseline.mjs`, that applies a curated set of source mutations in place, runs the scoped specs, and records killed/survived/inapplicable outcomes. It runs **manually or on a schedule**, not in `verify`.
 
 If/when a heavier tool (Stryker/fast-check) is approved, these baselines define the behavior that tool must preserve.
 
@@ -28,10 +28,10 @@ Scoring, config, guarded validation, retry, and Redis compare-and-set:
 ```bash
 npm run test:unit            # property tests run here (fast, seeded, bounded)
 npm run test:mutation        # refresh + record the mutation baseline (warning-only, exit 0)
-npm run test:mutation:check  # no-regression gate: fails if a previously-killed mutant now survives
+npm run test:mutation:check  # fails if a killed mutant now survives or becomes inapplicable
 ```
 
-Scheduling: run `npm run test:mutation:check` on a schedule or a risk-triggered CI lane. It is intentionally not part of `npm run verify` because it mutates source files in place (each is restored in a `finally`, plus a top-level safety restore) and is slower than the fast gate.
+The Quality Gates workflow runs this check as `Mutation Baseline (Advisory)` on scheduled and manual evidence runs, then uploads `baseline-check.txt` even on failure. It is intentionally not part of `npm run verify` or branch protection because it mutates source files in place (each is restored in a `finally`, plus a top-level safety restore) and is slower than the fast gate.
 
 ## Current baseline
 
@@ -40,5 +40,5 @@ Recorded in `docs/quality/mutation-baseline.json`: **11/11 mutants killed (kill 
 ## Triage policy
 
 - A surviving mutant means an assertion gap. It must be **triaged into a test or recorded as a documented exception** — never silently ignored.
-- The runner marks a mutation `inapplicable` when its `find` string no longer matches exactly once (source drift). Treat that as a prompt to update the manifest in the same change as the source edit, not as a pass.
+- The runner marks a mutation `inapplicable` when its `find` string no longer matches exactly once (source drift). A previously killed mutant becoming inapplicable is a regression: update the manifest in the same change as the source edit, then deliberately review and record the replacement baseline.
 - Expanding the manifest: add an entry to `MUTATIONS` in `scripts/mutation-baseline.mjs` and re-run `npm run test:mutation`. New survivors are expected as coverage of operators grows; resolve each before promoting the gate from warning-only to required.

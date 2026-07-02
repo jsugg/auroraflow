@@ -147,7 +147,7 @@ function labelsForMetric(metricName: string): Readonly<Record<string, string>> {
 }
 
 function createPrometheusFetch(): typeof fetch {
-  return (async (input: string | URL | Request): Promise<Response> => {
+  return async (input: string | URL | Request): Promise<Response> => {
     const url = new URL(input.toString());
     const pathname = url.pathname;
     if (pathname === '/api/v1/labels') {
@@ -187,7 +187,7 @@ function createPrometheusFetch(): typeof fetch {
       });
     }
     return Response.json({ error: 'not found', status: 'error' }, { status: 404 });
-  }) as typeof fetch;
+  };
 }
 
 describe('parseObservabilityLiveExportAssertCliOptions', () => {
