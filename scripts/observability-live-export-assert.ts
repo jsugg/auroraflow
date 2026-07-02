@@ -320,7 +320,7 @@ function summarizeSeries(
       [...labelValues.entries()]
         .sort(([left], [right]) => left.localeCompare(right))
         .map(([labelName, values]) => [labelName, [...values].sort()]),
-    ) as Readonly<Record<string, readonly string[]>>,
+    ),
     queryResultCount,
     seriesCount: series.length,
   };

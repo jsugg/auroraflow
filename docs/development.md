@@ -90,6 +90,8 @@ npm run verify
 
 `npm run verify` runs repo-local actionlint bootstrap, formatting, linting, typechecking, unit tests, contracts, Redis/OTLP integration, schema validation, ShellCheck, and workflow linting.
 
+TypeScript strictness includes `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes`. Type-aware ESLint also rejects unnecessary type assertions; validate external values at their boundary instead of casting them to silence the checker.
+
 ### Contract assertion policy
 
 Contract specs are semantic-first:

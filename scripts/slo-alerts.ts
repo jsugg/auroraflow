@@ -6,7 +6,6 @@ import {
   evaluateAlertPolicy,
   parseAlertPolicy,
   type AlertEvaluationResult,
-  type AlertPolicy,
 } from '../src/framework/observability/alertPolicies';
 import { runSloAlertTelemetry } from '../src/framework/observability/reportTelemetry';
 import { shutdownTelemetry } from '../src/framework/observability/telemetry';
@@ -162,7 +161,7 @@ async function main(): Promise<number> {
       const options = parseCliOptions(process.argv.slice(2));
 
       const dashboard = parseDashboard(await parseJsonFile(options.dashboardJsonPath));
-      const policy = parseAlertPolicy((await parseJsonFile(options.policyPath)) as AlertPolicy);
+      const policy = parseAlertPolicy(await parseJsonFile(options.policyPath));
 
       const result = evaluateAlertPolicy({
         dashboard,

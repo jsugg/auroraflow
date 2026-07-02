@@ -1,7 +1,6 @@
 import { spawn } from 'node:child_process';
 import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:http';
-import type { AddressInfo } from 'node:net';
 import os from 'node:os';
 import path from 'node:path';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
@@ -754,7 +753,7 @@ describe('workflow script process boundaries', () => {
         if (address === null || typeof address === 'string') {
           throw new Error('Observability validator fixture server did not bind a TCP port.');
         }
-        const port = (address as AddressInfo).port;
+        const port = address.port;
         const [success, failure] = await Promise.all([
           runTypeScriptScript(
             'scripts/observability-validate-backends.ts',
