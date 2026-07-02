@@ -67,7 +67,6 @@ jobs:
 
   codeql:
     name: CodeQL
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     permissions:
@@ -88,9 +87,6 @@ jobs:
         uses: github/codeql-action/init@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
         with:
           languages: ${{ matrix.language }}
-
-      - name: Autobuild
-        uses: github/codeql-action/autobuild@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@8aad20d150bbac5944a9f9d289da16a4b0d87c1e # v4.36.2
@@ -201,27 +197,65 @@ jobs:
           SECRET_SCAN_EFFECT_PROOF_RESULT: ${{ needs.secret-scan-effect-proof.result }}
           WORKFLOW_SECURITY_RESULT: ${{ needs.workflow-security.result }}
         run: |
-          if [ "${{ github.event_name }}" = "pull_request" ] && [ "$DEPENDENCY_REVIEW_RESULT" != "success" ]; then
-            echo "Dependency review failed: $DEPENDENCY_REVIEW_RESULT"
-            exit 1
+          set -u
+          status=0
+
+          require_success() {
+            label="$1"
+            result="$2"
+            if [ "$result" != "success" ]; then
+              echo "::error::${label} expected success but was ${result:-missing}"
+              status=1
+            fi
+          }
+
+          require_skipped() {
+            label="$1"
+            result="$2"
+            if [ "$result" != "skipped" ]; then
+              echo "::error::${label} expected skipped for ${{ github.event_name }} but was ${result:-missing}"
+              status=1
+            fi
+          }
+
+          {
+            echo "### Security Gate results"
+            echo
+            echo "| Job | Expected | Actual |"
+            echo "| --- | --- | --- |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          record_result() {
+            label="$1"
+            expected="$2"
+            result="$3"
+            echo "| ${label} | ${expected} | ${result:-missing} |" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            require_success "Dependency Review" "$DEPENDENCY_REVIEW_RESULT"
+            require_skipped "NPM Audit" "$NPM_AUDIT_RESULT"
+            record_result "Dependency Review" "success" "$DEPENDENCY_REVIEW_RESULT"
+            record_result "NPM Audit" "skipped" "$NPM_AUDIT_RESULT"
+          else
+            require_skipped "Dependency Review" "$DEPENDENCY_REVIEW_RESULT"
+            require_success "NPM Audit" "$NPM_AUDIT_RESULT"
+            record_result "Dependency Review" "skipped" "$DEPENDENCY_REVIEW_RESULT"
+            record_result "NPM Audit" "success" "$NPM_AUDIT_RESULT"
           fi
-          if [ "${{ github.event_name }}" != "pull_request" ] && [ "$NPM_AUDIT_RESULT" != "success" ]; then
-            echo "NPM audit failed: $NPM_AUDIT_RESULT"
-            exit 1
+
+          require_success "CodeQL" "$CODEQL_RESULT"
+          require_success "Secret Scan" "$SECRET_SCAN_RESULT"
+          require_success "Secret Scan Effect Proof" "$SECRET_SCAN_EFFECT_PROOF_RESULT"
+          require_success "Workflow Security" "$WORKFLOW_SECURITY_RESULT"
+          record_result "CodeQL" "success" "$CODEQL_RESULT"
+          record_result "Secret Scan" "success" "$SECRET_SCAN_RESULT"
+          record_result "Secret Scan Effect Proof" "success" "$SECRET_SCAN_EFFECT_PROOF_RESULT"
+          record_result "Workflow Security" "success" "$WORKFLOW_SECURITY_RESULT"
+
+          if [ "$status" -ne 0 ]; then
+            echo "Security Gate failed closed because one or more required security jobs had an unexpected result."
+            exit "$status"
           fi
-          if [ "$SECRET_SCAN_RESULT" != "success" ]; then
-            echo "Secret scan failed: $SECRET_SCAN_RESULT"
-            exit 1
-          fi
-          if [ "$SECRET_SCAN_EFFECT_PROOF_RESULT" != "success" ]; then
-            echo "Secret scan effect proof failed: $SECRET_SCAN_EFFECT_PROOF_RESULT"
-            exit 1
-          fi
-          if [ "$WORKFLOW_SECURITY_RESULT" != "success" ]; then
-            echo "Workflow security failed: $WORKFLOW_SECURITY_RESULT"
-            exit 1
-          fi
-          if [ "${{ github.event_name }}" != "pull_request" ] && [ "$CODEQL_RESULT" != "success" ]; then
-            echo "CodeQL failed: $CODEQL_RESULT"
-            exit 1
-          fi
+
+          echo "Security Gate passed with the expected event-aware result map."

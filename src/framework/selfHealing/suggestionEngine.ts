@@ -148,32 +148,126 @@ function scoreSuggestion({
   };
 }
 
-function extractDataTestId(target: string): string | null {
-  const cssMatch = target.match(/\[data-testid=(['"]?)([^'"\]]+)\1\]/i);
-  if (cssMatch?.[2]) {
-    return cssMatch[2];
+function isQuote(value: string | undefined): value is "'" | '"' | '`' {
+  return value === "'" || value === '"' || value === '`';
+}
+
+function readLeadingStringLiteral(input: string): { value: string; rest: string } | null {
+  const quote = input[0];
+  if (!isQuote(quote)) {
+    return null;
   }
 
-  const getByTestIdMatch = target.match(/getByTestId\((['"`])([^'"`]+)\1\)/i);
-  if (getByTestIdMatch?.[2]) {
-    return getByTestIdMatch[2];
+  let value = '';
+  for (let index = 1; index < input.length; index += 1) {
+    const char = input[index];
+    if (char === '\\') {
+      const next = input[index + 1];
+      if (next !== undefined) {
+        value += next;
+        index += 1;
+        continue;
+      }
+    }
+    if (char === quote) {
+      return { value, rest: input.slice(index + 1) };
+    }
+    value += char;
+  }
+
+  return null;
+}
+
+function readMethodStringArgument(target: string, methodName: string): string | null {
+  const prefix = `${methodName}(`;
+  const start = target.toLowerCase().indexOf(prefix.toLowerCase());
+  if (start === -1) {
+    return null;
+  }
+
+  const literal = readLeadingStringLiteral(target.slice(start + prefix.length).trimStart());
+  return literal !== null && literal.rest.trimStart().startsWith(')') ? literal.value : null;
+}
+
+function extractCssDataTestId(target: string): string | null {
+  const prefix = '[data-testid=';
+  const valueStart = target.toLowerCase().indexOf(prefix);
+  if (valueStart === -1) {
+    return null;
+  }
+
+  const contentStart = valueStart + prefix.length;
+  const quote = target[contentStart];
+  if (quote === "'" || quote === '"') {
+    const endQuote = target.indexOf(quote, contentStart + 1);
+    if (
+      endQuote <= contentStart + 1 ||
+      !target
+        .slice(endQuote + 1)
+        .trimStart()
+        .startsWith(']')
+    ) {
+      return null;
+    }
+    return target.slice(contentStart + 1, endQuote);
+  }
+
+  const endBracket = target.indexOf(']', contentStart);
+  return endBracket <= contentStart ? null : target.slice(contentStart, endBracket);
+}
+
+function extractDataTestId(target: string): string | null {
+  const cssDataTestId = extractCssDataTestId(target);
+  return cssDataTestId ?? readMethodStringArgument(target, 'getByTestId');
+}
+
+function trimBoundaryQuotes(rawValue: string): string {
+  let start = 0;
+  let end = rawValue.length;
+
+  if (isQuote(rawValue[0])) {
+    start = 1;
+  }
+  if (end > start && isQuote(rawValue[end - 1])) {
+    end -= 1;
+  }
+
+  return rawValue.slice(start, end);
+}
+
+function extractTextSelectorTarget(target: string): string | null {
+  const lowerTarget = target.toLowerCase();
+  let searchFrom = 0;
+
+  while (searchFrom < target.length) {
+    const start = lowerTarget.indexOf('text', searchFrom);
+    if (start === -1) {
+      return null;
+    }
+
+    let index = start + 'text'.length;
+    while (target[index] === ' ' || target[index] === '\t') {
+      index += 1;
+    }
+    if (target[index] !== '=') {
+      searchFrom = start + 1;
+      continue;
+    }
+
+    const value = target.slice(index + 1).trim();
+    return value.length === 0 ? null : trimBoundaryQuotes(value).trim();
   }
 
   return null;
 }
 
 function extractTextTarget(target: string): string | null {
-  const textSelectorMatch = target.match(/text\s*=\s*(.+)$/i);
-  if (textSelectorMatch?.[1]) {
-    return textSelectorMatch[1].replace(/^['"`]|['"`]$/g, '').trim();
+  const textSelectorTarget = extractTextSelectorTarget(target);
+  if (textSelectorTarget !== null) {
+    return textSelectorTarget;
   }
 
-  const getByTextMatch = target.match(/getByText\((['"`])([^'"`]+)\1\)/i);
-  if (getByTextMatch?.[2]) {
-    return getByTextMatch[2].trim();
-  }
-
-  return null;
+  return readMethodStringArgument(target, 'getByText')?.trim() ?? null;
 }
 
 function addSeed(targetSeeds: Map<string, CandidateSeed>, seed: CandidateSeed): void {

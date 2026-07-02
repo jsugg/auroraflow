@@ -29,6 +29,7 @@ describe('documentation surface contract', () => {
   it('ships API-grade onboarding and reference docs', () => {
     const requiredDocs = [
       'CONTRIBUTING.md',
+      'SECURITY.md',
       'docs/getting-started.md',
       'docs/writing-tests.md',
       'docs/configuration.md',
@@ -60,6 +61,24 @@ describe('documentation surface contract', () => {
 
     for (const docPath of requiredDocs) {
       expect(readRepoFile(docPath).trim().length).toBeGreaterThan(200);
+    }
+  });
+
+  it('documents the vulnerability reporting and supported-version security policy', () => {
+    const securityPolicy = readRepoFile('SECURITY.md');
+
+    for (const text of [
+      'Supported versions',
+      'latest released `1.x` line',
+      'private vulnerability reporting',
+      'Do not submit real credentials or sensitive production data',
+      'consumer-owned Redis, observability, CI runner, and retention infrastructure',
+    ]) {
+      expectTextIncludes(securityPolicy, {
+        text,
+        rationale:
+          'Security policy must keep vulnerability reporting private and preserve library scope.',
+      });
     }
   });
 

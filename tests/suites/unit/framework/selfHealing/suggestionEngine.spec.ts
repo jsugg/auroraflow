@@ -64,4 +64,16 @@ describe('generateRankedLocatorSuggestions', () => {
       expect(suggestion.score).toBeLessThanOrEqual(1);
     }
   });
+
+  it('extracts selector hints from adversarial strings without regex backtracking', () => {
+    const suggestions = generateRankedLocatorSuggestions({
+      actionType: 'click',
+      failedTarget: `[data-testid='submit-order'] text=${' '.repeat(2_048)}Submit`,
+      maxCandidates: 10,
+    });
+
+    expect(suggestions.map((suggestion) => suggestion.locator)).toEqual(
+      expect.arrayContaining(["page.getByTestId('submit-order')", "page.getByText('Submit')"]),
+    );
+  });
 });

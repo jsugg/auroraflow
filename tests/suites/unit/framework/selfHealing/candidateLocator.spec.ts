@@ -166,6 +166,20 @@ describe('parseLegacyLocatorString (legacy string read path)', () => {
     );
   });
 
+  it('parses legacy role locators from adversarial spacing without regex backtracking', () => {
+    const repeatedSpaces = ' '.repeat(2_048);
+
+    expect(
+      parseLegacyLocatorString(`page.getByRole('button', { name: '${repeatedSpaces}Save' })`),
+    ).toEqual(roleLocator('button', stringName(`${repeatedSpaces}Save`)));
+    expect(
+      parseLegacyLocatorString(`page.getByRole('button', ${repeatedSpaces}{ name: /save/i })`),
+    ).toEqual(roleLocator('button', regexName('save', 'i')));
+    expect(
+      parseLegacyLocatorString(`page.getByRole('button', { name: ${repeatedSpaces} })`),
+    ).toBeNull();
+  });
+
   it('reads same-origin frame candidates into the structured frame model', () => {
     expect(
       parseLegacyLocatorString(

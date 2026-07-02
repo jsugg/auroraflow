@@ -129,6 +129,10 @@ function quoteLiteral(value: string): string | null {
   return null;
 }
 
+function isQuote(value: string | undefined): value is "'" | '"' | '`' {
+  return value === "'" || value === '"' || value === '`';
+}
+
 function describeName(name: CandidateLocatorName): string | null {
   if (name.kind === 'regex') {
     return `/${name.source}/${name.flags}`;
@@ -260,13 +264,53 @@ function parsePageStringArgument(expression: string, methodName: string): string
   return parseQuotedStringLiteral(expression.slice(prefix.length, -1));
 }
 
+function isRegexFlagCharacter(value: string): boolean {
+  const code = value.charCodeAt(0);
+  return (code >= 65 && code <= 90) || (code >= 97 && code <= 122);
+}
+
+function parseRegexNameOption(rawValue: string): CandidateLocatorName | null {
+  const trimmedValue = rawValue.trim();
+  if (!trimmedValue.startsWith('/')) {
+    return null;
+  }
+
+  const closingSlashIndex = trimmedValue.lastIndexOf('/');
+  if (closingSlashIndex <= 1) {
+    return null;
+  }
+
+  const flags = trimmedValue.slice(closingSlashIndex + 1);
+  for (const flag of flags) {
+    if (!isRegexFlagCharacter(flag)) {
+      return null;
+    }
+  }
+
+  return regexName(trimmedValue.slice(1, closingSlashIndex), flags);
+}
+
+function trimBoundaryQuotes(rawValue: string): string {
+  let start = 0;
+  let end = rawValue.length;
+
+  if (isQuote(rawValue[0])) {
+    start = 1;
+  }
+  if (end > start && isQuote(rawValue[end - 1])) {
+    end -= 1;
+  }
+
+  return rawValue.slice(start, end);
+}
+
 function parseNameOption(rawValue: string): CandidateLocatorName {
-  const regexMatch = rawValue.match(/^\/(.+)\/([a-z]*)$/i);
-  if (regexMatch) {
-    return regexName(regexMatch[1], regexMatch[2]);
+  const regexNameOption = parseRegexNameOption(rawValue);
+  if (regexNameOption !== null) {
+    return regexNameOption;
   }
   const quotedValue = parseQuotedStringLiteral(rawValue);
-  return stringName(quotedValue ?? rawValue.replace(/^['"`]|['"`]$/g, ''));
+  return stringName(quotedValue ?? trimBoundaryQuotes(rawValue));
 }
 
 /**
@@ -277,7 +321,7 @@ function parseNameOption(rawValue: string): CandidateLocatorName {
  */
 function readLeadingQuotedLiteral(input: string): { value: string; rest: string } | null {
   const quote = input[0];
-  if (quote !== "'" && quote !== '"' && quote !== '`') {
+  if (!isQuote(quote)) {
     return null;
   }
 
@@ -299,6 +343,49 @@ function readLeadingQuotedLiteral(input: string): { value: string; rest: string 
   }
 
   return null;
+}
+
+function parseRoleNameObjectOption(rawValue: string): CandidateLocatorName | null {
+  const trimmedValue = rawValue.trim();
+  if (!trimmedValue.startsWith('{') || !trimmedValue.endsWith('}')) {
+    return null;
+  }
+
+  const property = trimmedValue.slice(1, -1).trim();
+  if (!property.startsWith('name')) {
+    return null;
+  }
+
+  const afterName = property.slice('name'.length).trimStart();
+  if (!afterName.startsWith(':')) {
+    return null;
+  }
+
+  const rawNameOption = afterName.slice(1).trim();
+  return rawNameOption.length === 0 ? null : parseNameOption(rawNameOption);
+}
+
+function parseRoleLocatorExpression(expression: string): CandidateLocator | null {
+  const prefix = 'page.getByRole(';
+  if (!expression.startsWith(prefix) || !expression.endsWith(')')) {
+    return null;
+  }
+
+  const roleLiteral = readLeadingQuotedLiteral(expression.slice(prefix.length, -1));
+  if (roleLiteral === null || roleLiteral.value.length === 0) {
+    return null;
+  }
+
+  const rest = roleLiteral.rest.trim();
+  if (rest.length === 0) {
+    return roleLocator(roleLiteral.value);
+  }
+  if (!rest.startsWith(',')) {
+    return null;
+  }
+
+  const nameOption = parseRoleNameObjectOption(rest.slice(1));
+  return nameOption === null ? null : roleLocator(roleLiteral.value, nameOption);
 }
 
 /**
@@ -351,15 +438,9 @@ export function parseLegacyLocatorString(expression: string): CandidateLocator |
     return labelLocator(labelValue);
   }
 
-  const roleMatch = trimmedExpression.match(
-    /^page\.getByRole\((['"`])([^'"`]+)\1(?:,\s*\{\s*name:\s*(.+)\s*\})?\)$/,
-  );
-  if (roleMatch?.[2]) {
-    const role = roleMatch[2];
-    const rawNameOption = roleMatch[3];
-    return rawNameOption
-      ? roleLocator(role, parseNameOption(rawNameOption.trim()))
-      : roleLocator(role);
+  const roleValue = parseRoleLocatorExpression(trimmedExpression);
+  if (roleValue !== null) {
+    return roleValue;
   }
 
   const locatorValue = parsePageStringArgument(trimmedExpression, 'locator');

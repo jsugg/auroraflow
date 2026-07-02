@@ -64,6 +64,17 @@ describe('resolveTelemetryConfig', () => {
     });
   });
 
+  it('normalizes repository URLs without regex-based trailing slash trimming', () => {
+    const config = resolveTelemetryConfig({
+      GITHUB_REPOSITORY: 'jsugg/auroraflow',
+      GITHUB_SERVER_URL: 'https://github.enterprise.example////',
+    });
+
+    expect(config.resourceAttributes).toMatchObject({
+      'vcs.repository.url': 'https://github.enterprise.example/jsugg/auroraflow',
+    });
+  });
+
   it('rejects invalid boolean, environment, and OTLP endpoint values', () => {
     expect(() => resolveTelemetryConfig({ AURORAFLOW_OBSERVABILITY_ENABLED: 'sometimes' })).toThrow(
       TelemetryConfigError,
