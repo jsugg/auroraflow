@@ -44,6 +44,7 @@ describe('documentation surface contract', () => {
       'docs/adr/0007-durable-trend-export.md',
       'docs/adr/0008-adoption-gated-extensibility.md',
       'docs/adr/0009-strategic-architecture.md',
+      'docs/adr/0010-ci-cd-maturity-deferrals.md',
       'docs/architecture/adoption-readiness.md',
       'docs/architecture/locator-first-api.md',
       'docs/architecture/self-healing.md',
@@ -176,6 +177,32 @@ describe('documentation surface contract', () => {
         text,
         rationale:
           'Strategic ADR must keep package split, hosted SAT, and observability deferred without authorizing expansion.',
+      });
+    }
+  });
+
+  it('records CI/CD maturity deferrals without enabling publish or governance expansion', () => {
+    const adr = readRepoFile('docs/adr/0010-ci-cd-maturity-deferrals.md');
+    const decisionLog = readRepoFile('docs/architecture/decision-log.md');
+    const releaseProcess = readRepoFile('docs/operations/release-process.md');
+    const docs = `${adr}\n${decisionLog}\n${releaseProcess}`;
+
+    for (const text of [
+      'harden-runner starts audit-only',
+      'OpenSSF Scorecard must record a measured score before any threshold is proposed',
+      'Do not enable mandatory code-owner review, mandatory signed commits, merge queue',
+      'Merge queue requires every required workflow to support `merge_group` before enablement.',
+      'No npm publish job, no `id-token: write` publish permission, and no `NPM_TOKEN`',
+      'explicit maintainer release decision, a protected `release` environment, npm trusted publisher configuration',
+      'same-commit Quality/Security evidence green before publish',
+      'No container image scanning, Kubernetes/deploy gates, database migration gates, hosted SAT, hosted observability',
+      'Keep the six-workflow topology',
+      'Keep six workflows, no mandatory code-owner review, no signed-commit requirement, no merge queue, no publish job, no `NPM_TOKEN`',
+    ]) {
+      expectTextIncludes(docs, {
+        text,
+        rationale:
+          'CI/CD maturity docs must preserve Phase 6 deferrals and avoid accidental publish or governance expansion.',
       });
     }
   });
