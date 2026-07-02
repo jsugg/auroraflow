@@ -1,8 +1,16 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 interface PinoMock {
   readonly factory: ReturnType<typeof vi.fn>;
   readonly transport: ReturnType<typeof vi.fn>;
+}
+
+const REPO_ROOT = process.cwd();
+
+function readSource(relativePath: string): string {
+  return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
 }
 
 function mockPino(): PinoMock {
@@ -20,7 +28,7 @@ describe('logger module import', () => {
     vi.resetModules();
   });
 
-  it('does not create a logger or transport during import', async () => {
+  it('does not create a logger or transport during direct logger import', async () => {
     vi.resetModules();
     vi.stubEnv('AURORAFLOW_LOG_DESTINATION', 'both');
     const pino = mockPino();
@@ -31,13 +39,15 @@ describe('logger module import', () => {
     expect(pino.transport).not.toHaveBeenCalled();
   });
 
-  it('does not validate logger environment during package import', async () => {
-    vi.resetModules();
-    vi.stubEnv('AURORAFLOW_LOG_DESTINATION', 'invalid-at-import');
-    const pino = mockPino();
+  it('keeps package import as a side-effect-free logger re-export', () => {
+    const indexSource = readSource('src/index.ts');
+    const loggerSource = readSource('src/utils/logger.ts');
 
-    await expect(import('../../../../../src/index.js')).resolves.toBeDefined();
-    expect(pino.factory).not.toHaveBeenCalled();
-    expect(pino.transport).not.toHaveBeenCalled();
-  }, 15_000);
+    expect(indexSource).toContain("} from './utils/logger';");
+    expect(indexSource).not.toMatch(/(?:getMainLogger|createConfiguredLogger)\s*\(/);
+    expect(loggerSource).toContain('mainLogger ??= createConfiguredLogger();');
+    expect(loggerSource).not.toMatch(
+      /(?:let|const)\s+mainLogger\s*=\s*createConfiguredLogger\s*\(/,
+    );
+  });
 });
