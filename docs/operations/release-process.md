@@ -9,7 +9,7 @@ Policy source: `AUR-DEC-012` (see `docs/architecture/decision-log.md`) — npm p
 The release workflow (`.github/workflows/release.yml`) is manual (`workflow_dispatch`) and **never publishes**. It exists to make the release path auditable before the first publish:
 
 - The workflow has read-only (`contents: read`) permissions in every job.
-- No job invokes `npm publish`; packaging runs exclusively through `npm pack --dry-run`.
+- No job invokes `npm publish`; packaging produces a local `npm pack` tarball only for validation and evidence.
 - The `publish-gate` job is a placeholder. It only runs when the `publish_confirmation` input is non-empty, requires the protected `release` environment, and then refuses with a hard failure. Enabling a real publish is a separate future task and requires maintainer sign-off.
 
 Run it from the repository:
@@ -25,13 +25,23 @@ Each run uploads a `release-dry-run-evidence` artifact (30-day retention) contai
 | File | Purpose |
 | --- | --- |
 | `pack-report.json` | Exact file list and sizes `npm pack` would publish |
+| `consumer-smoke.txt` | Temp-project install/import/typecheck proof for the packed tarball |
+| `publint.txt` | `publint` compatibility report for package metadata and exports |
+| `attw.txt` | Are The Types Wrong report for package declaration resolution |
 | `sbom.spdx.json` | SPDX SBOM of runtime dependencies (`npm sbom --omit dev`) |
 | `sbom.cyclonedx.json` | CycloneDX SBOM of runtime dependencies |
 | `schema-validation.txt` | `npm run schemas:check` output proving artifact schemas compile before packaging |
 | `provenance-readiness.txt` | Verification that package metadata satisfies npm provenance prerequisites |
 | `changelog-draft.md` | Conventional Commits log since the previous tag, input for curated notes |
 
-The run also executes the full `npm run verify` gate and a clean `npm run build` so release evidence always reflects a healthy tree. Schema validation is also recorded as standalone release evidence, even though it is part of `verify`.
+The run also executes the full `npm run verify` gate and a clean `npm run build` so release evidence always reflects a healthy tree. Schema validation is also recorded as standalone release evidence, even though it is part of `verify`. Package validation then:
+
+- builds a local tarball with `npm pack --json`;
+- installs that tarball into a temporary consumer project with the supported Playwright peer floor;
+- imports `auroraflow` and `auroraflow/playwright`;
+- instantiates the default console logger path so the runtime `pino-pretty` transport dependency is proven present;
+- typechecks the installed declarations from the consumer project; and
+- runs `publint` and `attw --pack .`.
 
 ## Playwright peer compatibility
 
@@ -54,7 +64,7 @@ Each lane runs type checking, focused page-object/factory unit tests, and the Ch
 
 Per `AUR-DEC-012`:
 
-- **npm provenance — required at publish time.** The future publish path must run `npm publish --provenance` from GitHub Actions with OIDC (`id-token: write` granted only to the publish job). Provenance statements cannot be produced by a dry run; the dry-run workflow instead validates the prerequisites (public package, `repository.url` matching the repository, explicit `files` allowlist).
+- **npm provenance — required at publish time.** The future publish path must use npm trusted publishing from GitHub Actions OIDC (`id-token: write` granted only to the publish job). Trusted publishing eliminates long-lived npm tokens and produces provenance during the registry publish. Provenance statements cannot be produced by a dry run; the dry-run workflow instead validates the prerequisites (public package, `repository.url` matching the repository, explicit `files` allowlist).
 - **SBOM — required for every release.** Generated with the npm CLI's built-in `npm sbom` in both SPDX and CycloneDX formats, restricted to runtime dependencies (`--omit dev`). The package manager is pinned to `npm@11.17.0`, and the release dry-run workflow installs that version and verifies `npm sbom --help` before dependency install and SBOM generation.
 - **Artifact signing — deferred.** No Sigstore/GPG signing ceremony until the product demonstrates release readiness; revisit when the first real publish is scheduled.
 
@@ -64,7 +74,7 @@ A real publish must never be reachable from a routine CI event. The gates, all o
 
 1. Manual `workflow_dispatch` by a maintainer with an explicit non-empty confirmation input.
 2. The protected `release` GitHub environment with required reviewers configured (the placeholder job already binds to this environment).
-3. A dedicated publish job — added by a future task — carrying the npm token or OIDC trust configuration; no publish credentials exist in the repository today, and adding them is out of scope for the current release dry-run workflow.
+3. A dedicated publish job — added by a future task — mapped to an npm trusted publisher for this exact repository, workflow, and environment. No `NPM_TOKEN` or other long-lived npm publish secret may be added.
 
 ## Rollback policy
 
@@ -92,7 +102,7 @@ If a published release is broken or compromised:
 - [ ] `npm run verify` green on the release commit.
 - [ ] `npm run schemas:check` evidence recorded in `schema-validation.txt`.
 - [ ] Playwright floor/current/latest peer matrix green.
-- [ ] Release dry-run workflow green; evidence artifact reviewed (pack contents, SBOMs, provenance readiness, changelog draft).
+- [ ] Release dry-run workflow green; evidence artifact reviewed (pack contents, consumer smoke, publint, ATTW, SBOMs, trusted-publishing readiness, changelog draft).
 - [ ] Release notes curated from the changelog draft.
 - [ ] Version bump follows SemVer against `docs/api-stability.md` tiers.
 - [ ] Rollback owner identified and reachable.

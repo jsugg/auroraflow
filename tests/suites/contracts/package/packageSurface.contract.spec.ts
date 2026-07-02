@@ -19,6 +19,7 @@ const packageJson = JSON.parse(readFileSync(path.join(process.cwd(), 'package.js
   scripts?: Record<string, string>;
   license?: string;
   dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
   peerDependencies?: Record<string, string>;
 };
 
@@ -48,6 +49,11 @@ describe('package surface contract', () => {
     expect(packageJson.scripts?.build).toBe('npm run clean && tsc -p tsconfig.build.json');
     expect(packageJson.scripts?.prepack).toBe('npm run build');
     expect(packageJson.scripts?.['pack:dry-run']).toBe('npm pack --dry-run');
+    expect(packageJson.scripts?.['package:consumer-smoke']).toBe(
+      'node scripts/package-consumer-smoke.mjs',
+    );
+    expect(packageJson.scripts?.['package:publint']).toBe('publint');
+    expect(packageJson.scripts?.['package:attw']).toBe('attw --pack .');
   });
 
   it('declares runtime and peer dependencies required by exported APIs', () => {
@@ -62,6 +68,12 @@ describe('package surface contract', () => {
       playwright: '>=1.59 <2',
       '@playwright/test': '>=1.59 <2',
     });
+    expect(packageJson.devDependencies).toEqual(
+      expect.objectContaining({
+        publint: expect.any(String),
+        '@arethetypeswrong/cli': expect.any(String),
+      }),
+    );
   });
 });
 
