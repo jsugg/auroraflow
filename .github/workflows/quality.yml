@@ -209,7 +209,29 @@ jobs:
           cache-version: v1
 
       - name: Enforce critical and global coverage thresholds
-        run: npm run test:coverage
+        run: |
+          set -o pipefail
+          mkdir -p coverage
+          npm run test:coverage 2>&1 | tee coverage/coverage-gate.log
+
+      - name: Summarize coverage gate
+        if: always()
+        run: |
+          {
+            echo "### Coverage gate"
+            echo
+            echo "Command: \`npm run test:coverage\`"
+            echo
+            echo "Critical-module and global coverage thresholds are enforced by this required job."
+            echo
+            echo "\`\`\`text"
+            if [ -f coverage/coverage-gate.log ]; then
+              tail -n 120 coverage/coverage-gate.log
+            else
+              echo "coverage/coverage-gate.log was not created."
+            fi
+            echo "\`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"
 
   mutation-baseline:
     name: Mutation Baseline (Advisory)

@@ -97,9 +97,23 @@ describe('quality workflow Node compatibility contract', () => {
     expect(setupNodeStep.uses).toBe(lockedInstallActionPath);
     expect(setupNodeStep.with.get('node-version')).toBe('22');
     expect(setupNodeStep.with.get('cache-namespace')).toBe('coverage');
-    expect(
-      getWorkflowStep(coverageJob, 'Enforce critical and global coverage thresholds').run,
-    ).toBe('npm run test:coverage');
+    expectTextIncludes(
+      getWorkflowStep(coverageJob, 'Enforce critical and global coverage thresholds').run ?? '',
+      {
+        text: 'npm run test:coverage 2>&1 | tee coverage/coverage-gate.log',
+        rationale: 'Coverage gate must preserve threshold output for actionable job summaries.',
+      },
+    );
+    const summaryStep = getWorkflowStep(coverageJob, 'Summarize coverage gate');
+    expect(summaryStep.if).toBe('always()');
+    expectTextIncludes(summaryStep.run ?? '', {
+      text: 'GITHUB_STEP_SUMMARY',
+      rationale: 'Coverage gate must publish a summary even after threshold failures.',
+    });
+    expectTextIncludes(summaryStep.run ?? '', {
+      text: 'coverage/coverage-gate.log',
+      rationale: 'Coverage summary must identify the module/floor output that failed.',
+    });
   });
 
   it('makes Redis integration and guarded self-heal proof mandatory in quality gates', () => {
