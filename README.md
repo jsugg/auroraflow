@@ -24,9 +24,12 @@ Not implemented yet:
 
 - Source-code rewrites or blind autonomous selector mutation.
 - A Dockerized SAT service or a Dockerized framework service.
-- Production-owned observability deployment; production manifests are references that require environment-specific ownership, credentials, storage, DNS, TLS, and network controls.
 
-## Feature maturity
+Observability deployment references:
+
+- Production manifests are references that require environment-specific ownership, credentials, storage, DNS, TLS, and network controls.
+
+## Features
 
 | Area | What is mature now | Current boundary | Source |
 | --- | --- | --- | --- |
