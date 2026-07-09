@@ -231,7 +231,7 @@ scripts/                   Report generation, workflow linting, governance, and 
 
 ## Roadmap
 
-The next meaningful maturity steps are:
+Next steps include:
 
 1. Add richer trend triage views on top of the persisted JSONL history.
 2. Continue package-surface contracts and example coverage before widening the public API.
