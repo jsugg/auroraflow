@@ -73,10 +73,15 @@ runs:
           exit 1
         fi
         for attempt in 1 2 3; do
-          if timeout 300 npx playwright install --with-deps ${{ inputs.browser-name }}; then
+          if timeout -k 30 600 npx playwright install --with-deps ${{ inputs.browser-name }}; then
             exit 0
           fi
           echo "::warning::Playwright browser install attempt ${attempt} failed or timed out; retrying"
+          # A timed-out attempt only kills npx; the apt-get it spawned keeps running
+          # and holds /var/lib/dpkg/lock-frontend, which makes every later attempt
+          # fail fast with "Could not get lock" (exit 100). Wait for the lock to be
+          # released before retrying so a slow package mirror does not deadlock us.
+          timeout 180 bash -c 'while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done' || true
           sleep $((attempt * 15))
         done
         echo "::error::Playwright browser install failed after 3 attempts"
