@@ -63,6 +63,21 @@ runs:
         restore-keys: |
           ${{ runner.os }}-playwright-${{ inputs.cache-version }}-${{ inputs.cache-namespace }}-
 
+    # Cache the OS-level .deb packages that `--with-deps` installs. webkit pulls
+    # ~114 MB; downloading it every run makes the job hostage to apt mirror speed
+    # (a slow draw has cancelled whole shards at the job timeout). Caching the
+    # archives makes the download a one-time cost -- later runs install from disk.
+    # run_id in the key means every run refreshes the cache; restore-keys reuses
+    # the most recent one, so package drift only ever costs an incremental fetch.
+    - name: Cache Playwright apt dependencies
+      if: ${{ inputs.install-browsers == 'true' }}
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/playwright-apt-debs
+        key: ${{ runner.os }}-pw-aptdebs-${{ inputs.cache-version }}-${{ inputs.browser-name }}-${{ github.run_id }}
+        restore-keys: |
+          ${{ runner.os }}-pw-aptdebs-${{ inputs.cache-version }}-${{ inputs.browser-name }}-
+
     - name: Ensure Playwright browser is installed
       if: ${{ inputs.install-browsers == 'true' }}
       shell: bash
@@ -72,17 +87,56 @@ runs:
           echo "::error::browser-name is required when install-browsers is true"
           exit 1
         fi
+
+        stage="${HOME}/.cache/playwright-apt-debs"
+        mkdir -p "${stage}"
+
+        # Keep downloaded .debs so they can be cached across runs. GitHub images
+        # ship /etc/apt/apt.conf.d/docker-clean, which purges them after install.
+        # Also make apt retry stalled mirror connections (it may reconnect to a
+        # faster mirror node) as a fallback when the cache is cold.
+        sudo rm -f /etc/apt/apt.conf.d/docker-clean
+        printf 'APT::Keep-Downloaded-Packages "true";\nAcquire::Retries "5";\nAcquire::http::Timeout "60";\nAcquire::https::Timeout "60";\n' \
+          | sudo tee /etc/apt/apt.conf.d/99playwright-resilient >/dev/null
+
+        # Seed apt's archive from the restored cache so most packages need no
+        # download at all -- this is what makes the step independent of mirror speed.
+        if ls "${stage}"/*.deb >/dev/null 2>&1; then
+          sudo cp -n "${stage}"/*.deb /var/cache/apt/archives/ 2>/dev/null || true
+          echo "Seeded $(ls "${stage}"/*.deb | wc -l) cached apt package(s) into the archive."
+        fi
+
+        # Persist freshly downloaded .debs back to the cache staging dir (owned by
+        # the runner user so the cache post-step can read them).
+        persist_debs() {
+          sudo cp -n /var/cache/apt/archives/*.deb "${stage}"/ 2>/dev/null || true
+          sudo chown -R "$(id -u):$(id -g)" "${stage}" 2>/dev/null || true
+        }
+
+        # Recover from a timed-out attempt. `timeout` only kills npx/node, so the
+        # root apt-get it spawned survives, keeps holding /var/lib/dpkg/lock-frontend,
+        # and makes every later attempt fail instantly with "Could not get lock"
+        # (exit 100) -- which previously deadlocked the job until it was cancelled at
+        # its timeout-minutes budget. Kill the orphan, wait for the lock, and repair
+        # any half-applied dpkg state. Packages already fetched stay in
+        # /var/cache/apt/archives, so the next attempt resumes instead of restarting.
+        recover_apt() {
+          sudo pkill -9 -x apt-get 2>/dev/null || true
+          sudo pkill -9 -x dpkg 2>/dev/null || true
+          timeout 120 bash -c 'while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 3; done' || true
+          sudo dpkg --configure -a 2>/dev/null || true
+        }
+
         for attempt in 1 2 3; do
-          if timeout -k 30 600 npx playwright install --with-deps ${{ inputs.browser-name }}; then
+          if timeout --kill-after=30 600 npx playwright install --with-deps ${{ inputs.browser-name }}; then
+            persist_debs
             exit 0
           fi
-          echo "::warning::Playwright browser install attempt ${attempt} failed or timed out; retrying"
-          # A timed-out attempt only kills npx; the apt-get it spawned keeps running
-          # and holds /var/lib/dpkg/lock-frontend, which makes every later attempt
-          # fail fast with "Could not get lock" (exit 100). Wait for the lock to be
-          # released before retrying so a slow package mirror does not deadlock us.
-          timeout 180 bash -c 'while sudo fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done' || true
-          sleep $((attempt * 15))
+          echo "::warning::Playwright browser install attempt ${attempt} timed out or failed; recovering apt state and retrying"
+          recover_apt
+          sleep $((attempt * 10))
         done
+        # Still cache whatever was fetched so the next run starts warmer.
+        persist_debs
         echo "::error::Playwright browser install failed after 3 attempts"
         exit 1
