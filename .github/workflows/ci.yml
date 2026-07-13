@@ -21,7 +21,10 @@ jobs:
   e2e:
     name: Full E2E (${{ matrix.project }} shard ${{ matrix.shard }})
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    # 30 min (was 20): webkit --with-deps can pull ~114 MB from a slow apt mirror;
+    # the setup action now retries+resumes that download, which needs headroom
+    # beyond the test run itself.
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: 6
