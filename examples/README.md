@@ -34,6 +34,6 @@ npm run security:check
 
 ## Notes
 
-- Examples are validated in CI by `.github/workflows/examples.yml`.
+- Examples are validated in CI by the `E2E (Chrome)` lane in `.github/workflows/quality.yml` (the full Chrome suite includes every example on browser-relevant changes) and by the daily cross-browser `.github/workflows/ci.yml` matrix.
 - Example tests are organized under `tests/suites/e2e/examples/`.
 - Examples are documentation and test fixtures. They are not production integrations and must not depend on live external websites.

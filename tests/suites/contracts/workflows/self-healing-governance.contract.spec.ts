@@ -12,7 +12,7 @@ const qualityWorkflow = readWorkflowModel('.github/workflows/quality.yml');
 describe('self-healing governance workflow contract', () => {
   it('runs governance checks after smoke execution with explicit env controls', () => {
     const governanceStep = getWorkflowStep(
-      getWorkflowJob(qualityWorkflow, 'smoke-e2e'),
+      getWorkflowJob(qualityWorkflow, 'e2e-chrome'),
       'Evaluate self-healing governance',
     );
 
@@ -23,7 +23,7 @@ describe('self-healing governance workflow contract', () => {
   });
 
   it('exposes governance outputs for downstream triage handling', () => {
-    const smokeJob = getWorkflowJob(qualityWorkflow, 'smoke-e2e');
+    const smokeJob = getWorkflowJob(qualityWorkflow, 'e2e-chrome');
 
     expect(getWorkflowStepById(smokeJob, 'self-heal-governance').name).toBe(
       'Evaluate self-healing governance',
@@ -38,7 +38,7 @@ describe('self-healing governance workflow contract', () => {
 
   it('supports optional auto-triage issue creation with explicit opt-in', () => {
     const triageStep = getWorkflowStep(
-      getWorkflowJob(qualityWorkflow, 'smoke-e2e'),
+      getWorkflowJob(qualityWorkflow, 'e2e-chrome'),
       'Auto-open self-healing triage issue',
     );
 

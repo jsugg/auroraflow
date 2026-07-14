@@ -69,9 +69,9 @@ Policy fields:
 
 The triage report groups, per owner, the failing tests, flaky tests, quarantined tests (kept visible even when the run passed), and repeated flakes (failed attempts at or over the threshold), each with an actionable next step. Quarantined and repeated flakes always appear in the report so they cannot silently disappear.
 
-### PR risk E2E lane
+### PR E2E lane
 
-Default pull requests stay fast: only smoke and path-filtered lanes run. Risky pull requests can run the full Chrome E2E suite through the `Risk-Triggered E2E` job in `quality.yml`, triggered by the `risk:e2e` or `full-e2e` label, by changes under risk paths (`src/pageObjects/**`, `src/framework/selfHealing/**`, E2E specs and fixtures), or by a manual `workflow_dispatch` run.
+Default pull requests stay fast: the single path-filtered `E2E (Chrome)` job in `quality.yml` runs the full Chrome project only on browser-relevant changes and is skipped (no runner) otherwise. Because the full Chrome suite is the union of the former smoke, guarded self-heal, examples, and risk subsets, no Playwright test ID runs twice on a pull request. It also runs on `main`, on scheduled/manual dispatch, and can be forced on an otherwise-skipped PR with the `risk:e2e` or `full-e2e` label. Exhaustive cross-browser coverage runs on the daily `E2E Matrix`.
 
 ## Downstream SLO and Alerting
 

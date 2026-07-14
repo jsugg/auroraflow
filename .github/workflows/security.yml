@@ -19,6 +19,34 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
+  preflight:
+    name: Security Preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      run_effect_proof: ${{ steps.paths-filter.outputs.effect_proof }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Detect security-governing changes
+        id: paths-filter
+        if: github.event_name == 'pull_request'
+        uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
+        with:
+          # The gitleaks version/checksum, synthetic credential, allowlist, and
+          # scanner invocation all live inline in security.yml, so its change is
+          # what governs whether the effect-proof meta-test must re-run on a PR.
+          filters: |
+            effect_proof:
+              - '.github/workflows/security.yml'
+              - '.github/zizmor.yml'
+              - 'scripts/dependency-review.sh'
+
   dependency-review:
     name: Dependency Review
     if: github.event_name == 'pull_request'
@@ -133,6 +161,11 @@ jobs:
   secret-scan-effect-proof:
     name: Secret Scan Effect Proof
     runs-on: ubuntu-latest
+    needs: preflight
+    # Scanner-effectiveness meta-test. It runs on push/schedule/dispatch and on
+    # pull requests only when the scanner configuration itself changed, so it no
+    # longer consumes a runner on every ordinary PR (spec section 8).
+    if: github.event_name != 'pull_request' || needs.preflight.outputs.run_effect_proof == 'true'
     timeout-minutes: 6
     permissions:
       contents: read
@@ -176,6 +209,7 @@ jobs:
     runs-on: ubuntu-latest
     if: always()
     needs:
+      - preflight
       - dependency-review
       - npm-audit
       - codeql
@@ -194,6 +228,7 @@ jobs:
           SECRET_SCAN_RESULT: ${{ needs.secret-scan.result }}
           SECRET_SCAN_EFFECT_PROOF_RESULT: ${{ needs.secret-scan-effect-proof.result }}
           WORKFLOW_SECURITY_RESULT: ${{ needs.workflow-security.result }}
+          RUN_EFFECT_PROOF: ${{ needs.preflight.outputs.run_effect_proof }}
         run: |
           set -u
           status=0
@@ -244,12 +279,21 @@ jobs:
 
           require_success "CodeQL" "$CODEQL_RESULT"
           require_success "Secret Scan" "$SECRET_SCAN_RESULT"
-          require_success "Secret Scan Effect Proof" "$SECRET_SCAN_EFFECT_PROOF_RESULT"
           require_success "Workflow Security" "$WORKFLOW_SECURITY_RESULT"
           record_result "CodeQL" "success" "$CODEQL_RESULT"
           record_result "Secret Scan" "success" "$SECRET_SCAN_RESULT"
-          record_result "Secret Scan Effect Proof" "success" "$SECRET_SCAN_EFFECT_PROOF_RESULT"
           record_result "Workflow Security" "success" "$WORKFLOW_SECURITY_RESULT"
+
+          # Effect proof runs on push/schedule/dispatch, and on pull requests only
+          # when scanner-governing files changed; otherwise it is intentionally
+          # skipped and the gate must confirm that skip rather than a silent drop.
+          if [ "${{ github.event_name }}" != "pull_request" ] || [ "$RUN_EFFECT_PROOF" = "true" ]; then
+            require_success "Secret Scan Effect Proof" "$SECRET_SCAN_EFFECT_PROOF_RESULT"
+            record_result "Secret Scan Effect Proof" "success" "$SECRET_SCAN_EFFECT_PROOF_RESULT"
+          else
+            require_skipped "Secret Scan Effect Proof" "$SECRET_SCAN_EFFECT_PROOF_RESULT"
+            record_result "Secret Scan Effect Proof" "skipped" "$SECRET_SCAN_EFFECT_PROOF_RESULT"
+          fi
 
           if [ "$status" -ne 0 ]; then
             echo "Security Gate failed closed because one or more required security jobs had an unexpected result."

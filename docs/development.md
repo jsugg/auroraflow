@@ -107,10 +107,10 @@ Contract specs are semantic-first:
 | `npm run test:contracts` | Static/contract | Package, workflow, infrastructure, and docs contracts. |
 | `npm run test:integration` | Real integration | Redis/Testcontainers and OTLP export. |
 | `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` | Blocking real integration | Same Redis/OTLP integration suite, but Redis startup/connect failures fail instead of skip. |
-| `npm run test:coverage` | Coverage | Critical-module thresholds plus global `src/**` coverage. |
+| `npm run test:coverage` | Coverage | One complete unit coverage run enforcing the global `src/**` floor and every risk-weighted per-file floor. |
 | `npm run test:e2e` | Browser | Playwright browser projects. |
 | `npm run test:e2e:guarded` | Guarded browser proof | Parallel Chrome proof for guarded self-heal at the default gate. |
-| `npm run verify` | Full local gate | Static checks, unit, contracts, integration, schemas, ShellCheck, and workflow lint. |
+| `npm run verify` | Full local gate | Static checks, unit, contracts, integration, ShellCheck, and workflow lint. Schema validation is a CI/release evidence gate (`npm run schemas:check`), run once outside `verify`. |
 | `npm run test:mutation` / `test:mutation:check` | Scheduled/manual advisory | Scoped mutation baseline for calibration-critical code; killed mutants that survive or become inapplicable fail the evidence lane, but it remains outside `verify`. See [mutation & property baseline](quality/mutation-property-baseline.md). |
 | `npm run benchmark:failure-path` | Manual/browser | Warning-only safe-action failure, DOM snapshot, SAT extraction, and artifact-write timing; not part of `verify`. See [failure-path performance baseline](quality/failure-path-performance-baseline.md). |
 
@@ -130,15 +130,16 @@ Calibration-critical code (scoring, config, guarded validation, retry, Redis CAS
 
 ### CI gate topology
 
+Branch protection depends on two stable aggregate gates, `Quality Gate` and `Security Gate`, not on individual matrix-leg or internal job names. Each aggregate runs with `if: always()`, verifies the expected success-or-skipped result of every upstream lane for the current event, fails closed on a missing/cancelled/unexpectedly-skipped lane, and publishes a result table to the job summary.
+
 | Gate | Cost tier | Runs | Responsibility |
 | --- | --- | --- | --- |
-| `Lockfile Drift` | Fast dependency check | Manifest/dependabot changes, Dependabot PRs, `main`, scheduled, and manual quality workflow runs | Fails early with clear remediation when `package-lock.json` is not synchronized with `package.json`. |
-| `Node Compatibility (Node 20/22/24)` | Fast matrix | Pull requests, `main`, scheduled, and manual quality workflow runs | `npm ci`, lint, typecheck, and unit tests only; no Docker, Redis, OTLP collector, or browser install. |
-| `Repository Gates (Node 22)` | Static + Docker integration | Pull requests, `main`, scheduled, and manual quality workflow runs | Format, contracts, Redis/OTLP integration with `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true`, schemas, ShellCheck, and workflow lint. |
-| `Coverage (Critical + Global)` | Coverage | Pull requests, `main`, scheduled, and manual quality workflow runs | Enforces critical-module thresholds, global `src/**` coverage, and risk-weighted per-file floors for high-risk modules once on Node 22. |
-| `Guarded Self-Heal Proof (Chrome)` | Guarded browser proof | Pull requests, `main`, scheduled, and manual quality workflow runs | Preserves Chrome proof for guarded self-heal at the shipped default confidence gate. |
-| `Risk-Triggered E2E (Chrome)` | Browser heavy | `main`, scheduled/manual runs, risky browser/runtime paths, or `full-e2e`/`risk:e2e` PR labels | Runs the full Chrome E2E project outside the Node compatibility matrix. |
-| Observability smoke jobs | Docker/remote optional | Path-triggered, `main`, scheduled, or manual runs depending on the job | Keeps collector/full-stack/remote export evidence separate from fast compatibility gates. |
+| `Lockfile Drift` | Fast dependency check | Manifest/dependabot changes, Dependabot PRs, `main`, scheduled, and manual quality workflow runs | Fails early with clear remediation when `package-lock.json` is not synchronized with `package.json`; the one explicit lockfile gate (the shared setup no longer dry-runs it before every `npm ci`). |
+| `Node Compatibility (Node 20/22/24)` | Fast matrix | Pull requests, `main`, scheduled, and manual quality workflow runs | `npm ci` and unit tests only — runtime-sensitive behavior across supported Node versions; no lint/typecheck/schema (those are runtime-insensitive and run once), no Docker, Redis, OTLP collector, or browser install. |
+| `Static Analysis (Node 22)` | Static + Docker integration | Pull requests, `main`, scheduled, and manual quality workflow runs | Format, lint, typecheck, contracts, Redis/OTLP integration with `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true`, schemas, ShellCheck, and workflow lint — the canonical runtime-insensitive gates, run once. actionlint is installed once and reused. |
+| `Coverage (Unit Floors)` | Coverage | Pull requests, `main`, scheduled, and manual quality workflow runs | One complete unit coverage run enforcing the global `src/**` floor and risk-weighted per-file floors for high-risk modules once on Node 22. The former critical-only coverage pass was a strict subset with identical floors and was removed. |
+| `E2E (Chrome)` | Browser heavy | Browser-relevant changes, `main`, scheduled/manual runs, or `full-e2e`/`risk:e2e` PR labels; skipped (no runner) otherwise | Runs the full Chrome project once — the union of the former smoke, guarded self-heal, examples, and risk subsets, so no Playwright test ID runs twice on the same event — then evaluates self-healing governance on that run's artifacts. |
+| Observability smoke jobs | Docker optional | `Observability Lite` on observability-relevant changes plus a daily floor; `Observability Full Stack` weekly/manual only | Keeps collector-only Lite receipt evidence separate from the weekly full seven-service reference-stack validation; neither is a routine gate on unrelated pushes. |
 
 ### Browser suites
 
@@ -148,7 +149,7 @@ npm run test:examples
 npm run test:e2e
 ```
 
-The full E2E workflow shards across desktop and mobile browser projects on `main`, schedule, and manual dispatch. The quality workflow also has a risk-triggered full Chrome E2E lane for risky browser/runtime paths or `full-e2e`/`risk:e2e` PR labels. Pull-request smoke and examples lanes remain path-filtered by workflow configuration.
+The exhaustive `E2E Matrix` workflow runs one job per installed browser binary (desktop and mobile WebKit share a single `webkit` install in one job) on a daily schedule and manual dispatch — no per-run sharding, because Playwright is already fully parallel and browser/dependency setup, not test time, dominates a job. Post-merge Chrome coverage comes once from the Quality Gates `E2E (Chrome)` lane rather than the full matrix on every push; run `E2E Matrix` manually after a risky merge if cross-browser confirmation is needed before the next daily run. The `E2E (Chrome)` lane is path-filtered: it runs the full Chrome project on browser-relevant changes and is skipped (no runner) otherwise.
 
 If a constrained local machine times out during accessibility smoke checks, reproduce with a larger Playwright timeout before changing source:
 
@@ -180,7 +181,7 @@ npm run infra:redis:logs
 npm run infra:redis:down
 ```
 
-Default local Redis behavior is skip-friendly: if Docker/Testcontainers cannot start Redis, the Redis integration spec reports an explicit skip so non-Redis contributors are not blocked. Required mode is blocking: `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` fails on Redis startup, connection, or evidence failures and is the CI/release mode used by `Repository Gates (Node 22)` and the release dry-run. External mode is opt-in: `AURORAFLOW_REDIS_INTEGRATION_EXTERNAL=true AURORAFLOW_REDIS_HOST=127.0.0.1 AURORAFLOW_REDIS_PORT=6379 npm run test:integration` reuses an existing Redis with a per-run key prefix.
+Default local Redis behavior is skip-friendly: if Docker/Testcontainers cannot start Redis, the Redis integration spec reports an explicit skip so non-Redis contributors are not blocked. Required mode is blocking: `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` fails on Redis startup, connection, or evidence failures and is the CI/release mode used by `Static Analysis (Node 22)` and the release dry-run. External mode is opt-in: `AURORAFLOW_REDIS_INTEGRATION_EXTERNAL=true AURORAFLOW_REDIS_HOST=127.0.0.1 AURORAFLOW_REDIS_PORT=6379 npm run test:integration` reuses an existing Redis with a per-run key prefix.
 
 Production Redis use is outside local development ownership: operators own TLS, auth, ACLs, backups, restore drills, no-eviction capacity planning, retention, and incident response. Keep the [Redis production runbook](operations/redis-production-runbook.md) aligned with selector-store behavior when changing Redis keys, commands, TTLs, or cleanup workflows.
 

@@ -155,7 +155,8 @@ describe('observability contract documentation', () => {
     const supportTiers = readFileSync(SUPPORT_TIERS_PATH, 'utf8');
     const liteCompose = readComposeModel('docker-compose.observability-ci.yml');
     const fullCompose = readComposeModel('docker-compose.observability.yml');
-    const workflow = readWorkflowModel('.github/workflows/quality.yml');
+    const liteWorkflow = readWorkflowModel('.github/workflows/observability-lite.yml');
+    const fullStackWorkflow = readWorkflowModel('.github/workflows/observability-full-stack.yml');
     const packageJson = readPackageJson();
 
     expect([...liteCompose.services.keys()]).toEqual(['otel-collector']);
@@ -170,10 +171,8 @@ describe('observability contract documentation', () => {
         'prometheus',
       ].sort(),
     );
-    expect(getWorkflowJob(workflow, 'observability-stack').name).toBe('Observability Lite Smoke');
-    expect(getWorkflowJob(workflow, 'observability-full-stack').name).toBe(
-      'Observability Full Stack Smoke',
-    );
+    expect(getWorkflowJob(liteWorkflow, 'collector-lite-smoke').name).toBe('Collector Lite Smoke');
+    expect(getWorkflowJob(fullStackWorkflow, 'full-stack-smoke').name).toBe('Full Stack Smoke');
     expect(packageJson.scripts).toEqual(
       expect.objectContaining({
         'observability:lite:up': 'docker compose -f docker-compose.observability-ci.yml up -d',
@@ -290,9 +289,10 @@ describe('observability contract documentation', () => {
 
   it('provides a collector-only Lite CI smoke lane with diagnostics', () => {
     const ciCompose = readComposeModel('docker-compose.observability-ci.yml');
-    const workflow = readWorkflowModel('.github/workflows/quality.yml');
+    const qualityWorkflow = readWorkflowModel('.github/workflows/quality.yml');
+    const liteWorkflow = readWorkflowModel('.github/workflows/observability-lite.yml');
     const packageJson = readPackageJson();
-    const collectorOnlyJob = getWorkflowJob(workflow, 'observability-stack');
+    const collectorOnlyJob = getWorkflowJob(liteWorkflow, 'collector-lite-smoke');
     const collectorConfig = readFileSync(
       path.join(process.cwd(), 'observability', 'otel-collector', 'ci-config.yaml'),
       'utf8',
@@ -302,21 +302,34 @@ describe('observability contract documentation', () => {
     expect(getComposeService(ciCompose, 'otel-collector').volumes).toEqual([
       './observability/otel-collector/ci-config.yaml:/etc/otelcol-contrib/config.yaml:ro',
     ]);
+    // Quality gates call the Lite lane only on observability-relevant changes; the
+    // reusable workflow owns the daily scheduled floor so unrelated pushes do not
+    // force the collector stack.
+    const liteCallJob = getWorkflowJob(qualityWorkflow, 'observability-lite');
+    expect(liteCallJob.uses).toBe('./.github/workflows/observability-lite.yml');
+    expectTextIncludes(liteCallJob.if ?? '', {
+      text: "needs.preflight.outputs.run_observability == 'true'",
+      rationale: 'Quality gates must call the Lite lane only for observability-relevant changes.',
+    });
+    expect(
+      [...liteWorkflow.triggers].sort(),
+      'Lite lane must run on relevant-change calls, a scheduled floor, and manual dispatch.',
+    ).toEqual(['schedule', 'workflow_call', 'workflow_dispatch']);
     const pathFilters =
       getWorkflowStep(
-        getWorkflowJob(workflow, 'preflight'),
-        'Detect smoke-relevant changes',
+        getWorkflowJob(qualityWorkflow, 'preflight'),
+        'Detect change scopes',
       ).with.get('filters') ?? '';
     expectTextIncludes(pathFilters, {
-      text: 'observability_stack:',
-      rationale: 'Quality preflight must expose observability_stack path filter.',
+      text: 'observability:',
+      rationale: 'Quality preflight must expose the observability path filter.',
     });
     expectTextIncludes(pathFilters, {
-      text: 'scripts/observability-collector-receipt.ts',
-      rationale: 'Collector receipt changes must trigger the Lite evidence lane.',
+      text: 'scripts/observability-*.ts',
+      rationale: 'Collector/receipt script changes must trigger the Lite evidence lane.',
     });
-    expectTextIncludes(collectorOnlyJob.env.get('SHOULD_RUN_OBSERVABILITY') ?? '', {
-      text: 'AURORAFLOW_OBSERVABILITY_CI_ENABLED',
+    expectTextIncludes(collectorOnlyJob.if ?? '', {
+      text: "vars.AURORAFLOW_OBSERVABILITY_CI_ENABLED != 'false'",
       rationale: 'Collector smoke lane must support repository-variable opt-out.',
     });
     expect(collectorOnlyJob.env.get('OBSERVABILITY_DIAGNOSTICS_DIR')).toBe(
@@ -365,16 +378,21 @@ describe('observability contract documentation', () => {
     );
   });
 
-  it('provides full-stack and secret-gated remote-export CI observability lanes', () => {
-    const workflow = readWorkflowModel('.github/workflows/quality.yml');
-    const fullStackJob = getWorkflowJob(workflow, 'observability-full-stack');
-    const remoteExportJob = getWorkflowJob(workflow, 'observability-remote-export');
+  it('runs full-stack validation weekly and keeps remote export as operator docs only', () => {
+    const fullStackWorkflow = readWorkflowModel('.github/workflows/observability-full-stack.yml');
+    const fullStackJob = getWorkflowJob(fullStackWorkflow, 'full-stack-smoke');
 
-    expect(fullStackJob.name).toBe('Observability Full Stack Smoke');
-    expect(fullStackJob.env.get('AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED')).toBe('true');
-    expect(fullStackJob.env.get('SHOULD_RUN_OBSERVABILITY_FULL_STACK')).toBe(
-      "${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}",
-    );
+    // Full Stack is scheduled/manual reference-asset validation, never a PR gate:
+    // with only schedule + dispatch triggers no runner is allocated on pull requests.
+    expect(fullStackJob.name).toBe('Full Stack Smoke');
+    expect(
+      [...fullStackWorkflow.triggers].sort(),
+      'Full-stack reference validation must be weekly/manual only, never a PR gate.',
+    ).toEqual(['schedule', 'workflow_dispatch']);
+    expectTextIncludes(fullStackJob.if ?? '', {
+      text: "vars.AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED != 'false'",
+      rationale: 'Full-stack lane must support repository-variable opt-out.',
+    });
     expect(fullStackJob.env.get('OBSERVABILITY_DIAGNOSTICS_DIR')).toBe(
       'observability-output/full-stack',
     );
@@ -400,20 +418,27 @@ describe('observability contract documentation', () => {
       rationale: 'Full-stack workflow must upload validator JSON diagnostics.',
     });
 
-    expect(remoteExportJob.name).toBe('Observability Remote Export Smoke');
-    expect(remoteExportJob.env.get('AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED')).toBe('true');
-    expect(remoteExportJob.env.get('SHOULD_RUN_REMOTE_EXPORT')).toBe(
-      "${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}",
+    // No owned OTLP backend / endpoint secret exists, so the standing remote-export
+    // CI job is removed (spec section 7.3); the operator workflow stays documented.
+    for (const workflowPath of [
+      '.github/workflows/quality.yml',
+      '.github/workflows/observability-lite.yml',
+      '.github/workflows/observability-full-stack.yml',
+    ]) {
+      expectInvariant(
+        !readWorkflowModel(workflowPath).jobs.has('observability-remote-export'),
+        `Remote export must not remain a standing CI job in ${workflowPath} without an owned backend.`,
+      );
+    }
+    const productionDoc = readFileSync(
+      path.join(DOCS_OPERATIONS_ROOT, 'observability-production.md'),
+      'utf8',
     );
-    expect(remoteExportJob.env.get('OTEL_EXPORTER_OTLP_ENDPOINT')).toBe(
-      '${{ secrets.OTEL_EXPORTER_OTLP_ENDPOINT }}',
-    );
-    expect(remoteExportJob.env.get('OTEL_EXPORTER_OTLP_HEADERS')).toBe(
-      '${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}',
-    );
-    expect(
-      getWorkflowStep(remoteExportJob, 'Upload remote export diagnostics').with.get('name'),
-    ).toBe('observability-remote-export-diagnostics');
+    expectTextIncludes(productionDoc, {
+      text: 'OTEL_EXPORTER_OTLP_ENDPOINT',
+      rationale:
+        'Operator docs must retain the remote-export configuration example after CI removal.',
+    });
   });
 
   it('uses snapshot-proven Prometheus labels in dashboards and rules', () => {

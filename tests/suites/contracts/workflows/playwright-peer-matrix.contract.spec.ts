@@ -35,8 +35,13 @@ describe('Playwright peer matrix workflow', () => {
           'Peer matrix must keep playwright, playwright-core, and @playwright/test aligned.',
       },
     );
-    expect(getWorkflowStep(peerMatrixJob, 'Check lockfile drift').run).toBe(
-      'npm run lockfile:check',
+    // The lockfile gate runs once before matrix fan-out, not once per lane.
+    const lockfileJob = getWorkflowJob(workflow, 'lockfile');
+    expect(getWorkflowStep(lockfileJob, 'Check lockfile drift').run).toBe('npm run lockfile:check');
+    expect(peerMatrixJob.needs).toEqual(['lockfile']);
+    expectInvariant(
+      peerMatrixJob.steps.every((step) => step.run !== 'npm run lockfile:check'),
+      'Peer matrix lanes must not repeat the lockfile dry-run; the pre-fan-out lockfile job owns it.',
     );
   });
 

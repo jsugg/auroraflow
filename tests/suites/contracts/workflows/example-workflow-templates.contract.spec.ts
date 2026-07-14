@@ -60,24 +60,30 @@ describe('example workflow template contract', () => {
     }
   });
 
-  it('keeps quality template gates aligned with repository gate topology', () => {
+  it('keeps quality template gates aligned with the static/Node-matrix split topology', () => {
     const workflow = readWorkflowModel('examples/ci/quality.workflow.example.yml');
-    const verifyJob = getWorkflowJob(workflow, 'verify');
-    const repositoryGatesJob = getWorkflowJob(workflow, 'repository-gates');
+    const nodeCompatJob = getWorkflowJob(workflow, 'node-compat');
+    const staticJob = getWorkflowJob(workflow, 'static-analysis');
 
-    expect(verifyJob.name).toBe('Node Compatibility (Node ${{ matrix.node-version }})');
-    expect(repositoryGatesJob.name).toBe('Repository Gates (Node 22)');
-    expect(getWorkflowStep(verifyJob, 'Run Node compatibility gates').run).toBe(
-      'npm run lint && npm run typecheck && npm test',
+    expect(nodeCompatJob.name).toBe('Node Compatibility (Node ${{ matrix.node-version }})');
+    expect(staticJob.name).toBe('Static Analysis (Node 22)');
+    // The Node matrix exercises runtime-sensitive behavior only; runtime-insensitive
+    // gates run once via `npm run verify` on the canonical Node 22 lane.
+    expect(getWorkflowStep(nodeCompatJob, 'Run unit tests').run).toBe('npm test');
+    expectInvariant(
+      nodeCompatJob.steps.every(
+        (step) => !step.run?.includes('lint') && !step.run?.includes('typecheck'),
+      ),
+      'Quality template Node matrix must not repeat lint/typecheck per Node version.',
     );
     expect(
-      getWorkflowStep(repositoryGatesJob, 'Run repository gates').env.get(
+      getWorkflowStep(staticJob, 'Run static analysis and repository gates').env.get(
         'AURORAFLOW_REDIS_INTEGRATION_REQUIRED',
       ),
     ).toBe('true');
     expectInvariant(
-      repositoryGatesJob.steps.every((step) => step.name !== 'Run verification contract'),
-      'Quality template must use current repository gate naming, not retired verification contract prose.',
+      staticJob.steps.every((step) => step.name !== 'Run verification contract'),
+      'Quality template must use current static-analysis naming, not retired verification contract prose.',
     );
   });
 });

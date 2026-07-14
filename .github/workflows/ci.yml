@@ -1,8 +1,12 @@
 name: E2E Matrix
 
+# Exhaustive daily cross-browser E2E validation feeding flakiness and SLO trends.
+# Post-merge Chrome coverage is provided once by the Quality Gates `E2E (Chrome)`
+# lane; this workflow runs the full browser matrix on a daily schedule (and manual
+# dispatch) rather than on every main push. Trigger it manually after a risky merge
+# if cross-browser confirmation is needed before the next daily run.
+
 on:
-  push:
-    branches: [main]
   schedule:
     - cron: '0 3 * * *'
   workflow_dispatch:
@@ -19,43 +23,41 @@ env:
 
 jobs:
   e2e:
-    name: Full E2E (${{ matrix.project }} shard ${{ matrix.shard }})
+    name: Full E2E (${{ matrix.lane }})
     runs-on: ubuntu-latest
-    # 30 min (was 20): webkit --with-deps can pull ~114 MB from a slow apt mirror;
-    # the setup action now retries+resumes that download, which needs headroom
-    # beyond the test run itself.
+    # 30 min: webkit --with-deps can pull ~114 MB from a slow apt mirror; the setup
+    # action retries+resumes that download, which needs headroom beyond the tests.
     timeout-minutes: 30
     strategy:
       fail-fast: false
-      max-parallel: 6
+      max-parallel: 5
+      # One job per installed browser binary (Playwright is already fully parallel
+      # across a project's tests, so browser/dependency setup -- not test time --
+      # dominates a job). Desktop + mobile WebKit share one webkit install in a
+      # single job without losing per-project results. Two-way sharding was removed:
+      # measured shard wall-clock was setup, not tests, so it only doubled setup.
       matrix:
-        project:
-          - Google Chrome
-          - Firefox
-          - Safari
-          - Microsoft Edge
-          - Mobile Chrome
-          - Mobile Safari
-        shard: [1, 2]
         include:
-          - project: Google Chrome
+          - lane: Google Chrome
             install_args: chrome
-            project_slug: google-chrome
-          - project: Firefox
+            slug: google-chrome
+            projects: 'Google Chrome'
+          - lane: Firefox
             install_args: firefox
-            project_slug: firefox
-          - project: Safari
-            install_args: webkit
-            project_slug: safari
-          - project: Microsoft Edge
+            slug: firefox
+            projects: 'Firefox'
+          - lane: Microsoft Edge
             install_args: msedge
-            project_slug: microsoft-edge
-          - project: Mobile Chrome
+            slug: microsoft-edge
+            projects: 'Microsoft Edge'
+          - lane: Mobile Chrome
             install_args: chromium
-            project_slug: mobile-chrome
-          - project: Mobile Safari
+            slug: mobile-chrome
+            projects: 'Mobile Chrome'
+          - lane: 'WebKit (Safari + Mobile Safari)'
             install_args: webkit
-            project_slug: mobile-safari
+            slug: webkit
+            projects: 'Safari;Mobile Safari'
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -73,14 +75,23 @@ jobs:
 
       - name: Run full E2E suite
         env:
-          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/playwright-results-${{ matrix.project_slug }}-shard-${{ matrix.shard }}.json
-        run: npx playwright test --config=configs/playwright.config.ts --project="${{ matrix.project }}" --shard=${{ matrix.shard }}/2
+          PLAYWRIGHT_JSON_OUTPUT_FILE: test-results/playwright-results-${{ matrix.slug }}.json
+          PLAYWRIGHT_PROJECTS: ${{ matrix.projects }}
+        # Split the semicolon-delimited project list into safely-quoted --project
+        # flags so multi-project lanes (WebKit) handle names with spaces correctly.
+        run: |
+          IFS=';' read -ra projects <<< "${PLAYWRIGHT_PROJECTS}"
+          args=()
+          for project in "${projects[@]}"; do
+            args+=(--project "${project}")
+          done
+          npx playwright test --config=configs/playwright.config.ts "${args[@]}"
 
       - name: Upload E2E artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         if: always()
         with:
-          name: e2e-matrix-artifacts-${{ matrix.project }}-shard-${{ matrix.shard }}
+          name: e2e-matrix-artifacts-${{ matrix.slug }}
           retention-days: 14
           path: |
             test-results/

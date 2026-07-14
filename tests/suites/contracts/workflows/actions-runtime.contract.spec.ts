@@ -7,18 +7,20 @@ import { getWorkflowActionReferences, readWorkflowModel } from '../../../helpers
 const WORKFLOW_FILES = [
   '.github/workflows/ci.yml',
   '.github/workflows/quality.yml',
-  '.github/workflows/examples.yml',
   '.github/workflows/security.yml',
+  '.github/workflows/observability-lite.yml',
+  '.github/workflows/observability-full-stack.yml',
   '.github/workflows/playwright-peer-matrix.yml',
   '.github/workflows/release.yml',
 ] as const;
 const PR_AND_EVIDENCE_WORKFLOW_FILES = [
   '.github/workflows/quality.yml',
-  '.github/workflows/examples.yml',
   '.github/workflows/security.yml',
 ] as const;
 const EVIDENCE_ONLY_WORKFLOW_FILES = [
   '.github/workflows/ci.yml',
+  '.github/workflows/observability-lite.yml',
+  '.github/workflows/observability-full-stack.yml',
   '.github/workflows/playwright-peer-matrix.yml',
   '.github/workflows/release.yml',
 ] as const;
@@ -123,15 +125,16 @@ describe('workflow actions runtime contract', () => {
 
     expect(workflowsUsingComposite.sort()).toEqual([
       '.github/workflows/ci.yml',
-      '.github/workflows/examples.yml',
+      '.github/workflows/observability-full-stack.yml',
+      '.github/workflows/observability-lite.yml',
       '.github/workflows/quality.yml',
       '.github/workflows/release.yml',
       '.github/workflows/security.yml',
     ]);
-    expectTextIncludes(compositeAction, {
-      text: 'npm run lockfile:check',
-      rationale: 'Composite locked install must fail early on package-lock drift.',
-    });
+    expectInvariant(
+      !compositeAction.includes('npm run lockfile:check'),
+      'Composite locked install must not dry-run the lockfile before every npm ci; the explicit lockfile gate runs once per workflow.',
+    );
     expectTextIncludes(compositeAction, {
       text: 'npm ci',
       rationale: 'Composite locked install must keep reproducible npm ci semantics.',

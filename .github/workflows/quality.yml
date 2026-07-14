@@ -27,17 +27,16 @@ jobs:
       contents: read
       pull-requests: read
     outputs:
+      run_browser_e2e: ${{ steps.paths-filter.outputs.browser_e2e }}
+      run_observability: ${{ steps.paths-filter.outputs.observability }}
       run_lockfile_check: ${{ steps.paths-filter.outputs.lockfile_check }}
-      run_observability_stack: ${{ steps.paths-filter.outputs.observability_stack }}
-      run_risk_e2e: ${{ steps.paths-filter.outputs.risk_e2e }}
-      run_smoke: ${{ steps.paths-filter.outputs.smoke }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
           persist-credentials: false
 
-      - name: Detect smoke-relevant changes
+      - name: Detect change scopes
         id: paths-filter
         if: github.event_name == 'pull_request' || github.event_name == 'push'
         uses: dorny/paths-filter@7b450fff21473bca461d4b92ce414b9d0420d706 # v4.0.2
@@ -50,27 +49,20 @@ jobs:
               - '.github/actions/setup-node-cache/action.yml'
               - 'scripts/check-lockfile-drift.mjs'
               - '.github/workflows/quality.yml'
-            smoke:
+            browser_e2e:
               - 'src/**'
               - 'tests/suites/e2e/**'
               - 'tests/fixtures/e2e-app/**'
+              - 'examples/**'
               - 'configs/playwright.config.ts'
               - 'scripts/e2e-fixture-server.mjs'
               - 'package.json'
               - 'package-lock.json'
               - '.github/workflows/quality.yml'
-            risk_e2e:
-              - 'src/pageObjects/**'
-              - 'src/framework/selfHealing/**'
-              - 'tests/suites/e2e/**'
-              - 'tests/fixtures/e2e-app/**'
-              - 'configs/playwright.config.ts'
-              - 'scripts/e2e-fixture-server.mjs'
-              - 'package.json'
-              - 'package-lock.json'
+              - '.github/actions/setup-node-cache/action.yml'
+            observability:
               - '.github/workflows/quality.yml'
-            observability_stack:
-              - '.github/workflows/quality.yml'
+              - '.github/workflows/observability-lite.yml'
               - 'docker-compose.observability*.yml'
               - 'docs/adr/0007-durable-trend-export.md'
               - 'docs/architecture/observability-stack.md'
@@ -81,21 +73,17 @@ jobs:
               - 'scripts/observability-*.ts'
               - 'src/framework/observability/**'
               - 'tests/suites/unit/framework/observability/**'
+              - 'tests/suites/contracts/observability/**'
               - 'package.json'
               - 'package-lock.json'
-              - 'scripts/observability-ci-smoke.ts'
-              - 'scripts/observability-collector-receipt.ts'
-              - 'src/framework/observability/**'
-              - 'tests/suites/contracts/observability/**'
-
-      - name: Skip path filtering for scheduled or manual runs
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-        run: echo "Scheduled/manual run executes repository and heavy observability gates directly."
 
   lockfile-drift:
     name: Lockfile Drift
     runs-on: ubuntu-latest
     needs: preflight
+    # The single explicit lockfile diagnostic gate for this workflow. The shared
+    # setup action no longer dry-runs the lockfile before every `npm ci`; this
+    # clearer-diagnostic gate runs once when the lockfile could have moved.
     if: github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.preflight.outputs.run_lockfile_check == 'true' || startsWith(github.head_ref, 'dependabot/')
     timeout-minutes: 3
     permissions:
@@ -114,39 +102,8 @@ jobs:
       - name: Check package lockfile drift
         run: npm run lockfile:check
 
-  verify:
-    name: Node Compatibility (Node ${{ matrix.node-version }})
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    timeout-minutes: 5
-    needs: preflight
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        node-version: [20, 22, 24]
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - name: Setup locked Node.js dependencies
-        uses: ./.github/actions/setup-node-cache
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache-namespace: node-${{ matrix.node-version }}
-          cache-version: v1
-
-      - name: Run Node compatibility static gates
-        run: npm run lint && npm run typecheck
-
-      - name: Run unit tests
-        run: npm test
-
-  repository-gates:
-    name: Repository Gates (Node 22)
+  static-analysis:
+    name: Static Analysis (Node 22)
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -162,7 +119,7 @@ jobs:
         uses: ./.github/actions/setup-node-cache
         with:
           node-version: '22'
-          cache-namespace: repository-gates
+          cache-namespace: static-analysis
           cache-version: v1
 
       - name: Install shellcheck
@@ -173,6 +130,12 @@ jobs:
 
       - name: Run format check
         run: npm run format:check
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Run typecheck
+        run: npm run typecheck
 
       - name: Run contract tests
         run: npm run test:contracts
@@ -186,10 +149,42 @@ jobs:
         run: npm run schemas:check
 
       - name: Run shell and workflow lint
-        run: npm run shellcheck && npm run workflows:lint
+        # workflows:lint:check reuses the actionlint installed above instead of
+        # reinstalling it (workflows:lint would re-bootstrap the binary).
+        run: npm run shellcheck && npm run workflows:lint:check
+
+  node-compat:
+    name: Node Compatibility (Node ${{ matrix.node-version }})
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 5
+    needs: preflight
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        node-version: [20, 22, 24]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup locked Node.js dependencies
+        uses: ./.github/actions/setup-node-cache
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache-namespace: node-${{ matrix.node-version }}
+          cache-version: v1
+
+      - name: Run unit tests
+        # Runtime-sensitive signal only. Static gates (lint/typecheck/format/schema/
+        # workflow lint) run once on Node 22 in static-analysis, not per Node version.
+        run: npm test
 
   coverage:
-    name: Coverage (Critical + Global)
+    name: Coverage (Unit Floors)
     runs-on: ubuntu-latest
     needs: preflight
     timeout-minutes: 8
@@ -208,7 +203,10 @@ jobs:
           cache-namespace: coverage
           cache-version: v1
 
-      - name: Enforce critical and global coverage thresholds
+      - name: Enforce global and risk-weighted coverage thresholds
+        # Single authoritative coverage-floor run over the complete unit suite.
+        # Global aggregate + every risk-weighted per-file floor is enforced here;
+        # the previous critical-only pass was a strict subset with identical floors.
         run: |
           set -o pipefail
           mkdir -p coverage
@@ -222,7 +220,8 @@ jobs:
             echo
             echo "Command: \`npm run test:coverage\`"
             echo
-            echo "Critical-module and global coverage thresholds are enforced by this required job."
+            echo "One complete unit coverage run enforces the global aggregate floor and every"
+            echo "risk-weighted per-file floor (configs/vitest.coverage-global.mts)."
             echo
             echo "\`\`\`text"
             if [ -f coverage/coverage-gate.log ]; then
@@ -267,380 +266,16 @@ jobs:
           retention-days: 14
           path: mutation-output/baseline-check.txt
 
-  guarded-self-heal:
-    name: Guarded Self-Heal Proof (Chrome)
+  e2e-chrome:
+    name: E2E (Chrome)
     runs-on: ubuntu-latest
-    needs: [preflight, verify, repository-gates]
-    timeout-minutes: 8
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - name: Setup locked Node.js dependencies and Playwright browser
-        uses: ./.github/actions/setup-node-cache
-        with:
-          node-version: '22'
-          install-browsers: 'true'
-          browser-name: chrome
-          cache-namespace: guarded-chrome
-          cache-version: v1
-
-      - name: Prove guarded self-heal at default gate
-        run: npm run test:e2e:guarded
-
-      - name: Upload guarded self-heal artifacts
-        if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: guarded-self-heal-proof
-          retention-days: 7
-          path: |
-            test-results/
-            test-reports/
-
-  risk-e2e:
-    name: Risk-Triggered E2E (Chrome)
-    runs-on: ubuntu-latest
-    needs: [preflight, verify, repository-gates]
-    timeout-minutes: 20
-    permissions:
-      contents: read
-    env:
-      SHOULD_RUN_RISK_E2E: ${{ github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || needs.preflight.outputs.run_risk_e2e == 'true' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-e2e')) || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'risk:e2e')) }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - name: Setup locked Node.js dependencies and Playwright browser
-        if: env.SHOULD_RUN_RISK_E2E == 'true'
-        uses: ./.github/actions/setup-node-cache
-        with:
-          node-version: '22'
-          install-browsers: 'true'
-          browser-name: chrome
-          cache-namespace: risk-chrome
-          cache-version: v1
-
-      - name: Run full Chrome E2E suite
-        if: env.SHOULD_RUN_RISK_E2E == 'true'
-        run: npm run test:e2e -- --project='Google Chrome'
-
-      - name: Upload risk E2E artifacts
-        if: env.SHOULD_RUN_RISK_E2E == 'true' && always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: risk-e2e-artifacts
-          retention-days: 7
-          path: |
-            test-results/
-            test-reports/
-
-      - name: Skip risk-triggered E2E when not requested
-        if: env.SHOULD_RUN_RISK_E2E != 'true'
-        run: echo "No risky browser/runtime changes or full-e2e label detected; risk E2E completed as no-op."
-
-  observability-stack:
-    name: Observability Lite Smoke
-    runs-on: ubuntu-latest
-    needs: [preflight, verify, repository-gates]
-    timeout-minutes: 8
-    permissions:
-      contents: read
-    env:
-      SHOULD_RUN_OBSERVABILITY: ${{ github.ref == 'refs/heads/main' || (needs.preflight.outputs.run_observability_stack == 'true' && vars.AURORAFLOW_OBSERVABILITY_CI_ENABLED != 'false') }}
-      OBSERVABILITY_DIAGNOSTICS_DIR: observability-output/ci
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - name: Setup locked Node.js dependencies
-        if: env.SHOULD_RUN_OBSERVABILITY == 'true'
-        uses: ./.github/actions/setup-node-cache
-        with:
-          node-version: '22'
-          cache-namespace: observability-lite
-          cache-version: v1
-
-      - name: Validate Lite collector-only Compose config
-        if: env.SHOULD_RUN_OBSERVABILITY == 'true'
-        run: docker compose -f docker-compose.observability-ci.yml config
-
-      - name: Start Lite collector-only stack
-        if: env.SHOULD_RUN_OBSERVABILITY == 'true'
-        run: docker compose -f docker-compose.observability-ci.yml up -d
-
-      - name: Wait for collector health
-        if: env.SHOULD_RUN_OBSERVABILITY == 'true'
-        run: |
-          for attempt in $(seq 1 30); do
-            if curl --fail --silent --show-error http://localhost:13133/ >/dev/null; then
-              exit 0
-            fi
-            echo "Waiting for collector health (${attempt}/30)"
-            sleep 2
-          done
-          docker compose -f docker-compose.observability-ci.yml logs otel-collector
-          exit 1
-
-      - name: Emit smoke telemetry
-        if: env.SHOULD_RUN_OBSERVABILITY == 'true'
-        env:
-          AURORAFLOW_OBSERVABILITY_DIAGNOSTICS_DIR: ${{ env.OBSERVABILITY_DIAGNOSTICS_DIR }}
-          AURORAFLOW_OBSERVABILITY_EMIT_OTLP_LOG: 'true'
-          AURORAFLOW_OBSERVABILITY_ENABLED: 'true'
-          AURORAFLOW_OBSERVABILITY_ENVIRONMENT: ci
-          AURORAFLOW_OBSERVABILITY_STRICT: 'true'
-          OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4318
-        run: npm run observability:ci:smoke
-
-      - name: Assert Lite collector receipt
-        if: env.SHOULD_RUN_OBSERVABILITY == 'true'
-        run: |
-          mkdir -p "${OBSERVABILITY_DIAGNOSTICS_DIR}"
-          for attempt in $(seq 1 15); do
-            curl --fail --silent --show-error http://localhost:9464/metrics > "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector-metrics.txt" || true
-            docker compose -f docker-compose.observability-ci.yml logs --no-color otel-collector > "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector.log" || true
-            if npm run observability:collector-receipt -- \
-              --metrics-path "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector-metrics.txt" \
-              --collector-log-path "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector.log" \
-              --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}"; then
-              exit 0
-            fi
-            echo "Waiting for Collector receipt evidence (${attempt}/15)"
-            sleep 2
-          done
-          echo "Collector receipt evidence did not become complete."
-          exit 1
-
-      - name: Capture observability diagnostics
-        if: env.SHOULD_RUN_OBSERVABILITY == 'true' && always()
-        run: |
-          mkdir -p "${OBSERVABILITY_DIAGNOSTICS_DIR}"
-          curl --silent --show-error http://localhost:13133/ > "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector-health.txt" || true
-          curl --silent --show-error http://localhost:9464/metrics > "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector-metrics.txt" || true
-          docker compose -f docker-compose.observability-ci.yml ps > "${OBSERVABILITY_DIAGNOSTICS_DIR}/compose-ps.txt" || true
-          docker compose -f docker-compose.observability-ci.yml logs --no-color otel-collector > "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector.log" || true
-
-      - name: Stop Lite collector-only stack
-        if: env.SHOULD_RUN_OBSERVABILITY == 'true' && always()
-        run: docker compose -f docker-compose.observability-ci.yml down --remove-orphans
-
-      - name: Upload observability diagnostics
-        if: env.SHOULD_RUN_OBSERVABILITY == 'true' && always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: observability-collector-diagnostics
-          retention-days: 7
-          path: |
-            observability-output/ci/
-            logs/auroraflow.ndjson
-
-      - name: Skip observability collector smoke when not requested
-        if: env.SHOULD_RUN_OBSERVABILITY != 'true'
-        run: echo "No observability-relevant changes detected; Lite collector smoke completed as no-op."
-
-  observability-full-stack:
-    name: Observability Full Stack Smoke
-    runs-on: ubuntu-latest
-    needs: [preflight, verify, repository-gates]
-    timeout-minutes: 15
-    permissions:
-      contents: read
-    env:
-      AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED: 'true'
-      SHOULD_RUN_OBSERVABILITY_FULL_STACK: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
-      OBSERVABILITY_DIAGNOSTICS_DIR: observability-output/full-stack
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - name: Setup locked Node.js dependencies
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
-        uses: ./.github/actions/setup-node-cache
-        with:
-          node-version: '22'
-          cache-namespace: observability-full-stack
-          cache-version: v1
-
-      - name: Validate full-stack Compose config
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
-        run: docker compose -f docker-compose.yml -f docker-compose.observability.yml config
-
-      - name: Start full observability stack
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
-        run: |
-          mkdir -p logs test-results/self-healing "${OBSERVABILITY_DIAGNOSTICS_DIR}"
-          printf '{"timestamp":"%s","level":"info","message":"Observability full-stack smoke log seed.","component":"observability-ci","runId":"%s","workflow":"%s","branch":"%s","commit":"%s"}\n' \
-            "$(date --utc +%Y-%m-%dT%H:%M:%SZ)" \
-            "${GITHUB_RUN_ID}" \
-            "${GITHUB_WORKFLOW}" \
-            "${GITHUB_REF_NAME}" \
-            "${GITHUB_SHA}" > logs/auroraflow.ndjson
-          docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
-
-      - name: Wait for full-stack backends
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
-        run: |
-          npm run observability:validate -- \
-            --mode readiness \
-            --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}" \
-            --max-attempts 60 \
-            --poll-interval-ms 3000 \
-            --timeout-ms 15000
-
-      - name: Provision Elasticsearch and Kibana assets
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
-        run: |
-          curl --fail --silent --show-error -X PUT http://localhost:9200/_ilm/policy/auroraflow-local-retention \
-            -H 'Content-Type: application/json' \
-            --data-binary @observability/elastic/ilm/auroraflow-local-retention.json
-
-          for template in observability/elastic/index-templates/*.json; do
-            name="$(basename "${template}" .json)"
-            curl --fail --silent --show-error -X PUT "http://localhost:9200/_index_template/${name}" \
-              -H 'Content-Type: application/json' \
-              --data-binary "@${template}"
-          done
-
-          curl --fail --silent --show-error -X POST http://localhost:5601/api/saved_objects/_import?overwrite=true \
-            -H 'kbn-xsrf: auroraflow' \
-            --form file=@observability/kibana/saved-objects/auroraflow-log-exploration.ndjson
-
-      - name: Emit full-stack smoke telemetry
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
-        env:
-          AURORAFLOW_OBSERVABILITY_DIAGNOSTICS_DIR: ${{ env.OBSERVABILITY_DIAGNOSTICS_DIR }}
-          AURORAFLOW_OBSERVABILITY_ENABLED: 'true'
-          AURORAFLOW_OBSERVABILITY_ENVIRONMENT: ci
-          OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4318
-        run: npm run observability:ci:smoke
-
-      - name: Emit full-stack smoke log through Logstash
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
-        run: |
-          curl --fail --silent --show-error -X POST http://localhost:8080 \
-            -H 'Content-Type: application/json' \
-            --data-binary @- <<EOF
-          {
-            "timestamp": "$(date --utc +%Y-%m-%dT%H:%M:%SZ)",
-            "level": "info",
-            "message": "Observability full-stack smoke log indexed through Logstash.",
-            "component": "observability-ci",
-            "runId": "${GITHUB_RUN_ID}",
-            "workflow": "${GITHUB_WORKFLOW}",
-            "branch": "${GITHUB_REF_NAME}",
-            "commit": "${GITHUB_SHA}"
-          }
-          EOF
-
-      - name: Validate full-stack backend APIs
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
-        run: |
-          npm run observability:validate -- \
-            --mode smoke \
-            --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}" \
-            --max-attempts 30 \
-            --poll-interval-ms 2000 \
-            --timeout-ms 10000
-
-      - name: Validate Prometheus labels and rules
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true'
-        run: npm run observability:live-assert -- --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}"
-
-      - name: Capture backend snapshots
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true' && always()
-        run: npm run observability:snapshot -- --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}" --allow-partial
-
-      - name: Capture full-stack service logs
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true' && always()
-        run: |
-          mkdir -p "${OBSERVABILITY_DIAGNOSTICS_DIR}"
-          docker compose -f docker-compose.yml -f docker-compose.observability.yml ps > "${OBSERVABILITY_DIAGNOSTICS_DIR}/compose-ps.txt" || true
-          docker compose -f docker-compose.yml -f docker-compose.observability.yml logs --no-color > "${OBSERVABILITY_DIAGNOSTICS_DIR}/compose.log" || true
-
-      - name: Stop full observability stack
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true' && always()
-        run: docker compose -f docker-compose.yml -f docker-compose.observability.yml down --remove-orphans --volumes
-
-      - name: Upload full-stack diagnostics
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK == 'true' && always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: observability-full-stack-diagnostics
-          retention-days: 7
-          path: |
-            observability-output/full-stack/
-            logs/auroraflow.ndjson
-
-      - name: Skip full-stack smoke when not requested
-        if: env.SHOULD_RUN_OBSERVABILITY_FULL_STACK != 'true'
-        run: echo "No observability-relevant changes detected; full-stack smoke completed as no-op."
-
-  observability-remote-export:
-    name: Observability Remote Export Smoke
-    runs-on: ubuntu-latest
-    needs: [preflight, verify, repository-gates]
-    timeout-minutes: 8
-    permissions:
-      contents: read
-    env:
-      AURORAFLOW_OBSERVABILITY_REMOTE_EXPORT_ENABLED: 'true'
-      SHOULD_RUN_REMOTE_EXPORT: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
-      OBSERVABILITY_DIAGNOSTICS_DIR: observability-output/remote-export
-      OTEL_EXPORTER_OTLP_ENDPOINT: ${{ secrets.OTEL_EXPORTER_OTLP_ENDPOINT }}
-      OTEL_EXPORTER_OTLP_HEADERS: ${{ secrets.OTEL_EXPORTER_OTLP_HEADERS }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
-        with:
-          persist-credentials: false
-
-      - name: Setup locked Node.js dependencies
-        if: env.SHOULD_RUN_REMOTE_EXPORT == 'true' && env.OTEL_EXPORTER_OTLP_ENDPOINT != ''
-        uses: ./.github/actions/setup-node-cache
-        with:
-          node-version: '22'
-          cache-namespace: observability-remote-export
-          cache-version: v1
-
-      - name: Emit remote smoke telemetry
-        if: env.SHOULD_RUN_REMOTE_EXPORT == 'true' && env.OTEL_EXPORTER_OTLP_ENDPOINT != ''
-        env:
-          AURORAFLOW_OBSERVABILITY_DIAGNOSTICS_DIR: ${{ env.OBSERVABILITY_DIAGNOSTICS_DIR }}
-          AURORAFLOW_OBSERVABILITY_ENABLED: 'true'
-          AURORAFLOW_OBSERVABILITY_ENVIRONMENT: ci
-          AURORAFLOW_OBSERVABILITY_STRICT: 'true'
-        run: npm run observability:ci:smoke
-
-      - name: Upload remote export diagnostics
-        if: env.SHOULD_RUN_REMOTE_EXPORT == 'true' && env.OTEL_EXPORTER_OTLP_ENDPOINT != '' && always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: observability-remote-export-diagnostics
-          retention-days: 7
-          path: |
-            observability-output/remote-export/smoke-result.json
-            logs/auroraflow.ndjson
-
-      - name: Skip remote export when not configured
-        if: env.SHOULD_RUN_REMOTE_EXPORT != 'true' || env.OTEL_EXPORTER_OTLP_ENDPOINT == ''
-        run: echo "Remote observability export smoke skipped because no observability-relevant changes were detected or the OTLP endpoint secret is not configured."
-
-  smoke-e2e:
-    name: Smoke E2E (Chrome)
-    runs-on: ubuntu-latest
-    needs: [preflight, verify, repository-gates]
-    timeout-minutes: 8
+    needs: [preflight, static-analysis, node-compat]
+    timeout-minutes: 12
+    # One event-aware Chrome lane. The full Chrome project (14 tests) is the union
+    # of the old smoke (@smoke), guarded self-heal, examples, and risk subsets, so
+    # running it once means no Playwright test ID executes twice on the same event.
+    # Job-level gate: no runner is allocated for irrelevant changes.
+    if: needs.preflight.outputs.run_browser_e2e == 'true' || github.ref == 'refs/heads/main' || github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-e2e')) || (github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'risk:e2e'))
     outputs:
       self_heal_triage_required: ${{ steps.self-heal-governance.outputs.triage_required }}
       self_heal_acknowledged: ${{ steps.self-heal-governance.outputs.acknowledged }}
@@ -649,8 +284,6 @@ jobs:
     permissions:
       contents: read
       issues: write
-    env:
-      SHOULD_RUN_SMOKE: ${{ github.ref == 'refs/heads/main' || needs.preflight.outputs.run_smoke == 'true' }}
     steps:
       - name: Checkout
         uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
@@ -658,22 +291,21 @@ jobs:
           persist-credentials: false
 
       - name: Setup locked Node.js dependencies and Playwright browser
-        if: env.SHOULD_RUN_SMOKE == 'true'
         uses: ./.github/actions/setup-node-cache
         with:
           node-version: '22'
           install-browsers: 'true'
           browser-name: chrome
-          cache-namespace: smoke-chrome
+          cache-namespace: e2e-chrome
           cache-version: v1
 
-      - name: Run smoke test
-        if: env.SHOULD_RUN_SMOKE == 'true'
-        run: npm run test:smoke
+      - name: Run full Chrome E2E suite
+        # Full Chrome project: smoke + guarded self-heal + examples + SAT, each ID once.
+        run: npm run test:e2e -- --project='Google Chrome'
 
       - name: Evaluate self-healing governance
         id: self-heal-governance
-        if: env.SHOULD_RUN_SMOKE == 'true' && always()
+        if: always()
         env:
           SELF_HEAL_ARTIFACTS_DIR: test-results/self-healing
           SELF_HEAL_REQUIRE_ACK_FOR_ACCEPTED: 'true'
@@ -683,7 +315,7 @@ jobs:
         run: npm run self-heal:governance
 
       - name: Auto-open self-healing triage issue
-        if: env.SHOULD_RUN_SMOKE == 'true' && always() && github.ref == 'refs/heads/main' && vars.SELF_HEAL_AUTO_OPEN_TRIAGE_ISSUE == 'true' && steps.self-heal-governance.outputs.triage_required == 'true' && steps.self-heal-governance.outputs.acknowledged != 'true'
+        if: always() && github.ref == 'refs/heads/main' && vars.SELF_HEAL_AUTO_OPEN_TRIAGE_ISSUE == 'true' && steps.self-heal-governance.outputs.triage_required == 'true' && steps.self-heal-governance.outputs.acknowledged != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
@@ -707,16 +339,122 @@ jobs:
             --title "Self-healing guarded acceptance review (${GITHUB_SHA::7})" \
             --body-file "${SUMMARY_MARKDOWN_PATH}"
 
-      - name: Upload smoke artifacts
-        if: env.SHOULD_RUN_SMOKE == 'true' && always()
+      - name: Upload E2E artifacts
+        if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: smoke-e2e-artifacts
+          name: e2e-chrome-artifacts
           retention-days: 7
           path: |
             test-results/
             test-reports/
 
-      - name: Skip smoke lane when no relevant changes
-        if: env.SHOULD_RUN_SMOKE != 'true'
-        run: echo "No smoke-relevant changes detected; smoke lane completed as no-op."
+  observability-lite:
+    name: Observability Lite Smoke
+    needs: [preflight, static-analysis]
+    # Runs only for observability-relevant changes. A scheduled daily floor and
+    # manual dispatch live in the reusable observability-lite workflow itself, so
+    # unrelated main pushes no longer force the collector stack.
+    if: needs.preflight.outputs.run_observability == 'true'
+    permissions:
+      contents: read
+    uses: ./.github/workflows/observability-lite.yml
+
+  quality-gate:
+    name: Quality Gate
+    runs-on: ubuntu-latest
+    if: always()
+    needs:
+      - preflight
+      - lockfile-drift
+      - static-analysis
+      - node-compat
+      - coverage
+      - e2e-chrome
+    permissions:
+      contents: read
+    timeout-minutes: 3
+    steps:
+      - name: Enforce upstream quality lane results
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          IS_MAIN: ${{ github.ref == 'refs/heads/main' }}
+          IS_DEPENDABOT: ${{ startsWith(github.head_ref, 'dependabot/') }}
+          RUN_BROWSER_E2E: ${{ needs.preflight.outputs.run_browser_e2e }}
+          RUN_LOCKFILE_CHECK: ${{ needs.preflight.outputs.run_lockfile_check }}
+          HAS_FULL_E2E_LABEL: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'full-e2e') }}
+          HAS_RISK_E2E_LABEL: ${{ github.event_name == 'pull_request' && contains(github.event.pull_request.labels.*.name, 'risk:e2e') }}
+          PREFLIGHT_RESULT: ${{ needs.preflight.result }}
+          LOCKFILE_RESULT: ${{ needs.lockfile-drift.result }}
+          STATIC_ANALYSIS_RESULT: ${{ needs.static-analysis.result }}
+          NODE_COMPAT_RESULT: ${{ needs.node-compat.result }}
+          COVERAGE_RESULT: ${{ needs.coverage.result }}
+          E2E_CHROME_RESULT: ${{ needs.e2e-chrome.result }}
+        run: |
+          set -u
+          status=0
+
+          require_success() {
+            label="$1"; result="$2"
+            if [ "$result" != "success" ]; then
+              echo "::error::${label} expected success but was ${result:-missing}"
+              status=1
+            fi
+          }
+
+          require_skipped() {
+            label="$1"; result="$2"
+            if [ "$result" != "skipped" ]; then
+              echo "::error::${label} expected skipped for ${EVENT_NAME} but was ${result:-missing}"
+              status=1
+            fi
+          }
+
+          # Expected result depends on event + change scope so the gate fails closed
+          # on a lane that was cancelled, errored, or unexpectedly skipped.
+          lockfile_expected=skipped
+          if [ "$IS_MAIN" = "true" ] || [ "$EVENT_NAME" = "schedule" ] || [ "$EVENT_NAME" = "workflow_dispatch" ] || [ "$RUN_LOCKFILE_CHECK" = "true" ] || [ "$IS_DEPENDABOT" = "true" ]; then
+            lockfile_expected=success
+          fi
+
+          e2e_expected=skipped
+          if [ "$IS_MAIN" = "true" ] || [ "$EVENT_NAME" = "schedule" ] || [ "$EVENT_NAME" = "workflow_dispatch" ] || [ "$RUN_BROWSER_E2E" = "true" ] || [ "$HAS_FULL_E2E_LABEL" = "true" ] || [ "$HAS_RISK_E2E_LABEL" = "true" ]; then
+            e2e_expected=success
+          fi
+
+          {
+            echo "### Quality Gate results"
+            echo
+            echo "| Lane | Expected | Actual |"
+            echo "| --- | --- | --- |"
+            echo "| Preflight | success | ${PREFLIGHT_RESULT:-missing} |"
+            echo "| Static Analysis (Node 22) | success | ${STATIC_ANALYSIS_RESULT:-missing} |"
+            echo "| Node Compatibility (20/22/24) | success | ${NODE_COMPAT_RESULT:-missing} |"
+            echo "| Coverage (Unit Floors) | success | ${COVERAGE_RESULT:-missing} |"
+            echo "| Lockfile Drift | ${lockfile_expected} | ${LOCKFILE_RESULT:-missing} |"
+            echo "| E2E (Chrome) | ${e2e_expected} | ${E2E_CHROME_RESULT:-missing} |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          require_success "Preflight" "$PREFLIGHT_RESULT"
+          require_success "Static Analysis (Node 22)" "$STATIC_ANALYSIS_RESULT"
+          require_success "Node Compatibility (20/22/24)" "$NODE_COMPAT_RESULT"
+          require_success "Coverage (Unit Floors)" "$COVERAGE_RESULT"
+
+          if [ "$lockfile_expected" = "success" ]; then
+            require_success "Lockfile Drift" "$LOCKFILE_RESULT"
+          else
+            require_skipped "Lockfile Drift" "$LOCKFILE_RESULT"
+          fi
+
+          if [ "$e2e_expected" = "success" ]; then
+            require_success "E2E (Chrome)" "$E2E_CHROME_RESULT"
+          else
+            require_skipped "E2E (Chrome)" "$E2E_CHROME_RESULT"
+          fi
+
+          if [ "$status" -ne 0 ]; then
+            echo "Quality Gate failed closed because one or more required quality lanes had an unexpected result."
+            exit "$status"
+          fi
+
+          echo "Quality Gate passed with the expected event-aware result map."

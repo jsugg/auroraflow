@@ -1,0 +1,148 @@
+name: Observability Full Stack
+
+# Weekly reference-stack validation of the seven-service local observability stack
+# (collector, Prometheus, Grafana, Jaeger, Elasticsearch, Logstash, Kibana). This
+# validates local/reference infrastructure, dashboards, provisioning, and backend
+# semantics -- NOT a supported production service. It is intentionally never a PR
+# gate: with only schedule + manual triggers, no runner is allocated on pull
+# requests. See docs/operations/observability-support-tiers.md.
+
+on:
+  schedule:
+    - cron: '0 6 * * 0'
+  workflow_dispatch:
+
+concurrency:
+  group: observability-full-stack-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  full-stack-smoke:
+    name: Full Stack Smoke
+    runs-on: ubuntu-latest
+    if: vars.AURORAFLOW_OBSERVABILITY_FULL_STACK_CI_ENABLED != 'false'
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    env:
+      OBSERVABILITY_DIAGNOSTICS_DIR: observability-output/full-stack
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup locked Node.js dependencies
+        uses: ./.github/actions/setup-node-cache
+        with:
+          node-version: '22'
+          cache-namespace: observability-full-stack
+          cache-version: v1
+
+      - name: Validate full-stack Compose config
+        run: docker compose -f docker-compose.yml -f docker-compose.observability.yml config
+
+      - name: Start full observability stack
+        run: |
+          mkdir -p logs test-results/self-healing "${OBSERVABILITY_DIAGNOSTICS_DIR}"
+          printf '{"timestamp":"%s","level":"info","message":"Observability full-stack smoke log seed.","component":"observability-ci","runId":"%s","workflow":"%s","branch":"%s","commit":"%s"}\n' \
+            "$(date --utc +%Y-%m-%dT%H:%M:%SZ)" \
+            "${GITHUB_RUN_ID}" \
+            "${GITHUB_WORKFLOW}" \
+            "${GITHUB_REF_NAME}" \
+            "${GITHUB_SHA}" > logs/auroraflow.ndjson
+          docker compose -f docker-compose.yml -f docker-compose.observability.yml up -d
+
+      - name: Wait for full-stack backends
+        run: |
+          npm run observability:validate -- \
+            --mode readiness \
+            --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}" \
+            --max-attempts 60 \
+            --poll-interval-ms 3000 \
+            --timeout-ms 15000
+
+      - name: Provision Elasticsearch and Kibana assets
+        run: |
+          curl --fail --silent --show-error -X PUT http://localhost:9200/_ilm/policy/auroraflow-local-retention \
+            -H 'Content-Type: application/json' \
+            --data-binary @observability/elastic/ilm/auroraflow-local-retention.json
+
+          for template in observability/elastic/index-templates/*.json; do
+            name="$(basename "${template}" .json)"
+            curl --fail --silent --show-error -X PUT "http://localhost:9200/_index_template/${name}" \
+              -H 'Content-Type: application/json' \
+              --data-binary "@${template}"
+          done
+
+          curl --fail --silent --show-error -X POST http://localhost:5601/api/saved_objects/_import?overwrite=true \
+            -H 'kbn-xsrf: auroraflow' \
+            --form file=@observability/kibana/saved-objects/auroraflow-log-exploration.ndjson
+
+      - name: Emit full-stack smoke telemetry
+        env:
+          AURORAFLOW_OBSERVABILITY_DIAGNOSTICS_DIR: ${{ env.OBSERVABILITY_DIAGNOSTICS_DIR }}
+          AURORAFLOW_OBSERVABILITY_ENABLED: 'true'
+          AURORAFLOW_OBSERVABILITY_ENVIRONMENT: ci
+          OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4318
+        run: npm run observability:ci:smoke
+
+      - name: Emit full-stack smoke log through Logstash
+        run: |
+          curl --fail --silent --show-error -X POST http://localhost:8080 \
+            -H 'Content-Type: application/json' \
+            --data-binary @- <<EOF
+          {
+            "timestamp": "$(date --utc +%Y-%m-%dT%H:%M:%SZ)",
+            "level": "info",
+            "message": "Observability full-stack smoke log indexed through Logstash.",
+            "component": "observability-ci",
+            "runId": "${GITHUB_RUN_ID}",
+            "workflow": "${GITHUB_WORKFLOW}",
+            "branch": "${GITHUB_REF_NAME}",
+            "commit": "${GITHUB_SHA}"
+          }
+          EOF
+
+      - name: Validate full-stack backend APIs
+        run: |
+          npm run observability:validate -- \
+            --mode smoke \
+            --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}" \
+            --max-attempts 30 \
+            --poll-interval-ms 2000 \
+            --timeout-ms 10000
+
+      - name: Validate Prometheus labels and rules
+        run: npm run observability:live-assert -- --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}"
+
+      - name: Capture backend snapshots
+        if: always()
+        run: npm run observability:snapshot -- --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}" --allow-partial
+
+      - name: Capture full-stack service logs
+        if: always()
+        run: |
+          mkdir -p "${OBSERVABILITY_DIAGNOSTICS_DIR}"
+          docker compose -f docker-compose.yml -f docker-compose.observability.yml ps > "${OBSERVABILITY_DIAGNOSTICS_DIR}/compose-ps.txt" || true
+          docker compose -f docker-compose.yml -f docker-compose.observability.yml logs --no-color > "${OBSERVABILITY_DIAGNOSTICS_DIR}/compose.log" || true
+
+      - name: Stop full observability stack
+        if: always()
+        run: docker compose -f docker-compose.yml -f docker-compose.observability.yml down --remove-orphans --volumes
+
+      - name: Upload full-stack diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: observability-full-stack-diagnostics
+          retention-days: 7
+          path: |
+            observability-output/full-stack/
+            logs/auroraflow.ndjson

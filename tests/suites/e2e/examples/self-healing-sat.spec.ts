@@ -27,7 +27,7 @@ class SelfHealingSatFixturePage extends PageObjectBase {
   }
 }
 
-test('self-healing SAT enriches a deterministic failed page-object action', async ({
+test('@smoke self-healing SAT enriches a deterministic failed page-object action', async ({
   page,
 }, testInfo) => {
   const artifactScope = await createPlaywrightSelfHealingArtifactScope(testInfo, {
