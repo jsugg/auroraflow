@@ -1,3 +1,4 @@
+const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 
@@ -36,16 +37,39 @@ function readCachedOutput(filename) {
   }
 
   const stats = fs.statSync(filename);
-  const cacheKey = Buffer.from(`${tsVersion}\0${filename}\0${stats.mtimeMs}`, 'utf8')
-    .toString('base64url')
-    .slice(0, 180);
+  // Hash the identity so the key is fixed-length and collision-resistant. The old
+  // base64url(...).slice(0, 180) truncated long absolute paths before the filename,
+  // so sibling modules under a deep checkout path (e.g. a long CI/worktree prefix)
+  // collided to one cache entry and a module was served another file's transpile.
+  const cacheKey = crypto
+    .createHash('sha256')
+    .update(`${tsVersion}\0${filename}\0${stats.mtimeMs}`)
+    .digest('base64url');
   const cachePath = path.join(cacheRoot, `${cacheKey}.js`);
   try {
     return fs.readFileSync(cachePath, 'utf8');
   } catch {
     const outputText = transpileFile(filename);
     fs.mkdirSync(cacheRoot, { recursive: true });
-    fs.writeFileSync(cachePath, outputText, 'utf8');
+    // Publish atomically: two script children can cold-transpile the same uncached
+    // module concurrently, and a plain writeFileSync lets one read the other's
+    // half-written entry -- a truncated module drops its trailing exports and fails
+    // with "X is not a function". Write a unique temp file, then rename (atomic on
+    // the same filesystem) so a reader only ever sees a complete entry or none.
+    const tempPath = path.join(
+      cacheRoot,
+      `${cacheKey}.${process.pid}.${Math.random().toString(36).slice(2)}.tmp`,
+    );
+    try {
+      fs.writeFileSync(tempPath, outputText, 'utf8');
+      fs.renameSync(tempPath, cachePath);
+    } catch {
+      try {
+        fs.rmSync(tempPath, { force: true });
+      } catch {
+        // Best-effort cleanup; the current process still returns its own output.
+      }
+    }
     return outputText;
   }
 }
