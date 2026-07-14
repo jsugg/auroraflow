@@ -144,7 +144,9 @@ describe('test script taxonomy contract', () => {
     }
   });
 
-  it('requires contracts, Redis/OTLP integration, and schema validation in verify', () => {
+  it('requires contracts and Redis/OTLP integration in verify without a duplicate schema run', () => {
+    // Schema validation is captured once as CI/release evidence (npm run schemas:check),
+    // so verify intentionally excludes its own duplicate schema execution (spec section 4.4).
     expect(splitScriptSequence('verify')).toEqual([
       'npm run verify:tools',
       'npm run format:check',
@@ -153,7 +155,6 @@ describe('test script taxonomy contract', () => {
       'npm run test:unit',
       'npm run test:contracts',
       'npm run test:integration',
-      'npm run schemas:check',
       'npm run shellcheck',
       'npm run workflows:lint:check',
     ]);
@@ -272,15 +273,15 @@ describe('test script taxonomy contract', () => {
         'Same Redis/OTLP integration suite, but Redis startup/connect failures fail instead of skip.',
     });
     expect(rows.get('`npm run test:coverage`')?.scope).toBe(
-      'Critical-module thresholds plus global `src/**` coverage.',
+      'One complete unit coverage run enforcing the global `src/**` floor and every risk-weighted per-file floor.',
     );
     expect(rows.get('`npm run test:e2e:guarded`')?.scope).toBe(
       'Parallel Chrome proof for guarded self-heal at the default gate.',
     );
     for (const text of [
       'Node Compatibility (Node 20/22/24)',
-      'Repository Gates (Node 22)',
-      'Risk-Triggered E2E (Chrome)',
+      'Static Analysis (Node 22)',
+      'E2E (Chrome)',
       'risk-weighted per-file floors for high-risk modules once on Node 22.',
       'Default local Redis behavior is skip-friendly',
     ]) {

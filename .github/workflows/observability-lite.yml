@@ -1,0 +1,119 @@
+name: Observability Lite Smoke
+
+# Collector-only OTLP/HTTP Lite smoke. Proves real metric/trace export, optional
+# OTLP log emission, collector health, and a run-scoped collector receipt against
+# the local reference endpoint http://localhost:4318 (never a guessed remote).
+#
+# Runs: called by Quality Gates on observability-relevant changes (workflow_call),
+# on a daily scheduled floor, and on manual dispatch. It is intentionally NOT a
+# routine gate on unrelated pushes. Remote export requires an owned OTLP backend,
+# secrets, and receipt proof; see docs/operations/observability-production.md.
+
+on:
+  workflow_call:
+  schedule:
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: observability-lite-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  collector-lite-smoke:
+    name: Collector Lite Smoke
+    runs-on: ubuntu-latest
+    # Non-secret enable variable escape hatch (defaults on when unset).
+    if: vars.AURORAFLOW_OBSERVABILITY_CI_ENABLED != 'false'
+    timeout-minutes: 8
+    permissions:
+      contents: read
+    env:
+      OBSERVABILITY_DIAGNOSTICS_DIR: observability-output/ci
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup locked Node.js dependencies
+        uses: ./.github/actions/setup-node-cache
+        with:
+          node-version: '22'
+          cache-namespace: observability-lite
+          cache-version: v1
+
+      - name: Validate Lite collector-only Compose config
+        run: docker compose -f docker-compose.observability-ci.yml config
+
+      - name: Start Lite collector-only stack
+        run: docker compose -f docker-compose.observability-ci.yml up -d
+
+      - name: Wait for collector health
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent --show-error http://localhost:13133/ >/dev/null; then
+              exit 0
+            fi
+            echo "Waiting for collector health (${attempt}/30)"
+            sleep 2
+          done
+          docker compose -f docker-compose.observability-ci.yml logs otel-collector
+          exit 1
+
+      - name: Emit smoke telemetry
+        env:
+          AURORAFLOW_OBSERVABILITY_DIAGNOSTICS_DIR: ${{ env.OBSERVABILITY_DIAGNOSTICS_DIR }}
+          AURORAFLOW_OBSERVABILITY_EMIT_OTLP_LOG: 'true'
+          AURORAFLOW_OBSERVABILITY_ENABLED: 'true'
+          AURORAFLOW_OBSERVABILITY_ENVIRONMENT: ci
+          AURORAFLOW_OBSERVABILITY_STRICT: 'true'
+          OTEL_EXPORTER_OTLP_ENDPOINT: http://localhost:4318
+        run: npm run observability:ci:smoke
+
+      - name: Assert Lite collector receipt
+        run: |
+          mkdir -p "${OBSERVABILITY_DIAGNOSTICS_DIR}"
+          for attempt in $(seq 1 15); do
+            curl --fail --silent --show-error http://localhost:9464/metrics > "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector-metrics.txt" || true
+            docker compose -f docker-compose.observability-ci.yml logs --no-color otel-collector > "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector.log" || true
+            if npm run observability:collector-receipt -- \
+              --metrics-path "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector-metrics.txt" \
+              --collector-log-path "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector.log" \
+              --output-dir "${OBSERVABILITY_DIAGNOSTICS_DIR}"; then
+              exit 0
+            fi
+            echo "Waiting for Collector receipt evidence (${attempt}/15)"
+            sleep 2
+          done
+          echo "Collector receipt evidence did not become complete."
+          exit 1
+
+      - name: Capture observability diagnostics
+        if: always()
+        run: |
+          mkdir -p "${OBSERVABILITY_DIAGNOSTICS_DIR}"
+          curl --silent --show-error http://localhost:13133/ > "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector-health.txt" || true
+          curl --silent --show-error http://localhost:9464/metrics > "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector-metrics.txt" || true
+          docker compose -f docker-compose.observability-ci.yml ps > "${OBSERVABILITY_DIAGNOSTICS_DIR}/compose-ps.txt" || true
+          docker compose -f docker-compose.observability-ci.yml logs --no-color otel-collector > "${OBSERVABILITY_DIAGNOSTICS_DIR}/collector.log" || true
+
+      - name: Stop Lite collector-only stack
+        if: always()
+        run: docker compose -f docker-compose.observability-ci.yml down --remove-orphans
+
+      - name: Upload observability diagnostics
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: observability-collector-diagnostics
+          retention-days: 7
+          path: |
+            observability-output/ci/
+            logs/auroraflow.ndjson

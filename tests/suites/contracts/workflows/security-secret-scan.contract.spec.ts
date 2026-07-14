@@ -155,6 +155,38 @@ describe('security workflow secret scanning contract', () => {
     });
   });
 
+  it('keeps the scanner effect-proof off ordinary pull requests and event-aware in the gate', () => {
+    const effectProofJob = getWorkflowJob(securityWorkflow, 'secret-scan-effect-proof');
+    const preflightJob = getWorkflowJob(securityWorkflow, 'preflight');
+    const securityGateRun =
+      getWorkflowStep(
+        getWorkflowJob(securityWorkflow, 'security-gate'),
+        'Enforce upstream security job results',
+      ).run ?? '';
+
+    // Meta-test: runs on push/schedule/dispatch, and on PRs only when the scanner
+    // configuration itself changed -- not on every ordinary PR (spec section 8).
+    expect(effectProofJob.needs).toEqual(['preflight']);
+    for (const text of [
+      "github.event_name != 'pull_request'",
+      "needs.preflight.outputs.run_effect_proof == 'true'",
+    ]) {
+      expectTextIncludes(effectProofJob.if ?? '', {
+        text,
+        rationale: 'Effect proof must be gated to non-PR events plus scanner-config PRs only.',
+      });
+    }
+    expectTextIncludes(preflightJob.outputs.get('run_effect_proof') ?? '', {
+      text: 'steps.paths-filter.outputs.effect_proof',
+      rationale: 'Security preflight must expose the scanner-governing change signal.',
+    });
+    expectTextIncludes(securityGateRun, {
+      text: 'require_skipped "Secret Scan Effect Proof" "$SECRET_SCAN_EFFECT_PROOF_RESULT"',
+      rationale:
+        'Security gate must confirm the effect proof is intentionally skipped on ordinary PRs, not silently dropped.',
+    });
+  });
+
   it('proves gitleaks catches a synthetic secret without weakening the pinned scan job', () => {
     const effectProofJob = getWorkflowJob(securityWorkflow, 'secret-scan-effect-proof');
     const installStep = getWorkflowStep(effectProofJob, 'Install pinned gitleaks');

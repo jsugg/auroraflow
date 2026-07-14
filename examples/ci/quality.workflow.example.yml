@@ -17,7 +17,9 @@ env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
 
 jobs:
-  verify:
+  # Runtime-sensitive signal only: unit tests across supported Node versions.
+  # Runtime-insensitive gates (lint/typecheck/format/schema) run once below.
+  node-compat:
     name: Node Compatibility (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -35,11 +37,11 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Run Node compatibility gates
-        run: npm run lint && npm run typecheck && npm test
+      - name: Run unit tests
+        run: npm test
 
-  repository-gates:
-    name: Repository Gates (Node 22)
+  static-analysis:
+    name: Static Analysis (Node 22)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -52,7 +54,7 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: npm ci
-      - name: Run repository gates
+      - name: Run static analysis and repository gates
         env:
           AURORAFLOW_REDIS_INTEGRATION_REQUIRED: 'true'
         run: npm run verify

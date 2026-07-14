@@ -5,15 +5,13 @@ import { getWorkflowJob, getWorkflowStep, readWorkflowModel } from '../../../hel
 const ciWorkflow = readWorkflowModel('.github/workflows/ci.yml');
 
 describe('ci.yml flakiness report contract', () => {
-  it('emits shard-scoped Playwright JSON output files from matrix runs', () => {
+  it('emits binary-scoped Playwright JSON output files from matrix runs', () => {
     expect(
       getWorkflowStep(getWorkflowJob(ciWorkflow, 'e2e'), 'Run full E2E suite').env.get(
         'PLAYWRIGHT_JSON_OUTPUT_FILE',
       ),
-      'E2E matrix must emit shard-scoped JSON files for flakiness aggregation.',
-    ).toBe(
-      'test-results/playwright-results-${{ matrix.project_slug }}-shard-${{ matrix.shard }}.json',
-    );
+      'E2E matrix must emit binary-scoped JSON files for flakiness aggregation.',
+    ).toBe('test-results/playwright-results-${{ matrix.slug }}.json');
   });
 
   it('defines a dedicated flakiness report job that aggregates matrix artifacts', () => {

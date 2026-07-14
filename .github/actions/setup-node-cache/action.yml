@@ -29,7 +29,7 @@ runs:
   using: composite
   steps:
     - name: Setup Node.js
-      uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+      uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
       with:
         node-version: ${{ inputs.node-version }}
         cache: npm
@@ -46,10 +46,10 @@ runs:
         npm --version
         npm sbom --help > /dev/null
 
-    - name: Check lockfile drift
-      shell: bash
-      run: npm run lockfile:check
-
+    # Lockfile drift is validated once per workflow by a dedicated diagnostic gate
+    # (quality `lockfile-drift`, peer-matrix `lockfile`), not before every `npm ci`.
+    # `npm ci` already fails closed when package.json and package-lock.json diverge,
+    # so deterministic install is preserved without re-running the dry-run per job.
     - name: Install dependencies
       shell: bash
       run: npm ci
@@ -67,14 +67,16 @@ runs:
     # ~114 MB; downloading it every run makes the job hostage to apt mirror speed
     # (a slow draw has cancelled whole shards at the job timeout). Caching the
     # archives makes the download a one-time cost -- later runs install from disk.
-    # run_id in the key means every run refreshes the cache; restore-keys reuses
-    # the most recent one, so package drift only ever costs an incremental fetch.
+    # Key is content-derived and bounded (lockfile + Playwright config hash), not
+    # per-run: `github.run_id` would create an unbounded entry every run and cause
+    # same-run matrix save collisions. restore-keys falls back to the newest
+    # lane entry, so apt-version drift only ever costs an incremental fetch.
     - name: Cache Playwright apt dependencies
       if: ${{ inputs.install-browsers == 'true' }}
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/playwright-apt-debs
-        key: ${{ runner.os }}-pw-aptdebs-${{ inputs.cache-version }}-${{ inputs.browser-name }}-${{ github.run_id }}
+        key: ${{ runner.os }}-pw-aptdebs-${{ inputs.cache-version }}-${{ inputs.browser-name }}-${{ hashFiles('package-lock.json', 'configs/playwright.config.ts') }}
         restore-keys: |
           ${{ runner.os }}-pw-aptdebs-${{ inputs.cache-version }}-${{ inputs.browser-name }}-
 

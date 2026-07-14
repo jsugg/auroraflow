@@ -68,21 +68,25 @@ jobs:
           mkdir -p release-evidence
           npm run schemas:check 2>&1 | tee release-evidence/schema-validation.txt
 
-      - name: Build package
-        run: npm run build
-
       - name: Pack package tarball
+        # One intentional build + one local pack. `npm pack` runs the `prepack`
+        # build (npm run build) once and emits the real tarball; its JSON report
+        # proves the package-content contract, so the previous standalone
+        # `npm run build` and `npm run pack:dry-run` were duplicate build/pack work.
         run: |
           mkdir -p release-evidence
-          npm run pack:dry-run
           npm pack --json --pack-destination release-evidence --loglevel warn > release-evidence/pack-report.json
 
       - name: Validate package consumer install
+        # Reuses the single tarball packed above; no additional pack.
         run: |
           set -o pipefail
           npm run package:consumer-smoke -- --pack-report release-evidence/pack-report.json 2>&1 | tee release-evidence/consumer-smoke.txt
 
       - name: Run package publish validators
+        # publint reads the already-built dist. `attw --pack` performs its own
+        # internal repack to inspect the published type surface -- that repack is
+        # tool-owned and unavoidable; every other build/pack in this job is deduped.
         run: |
           set -o pipefail
           npm run package:publint 2>&1 | tee release-evidence/publint.txt

@@ -96,8 +96,7 @@ describe('smoke selection contract', () => {
       ),
     ).toBe('900919a84f2229bac68ca9cd4103ea297abc35e9689ebb842c6e34a3d1b01b0a');
     expect(
-      getWorkflowStep(getWorkflowJob(qualityWorkflow, 'repository-gates'), 'Install actionlint')
-        .run,
+      getWorkflowStep(getWorkflowJob(qualityWorkflow, 'static-analysis'), 'Install actionlint').run,
     ).toBe('npm run tools:actionlint');
     expect([...makeTargets]).toEqual(expect.arrayContaining(['tools', 'observability-smoke']));
   });
@@ -146,6 +145,9 @@ describe('smoke selection contract', () => {
       'tests/suites/e2e/examples/quickstart.spec.ts',
       'tests/suites/e2e/examples/deterministic-network-mock.spec.ts',
       'tests/suites/e2e/examples/retries-and-timeouts.spec.ts',
+      // The previously untagged deterministic SAT example is now part of smoke so
+      // no deterministic example test ID is left unselected (spec section 5.1).
+      'tests/suites/e2e/examples/self-healing-sat.spec.ts',
     ] as const;
 
     for (const spec of exampleSpecs) {

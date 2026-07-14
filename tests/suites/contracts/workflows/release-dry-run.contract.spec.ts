@@ -67,12 +67,12 @@ describe('release dry-run workflow contract', () => {
     );
     const packCommand = getWorkflowStep(releaseJob, 'Pack package tarball').run ?? '';
     expectInvariant(
-      packCommand.includes('npm run pack:dry-run'),
-      'Release workflow must keep pack dry-run evidence before creating the local validation tarball.',
-    );
-    expectInvariant(
       packCommand.includes('npm pack --json --pack-destination release-evidence'),
       'Release workflow must emit a local tarball for consumer validation without publishing.',
+    );
+    expectInvariant(
+      !packCommand.includes('npm run pack:dry-run') && !packCommand.includes('npm pack --dry-run'),
+      'Release workflow must perform one local pack; the dry-run pack is redundant with the real JSON pack report.',
     );
   });
 
@@ -96,6 +96,7 @@ describe('release dry-run workflow contract', () => {
     const setupStep = getWorkflowStep(releaseJob, 'Setup locked Node.js dependencies');
     const consumerSmokeStep = getWorkflowStep(releaseJob, 'Validate package consumer install');
     const validatorsStep = getWorkflowStep(releaseJob, 'Run package publish validators');
+    const stepNames = releaseJob.steps.map((step) => step.name);
 
     expect(getWorkflowStep(releaseJob, 'Run quality gates').run).toBe('npm run verify');
     expect(packageJson.packageManager).toBe('npm@11.17.0');
@@ -118,7 +119,12 @@ describe('release dry-run workflow contract', () => {
       ),
       'Release dry-run evidence must tee schema validation output into the evidence bundle.',
     );
-    expect(getWorkflowStep(releaseJob, 'Build package').run).toBe('npm run build');
+    // One intentional build: the prepack build during `npm pack` is the single
+    // build, so no standalone `npm run build` step (which would rebuild) remains.
+    expectInvariant(
+      !stepNames.includes('Build package'),
+      'Release must build once via the pack prepack hook, not a separate duplicate build step.',
+    );
     expectInvariant(
       (consumerSmokeStep.run ?? '').includes(
         'npm run package:consumer-smoke -- --pack-report release-evidence/pack-report.json 2>&1 | tee release-evidence/consumer-smoke.txt',

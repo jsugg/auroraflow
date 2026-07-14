@@ -203,9 +203,7 @@ describe('dependabot configuration contract', () => {
   it('runs an early lockfile drift guard for dependency automation changes', () => {
     const preflightJob = getWorkflowJob(qualityWorkflow, 'preflight');
     const lockfileJob = getWorkflowJob(qualityWorkflow, 'lockfile-drift');
-    const filters = getWorkflowStep(preflightJob, 'Detect smoke-relevant changes').with.get(
-      'filters',
-    );
+    const filters = getWorkflowStep(preflightJob, 'Detect change scopes').with.get('filters');
 
     expect(packageJson.scripts?.['lockfile:check']).toBe('node scripts/check-lockfile-drift.mjs');
     expect(preflightJob.outputs.get('run_lockfile_check')).toBe(
