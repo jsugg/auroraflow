@@ -15,6 +15,12 @@ updates:
       - dependency-name: '@eslint/js'
         update-types:
           - 'version-update:semver-major'
+      # typescript-eslint@8 peer-requires typescript <6.1.0, so a semver-major
+      # typescript bump (e.g. 7.x) fails `npm ci` with ERESOLVE. Pin to the 6.x
+      # line until the type-aware lint toolchain supports the next major.
+      - dependency-name: 'typescript'
+        update-types:
+          - 'version-update:semver-major'
     groups:
       npm-production:
         applies-to: 'version-updates'
