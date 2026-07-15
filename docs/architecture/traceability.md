@@ -4,7 +4,7 @@ This registry is a self-contained record of completed architectural improvements
 
 ## Architecture snapshot
 
-AuroraFlow is a public npm library that runs inside consumer Playwright Node processes. The runtime remains library-first rather than service-owned: consumers own test execution, CI, Redis, observability backends, retention, credentials, and incident response. The package owns safe page-object helpers, Selector Analysis Tooling (SAT), optional selector-registry adapters, failure artifacts, local reports, and reference observability assets.
+AuroraFlow is a public-target npm library (pre-publish; see the [release process](../operations/release-process.md#current-state-dry-run-only) for the canonical release state) that runs inside consumer Playwright Node processes. The runtime remains library-first rather than service-owned: consumers own test execution, CI, Redis, observability backends, retention, credentials, and incident response. The package owns safe page-object helpers, Selector Analysis Tooling (SAT), optional selector-registry adapters, failure artifacts, local reports, and reference observability assets.
 
 Target architecture is conservative evolution with internal seams:
 
@@ -24,7 +24,7 @@ Quality gates use a four-band model:
 - integration tests own Redis/Testcontainers and OTLP process-boundary proof;
 - browser E2E remains targeted, risk-triggered, scheduled, or manual for expensive proof.
 
-Semantic contracts are preferred over raw text matching. Contract specs may keep rare wording checks only through rationale helpers. Required verification includes unit, contracts, integration, schema validation, formatting, linting, typecheck, ShellCheck, and workflow lint. Coverage uses global erosion guards plus risk-weighted per-file floors for critical paths.
+Semantic contracts are preferred over raw text matching. Contract specs may keep rare wording checks only through rationale helpers. Required CI verification (the Static Analysis lane, plus unit tests on the Node compatibility matrix) includes unit, contracts, integration, schema validation, formatting, linting, typecheck, ShellCheck, and workflow lint; schema validation is a separate CI/release evidence gate rather than part of `npm run verify`. Coverage uses global erosion guards plus risk-weighted per-file floors for critical paths.
 
 ## Completed architectural improvements
 
@@ -38,7 +38,7 @@ The self-healing system was redesigned with safety-first defaults: a guarded-hea
 
 ### API stability and release governance
 
-API stability tiers and a deprecation policy were defined. A release workflow with provenance, changelog, SBOM, and npm signing was implemented.
+API stability tiers and a deprecation policy were defined. A dry-run release workflow was implemented with SBOM generation (SPDX + CycloneDX), npm trusted-publishing/provenance readiness checks, and changelog drafting; npm provenance is produced only at a future real publish, and artifact signing remains deferred (`AUR-DEC-012`).
 
 ### Privacy and retention
 
@@ -84,7 +84,7 @@ The default `npm test` target was corrected to run only fast tests (unit and con
 
 ### Schema and contract validation
 
-Schema validation was added to required verification gates. Brittle contract text assertions in Markdown, YAML, and workflows were replaced with semantic checks using parsed models. Observability workflow validation was converted from shell grep to typed validators.
+Schema validation was added to the required CI verification gates (the Static Analysis lane), as a standalone evidence step outside `npm run verify`. Brittle contract text assertions in Markdown, YAML, and workflows were replaced with semantic checks using parsed models. Observability workflow validation was converted from shell grep to typed validators.
 
 ### CI topology
 

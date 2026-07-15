@@ -1,6 +1,6 @@
 # API stability
 
-AuroraFlow is published as a public npm library (`AUR-DEC-001`). Every export of the package root (`import { ... } from 'auroraflow'`) is classified into a stability tier, and the classification below is machine-readable: the package-surface contract test parses `src/index.ts` and the tables in this document and fails when any root export is unclassified, stale, or mislabeled. Repository-internal source paths are not part of the package contract.
+AuroraFlow is developed as a public npm library (`AUR-DEC-001`); it is not yet published to the npm registry — see the [release process](./operations/release-process.md#current-state-dry-run-only) for the canonical release state. Every export of the package root (`import { ... } from 'auroraflow'`) is classified into a stability tier, and the classification below is machine-readable: the package-surface contract test parses `src/index.ts` and the tables in this document and fails when any root export is unclassified, stale, or mislabeled. Repository-internal source paths are not part of the package contract.
 
 ## Stability tiers
 

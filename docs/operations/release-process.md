@@ -6,6 +6,10 @@ Policy source: `AUR-DEC-012` (see `docs/architecture/decision-log.md`) — npm p
 
 ## Current state: dry-run only
 
+This section is the canonical release-state declaration for the repository; other documents must link here instead of restating publish status.
+
+AuroraFlow is **pre-publish**. The `auroraflow` package has not been published to the npm registry, and no workflow in this repository is able to publish it. Each release dry run generates an SBOM and checks npm provenance readiness; provenance itself is produced only at a future real publish via trusted publishing, and artifact signing remains deferred (`AUR-DEC-012`). `AUR-DEC-001` records a public npm library as the product _target_, not as the current state.
+
 The release workflow (`.github/workflows/release.yml`) is manual (`workflow_dispatch`) and **never publishes**. It exists to make the release path auditable before the first publish:
 
 - The workflow has read-only (`contents: read`) permissions in every job.
@@ -34,7 +38,7 @@ Each run uploads a `release-dry-run-evidence` artifact (30-day retention) contai
 | `provenance-readiness.txt` | Verification that package metadata satisfies npm provenance prerequisites |
 | `changelog-draft.md` | Conventional Commits log since the previous tag, input for curated notes |
 
-The run also executes the full `npm run verify` gate and a clean `npm run build` so release evidence always reflects a healthy tree. Schema validation is also recorded as standalone release evidence, even though it is part of `verify`. Package validation then:
+The run also executes the full `npm run verify` gate and a clean `npm run build` so release evidence always reflects a healthy tree. Schema validation is recorded as standalone release evidence, as a separate gate that is not part of `verify`. Package validation then:
 
 - builds a local tarball with `npm pack --json`;
 - installs that tarball into a temporary consumer project with the supported Playwright peer floor;

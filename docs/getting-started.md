@@ -11,6 +11,32 @@ This guide gets a new AuroraFlow test project running with Playwright, page obje
 
 ## Install in a test project
 
+AuroraFlow is not yet published to the npm registry, so install it from a locally packed tarball. See the [release process](./operations/release-process.md#current-state-dry-run-only) for the canonical release state.
+
+### Pre-publish install (current path)
+
+Build a tarball from a repository checkout:
+
+```bash
+git clone https://github.com/jsugg/auroraflow.git
+cd auroraflow
+npm ci
+npm pack
+```
+
+`npm pack` writes `auroraflow-<version>.tgz` to the repository root. Install that file in your test project:
+
+```bash
+npm install --save-dev /path/to/auroraflow-<version>.tgz @playwright/test playwright
+npx playwright install --with-deps
+```
+
+This is the same install path the release dry run exercises through `npm run package:consumer-smoke`, which installs the packed tarball into a temporary project and typechecks it.
+
+### Post-publish install (after the first release)
+
+Once the package is published, install it from the registry instead:
+
 ```bash
 npm install --save-dev auroraflow @playwright/test playwright
 npx playwright install --with-deps

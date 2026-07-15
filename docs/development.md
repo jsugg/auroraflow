@@ -88,7 +88,7 @@ npm run verify
 
 `npm run test:integration` is reserved for real integration coverage (Redis/Testcontainers and OTLP export). Use `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true npm run test:integration` when Redis evidence must block instead of skip. Set `AURORAFLOW_REDIS_INTEGRATION_EXTERNAL=true` with `AURORAFLOW_REDIS_*` connection settings to reuse an already-running Redis instead of starting the default Testcontainers Redis instance.
 
-`npm run verify` runs repo-local actionlint bootstrap, formatting, linting, typechecking, unit tests, contracts, Redis/OTLP integration, schema validation, ShellCheck, and workflow linting.
+`npm run verify` runs repo-local actionlint bootstrap, formatting, linting, typechecking, unit tests, contracts, Redis/OTLP integration, ShellCheck, and workflow linting. Schema validation is deliberately outside `verify`; it runs once as a CI/release evidence gate (`npm run schemas:check`).
 
 TypeScript keeps its strict baseline. The first phased type-aware ESLint slice rejects unnecessary type assertions; validate external values at their boundary instead of casting them to silence the checker. `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` remain deferred to dedicated boundary-hardening migrations rather than a broad drive-by change.
 
@@ -99,7 +99,7 @@ Contract specs are semantic-first:
 - raw toContain/toMatch and bare boolean toBe(true)/toBe(false) stay banned in `tests/suites/contracts/**`.
 - Use parsed workflow/JSON/Compose models where practical instead of asserting raw YAML, Markdown, or JSON text.
 - Public compatibility or safety wording checks are allowed only when they protect user-facing contracts; route them through `tests/helpers/contractAssertions.ts` with explicit rationale.
-- `tests/suites/contracts/workflows/test-taxonomy.contract.spec.ts` enforces the matcher ban, and root `AGENTS.md` repeats the rule for coding agents.
+- `tests/suites/contracts/workflows/test-taxonomy.contract.spec.ts` enforces the matcher ban.
 
 | Command | Cost tier | Scope |
 | --- | --- | --- |
@@ -246,7 +246,7 @@ The JSON/Markdown flakiness, SLO, and alert artifacts remain the deterministic m
 
 ## Workflow and security checks
 
-CI installs native `actionlint` before running `npm run verify`. For the closest local match, install `actionlint` and `shellcheck` before running:
+CI's `Static Analysis (Node 22)` lane installs native `actionlint` and `shellcheck`, then runs the same checks `npm run verify` bundles as individual steps; it does not invoke `npm run verify` itself. The manual release dry run is the only workflow that runs `npm run verify` verbatim. For the closest local match, install `actionlint` and `shellcheck` before running:
 
 ```bash
 npm run workflows:lint
@@ -285,7 +285,7 @@ Documentation should remain precise and source-backed:
 ## Troubleshooting
 
 - **Redis integration skipped:** confirm Docker is running. The integration suite should skip explicitly rather than hang when Testcontainers cannot start.
-- **Workflow lint differs locally:** install native `actionlint`; CI does this before `npm run verify`.
+- **Workflow lint differs locally:** install native `actionlint`; CI's Static Analysis lane installs it before running its workflow lint step.
 - **No live telemetry:** confirm `AURORAFLOW_OBSERVABILITY_ENABLED=true` and `OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318`.
 - **Grafana has no metrics:** check Prometheus targets at <http://localhost:9090/targets> and Collector health at <http://localhost:13133>.
 - **Self-healing artifacts missing:** confirm `SELF_HEAL_MODE` is `suggest` or `guarded`; `off` is the default.
