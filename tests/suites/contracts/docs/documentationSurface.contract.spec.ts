@@ -9,10 +9,23 @@ import {
 import {
   listMarkdownFiles,
   markdownLinks,
+  parseFrontMatter,
   resolveMarkdownLink,
 } from '../../../helpers/markdownDocs';
 
 const DOCUMENTATION_PORTAL = 'docs/README.md';
+
+/**
+ * Documents whose staleness carries real risk: they govern release, security, privacy,
+ * compatibility, and production Redis. Tutorials deliberately stay metadata-free.
+ */
+const HIGH_RISK_DOCS = [
+  'docs/api-stability.md',
+  'docs/operations/privacy-retention.md',
+  'docs/operations/redis-production-runbook.md',
+  'docs/operations/release-process.md',
+  'docs/operations/security-secrets.md',
+] as const;
 
 function readRepoFile(relativePath: string): string {
   return readFileSync(path.join(process.cwd(), relativePath), 'utf8');
@@ -114,6 +127,38 @@ describe('documentation surface contract', () => {
       linksToPortal,
       `README.md must link to ${DOCUMENTATION_PORTAL} so readers reach the canonical documentation index.`,
     );
+  });
+
+  it('records ownership and review metadata on high-risk documents', () => {
+    for (const docPath of HIGH_RISK_DOCS) {
+      const frontMatter = parseFrontMatter(readRepoFile(docPath));
+      expectInvariant(
+        frontMatter !== null,
+        `${docPath} governs release, security, privacy, compatibility, or production Redis, so it must open with YAML front matter recording ownership and review metadata.`,
+      );
+
+      const owner = frontMatter?.get('owner');
+      expectInvariant(
+        typeof owner === 'string' && owner.startsWith('@'),
+        `${docPath} front matter must name an owner handle so a stale high-risk document has someone to route to.`,
+      );
+
+      // Interval expiry is deliberately not enforced: calendar-driven build failures are out
+      // of scope. The metadata exists to drive manual or scheduled review sweeps.
+      const lastReviewed = frontMatter?.get('last-reviewed');
+      expectInvariant(
+        typeof lastReviewed === 'string' &&
+          /^\d{4}-\d{2}-\d{2}$/u.test(lastReviewed) &&
+          !Number.isNaN(Date.parse(lastReviewed)),
+        `${docPath} front matter must carry a parseable ISO last-reviewed date; found ${String(lastReviewed)}.`,
+      );
+
+      const updateTriggers = frontMatter?.get('update-triggers');
+      expectInvariant(
+        Array.isArray(updateTriggers) && updateTriggers.length > 0,
+        `${docPath} front matter must list at least one update trigger so contributors know which changes oblige them to revisit it.`,
+      );
+    }
   });
 
   it('documents the vulnerability reporting and supported-version security policy', () => {

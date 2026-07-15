@@ -1,3 +1,15 @@
+---
+owner: '@jsugg'
+status: current
+audience: maintainers-and-operators
+last-reviewed: 2026-07-15
+review-interval-days: 180
+update-triggers:
+  - A new secret, credential, or token surface is introduced.
+  - CI secret handling or the scanning toolchain changes.
+  - The vulnerability reporting or disclosure channel changes.
+---
+
 # Secrets Management Policy
 
 This document defines the minimum secret-handling requirements for AuroraFlow development and CI.

@@ -1,3 +1,15 @@
+---
+owner: '@jsugg'
+status: current
+audience: maintainers-and-release-owners
+last-reviewed: 2026-07-15
+review-interval-days: 180
+update-triggers:
+  - The release workflow changes its evidence, gating, or permissions.
+  - Publish gating, provenance, SBOM, or artifact-signing policy changes.
+  - The package is published for the first time, which supersedes the canonical release state below.
+---
+
 # Release Process
 
 This document defines the release policy for the `auroraflow` npm package: how release candidates are validated, what supply-chain evidence each release must produce, how changelogs are written, and how a bad release is rolled back.
