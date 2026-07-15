@@ -84,6 +84,7 @@
     "slo:dashboard": "node -r ts-node/register scripts/slo-dashboard.ts",
     "slo:alerts": "node -r ts-node/register scripts/slo-alerts.ts",
     "schemas:check": "node scripts/run-schemas-check.mjs",
+    "docs:links": "node scripts/docs-link-check.mjs",
     "tools:actionlint": "bash scripts/install-actionlint.sh",
     "verify:tools": "npm run tools:actionlint",
     "workflows:lint": "npm run tools:actionlint --silent && node scripts/workflows-lint.mjs",
