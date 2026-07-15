@@ -1,7 +1,18 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { expectTextExcludes, expectTextIncludes } from '../../../helpers/contractAssertions';
+import {
+  expectInvariant,
+  expectTextExcludes,
+  expectTextIncludes,
+} from '../../../helpers/contractAssertions';
+import {
+  listMarkdownFiles,
+  markdownLinks,
+  resolveMarkdownLink,
+} from '../../../helpers/markdownDocs';
+
+const DOCUMENTATION_PORTAL = 'docs/README.md';
 
 function readRepoFile(relativePath: string): string {
   return readFileSync(path.join(process.cwd(), relativePath), 'utf8');
@@ -31,10 +42,13 @@ describe('documentation surface contract', () => {
       'CHANGELOG.md',
       'CONTRIBUTING.md',
       'SECURITY.md',
+      'docs/README.md',
       'docs/getting-started.md',
       'docs/writing-tests.md',
       'docs/configuration.md',
       'docs/api.md',
+      'docs/api-stability.md',
+      'docs/development.md',
       'docs/adr/README.md',
       'docs/adr/0001-safety-first-self-healing.md',
       'docs/adr/0002-api-stability-tiers.md',
@@ -47,13 +61,18 @@ describe('documentation surface contract', () => {
       'docs/adr/0009-strategic-architecture.md',
       'docs/adr/0010-ci-cd-maturity-deferrals.md',
       'docs/architecture/adoption-readiness.md',
+      'docs/architecture/data-layer.md',
+      'docs/architecture/decision-log.md',
       'docs/architecture/locator-first-api.md',
+      'docs/architecture/observability-stack.md',
       'docs/architecture/self-healing.md',
       'docs/architecture/traceability.md',
       'docs/operations/artifact-schemas.md',
       'docs/operations/lifecycle.md',
       'docs/operations/privacy-retention.md',
       'docs/operations/redis-production-runbook.md',
+      'docs/operations/release-process.md',
+      'docs/operations/security-secrets.md',
       'docs/operations/observability-contract.md',
       'docs/operations/observability-support-tiers.md',
       'docs/operations/trend-durable-export.md',
@@ -64,6 +83,37 @@ describe('documentation surface contract', () => {
     for (const docPath of requiredDocs) {
       expect(readRepoFile(docPath).trim().length).toBeGreaterThan(200);
     }
+  });
+
+  it('keeps every documentation file reachable from the documentation portal', () => {
+    const portalLinks = markdownLinks(readRepoFile(DOCUMENTATION_PORTAL));
+    const indexed = new Set(
+      portalLinks.flatMap((link) => {
+        const resolved = resolveMarkdownLink(DOCUMENTATION_PORTAL, link.target);
+        return resolved === undefined ? [] : [resolved];
+      }),
+    );
+
+    const unreachable = listMarkdownFiles('docs')
+      .filter((docPath) => docPath !== DOCUMENTATION_PORTAL)
+      .filter((docPath) => !indexed.has(docPath));
+
+    expect(
+      unreachable,
+      `Every document under docs/ must be indexed in ${DOCUMENTATION_PORTAL} so it stays discoverable; add each unlisted file to the audience section it serves.`,
+    ).toEqual([]);
+  });
+
+  it('routes the root readme to the documentation portal as the canonical index', () => {
+    const readme = readRepoFile('README.md');
+    const linksToPortal = markdownLinks(readme).some(
+      (link) => resolveMarkdownLink('README.md', link.target) === DOCUMENTATION_PORTAL,
+    );
+
+    expectInvariant(
+      linksToPortal,
+      `README.md must link to ${DOCUMENTATION_PORTAL} so readers reach the canonical documentation index.`,
+    );
   });
 
   it('documents the vulnerability reporting and supported-version security policy', () => {
