@@ -48,6 +48,8 @@ const SNIPPET_DOCS = [
 ];
 
 const TYPESCRIPT_FENCE_LANGUAGES = new Set(['ts', 'typescript']);
+const COMMENT_OPENER = '<!--';
+const COMMENT_TERMINATORS = ['--!>', '-->'];
 const OPT_OUT_PATTERN = /^snippet:\s*no-compile\s*\(([^)]+)\)$/u;
 const CONTEXT_PATTERN = /^snippet:\s*context\s*\n([\s\S]*)$/u;
 const DECLARED_FILENAME_PATTERN = /^\/\/\s*([A-Za-z0-9_./-]+\.ts)\s*$/u;
@@ -96,24 +98,33 @@ function directiveAbove(lines, fenceIndex) {
   while (end >= 0 && lines[end].trim().length === 0) {
     end -= 1;
   }
-  if (end < 0 || !lines[end].trimEnd().endsWith('-->')) {
+  if (end < 0) {
+    return null;
+  }
+
+  // HTML comments end with `-->` or, per the spec's comment-end-bang state, `--!>`.
+  // Matched with string operations rather than a regex: delimiter-matching regexes are
+  // easy to get subtly wrong, and there is nothing here a pattern buys us.
+  const terminator = COMMENT_TERMINATORS.find((candidate) =>
+    lines[end].trimEnd().endsWith(candidate),
+  );
+  if (terminator === undefined) {
     return null;
   }
 
   let start = end;
-  while (start >= 0 && !lines[start].trimStart().startsWith('<!--')) {
+  while (start >= 0 && !lines[start].trimStart().startsWith(COMMENT_OPENER)) {
     start -= 1;
   }
   if (start < 0) {
     return null;
   }
 
-  return lines
+  const comment = lines
     .slice(start, end + 1)
     .join('\n')
-    .replace(/^\s*<!--/u, '')
-    .replace(/-->\s*$/u, '')
     .trim();
+  return comment.slice(COMMENT_OPENER.length, comment.length - terminator.length).trim();
 }
 
 /** Fenced TypeScript blocks with the documentation line their first code line sits on. */
