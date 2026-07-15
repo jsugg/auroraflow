@@ -210,26 +210,20 @@ scripts/                   Report generation, workflow linting, governance, and 
 
 ## Documentation
 
+**[Documentation portal](docs/README.md)** is the canonical index — every document, organized by audience, with the compliance standard and conventions.
+
+Common entry points:
+
 - [Getting started](docs/getting-started.md)
 - [Writing tests](docs/writing-tests.md)
 - [Configuration](docs/configuration.md)
 - [API](docs/api.md)
+- [API stability](docs/api-stability.md)
+- [Changelog](CHANGELOG.md)
 - [Contributing](CONTRIBUTING.md)
 - [Development guide](docs/development.md)
-- [Architecture decision records](docs/adr/README.md)
-- [Architecture decision log](docs/architecture/decision-log.md)
-- [Adoption readiness and extensibility gates](docs/architecture/adoption-readiness.md)
-- [Architecture and QE traceability registry](docs/architecture/traceability.md)
-- [Self-healing foundation](docs/architecture/self-healing.md)
-- [Data layer foundation](docs/architecture/data-layer.md)
-- [Redis production runbook](docs/operations/redis-production-runbook.md)
-- [Observability stack architecture](docs/architecture/observability-stack.md)
-- [Observability contract](docs/operations/observability-contract.md)
-- [Observability support tiers](docs/operations/observability-support-tiers.md)
-- [Durable trend export](docs/operations/trend-durable-export.md)
-- [Artifact schemas](docs/operations/artifact-schemas.md)
-- [SLO dashboard and alerting](docs/operations/slo-dashboard-alerting.md)
-- [Security and secrets](docs/operations/security-secrets.md)
+- [Release process](docs/operations/release-process.md)
+- [Security policy](SECURITY.md)
 - [Examples](examples/README.md)
 
 ## Roadmap

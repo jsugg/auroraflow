@@ -16,6 +16,8 @@ Every root export carries a stability tier (stable, advanced, experimental, depr
 
 Base class for instrumented Playwright page objects.
 
+<!-- snippet: no-compile (API signature reference, not runnable code) -->
+
 ```ts
 abstract class PageObjectBase {
   protected page: Page;
@@ -77,6 +79,8 @@ interface ActionOptions {
 
 ### `PageFactory`
 
+<!-- snippet: no-compile (API signature reference, not runnable code) -->
+
 ```ts
 class PageFactory {
   constructor(page: Page, context?: AuroraFlowContext);
@@ -99,6 +103,11 @@ Waits for `0..60000` milliseconds. Invalid values throw `RangeError`. Pass `null
 ### `retry(options)`
 
 Retries an async function with bounded exponential backoff.
+
+<!-- snippet: context
+import { retry } from 'auroraflow';
+declare function fetchValue(): Promise<string>;
+-->
 
 ```ts
 const value = await retry({
@@ -131,6 +140,11 @@ After the final failure, `retry()` throws an `Error` describing the exhausted re
 `RedisClient` wraps the `redis` driver with validated runtime config, key prefixing, explicit connection lifecycle, bounded retry, SCAN-based discovery, TTL writes, batched reads, and JSON compare-and-set helpers.
 
 Common methods:
+
+<!-- snippet: context
+import type { RedisClient } from 'auroraflow';
+declare const client: RedisClient;
+-->
 
 ```ts
 await client.connect();
@@ -187,6 +201,10 @@ Redis operations, durability, backups, capacity, retention, and incidents are co
 
 ### `MemorySelectorStore`
 
+<!-- snippet: context
+import { createMemorySelectorStore } from 'auroraflow';
+-->
+
 ```ts
 const store = createMemorySelectorStore();
 
@@ -236,6 +254,11 @@ Current lifecycle:
 Promotion scope is registry mutation only. AuroraFlow does not rewrite source files or apply blind autonomous selector changes. Local promotion authorization is permissive with a warning. Shared promotion authorization requires CODEOWNERS and protected-workflow evidence before mutating selector records.
 
 ### Promotion workflow
+
+<!-- snippet: context
+import { createMemorySelectorStore, SelfHealingPromotionWorkflow } from 'auroraflow';
+const store = createMemorySelectorStore();
+-->
 
 ```ts
 const workflow = new SelfHealingPromotionWorkflow({ store });

@@ -1,7 +1,31 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { expectTextExcludes, expectTextIncludes } from '../../../helpers/contractAssertions';
+import {
+  expectInvariant,
+  expectTextExcludes,
+  expectTextIncludes,
+} from '../../../helpers/contractAssertions';
+import {
+  listMarkdownFiles,
+  markdownLinks,
+  parseFrontMatter,
+  resolveMarkdownLink,
+} from '../../../helpers/markdownDocs';
+
+const DOCUMENTATION_PORTAL = 'docs/README.md';
+
+/**
+ * Documents whose staleness carries real risk: they govern release, security, privacy,
+ * compatibility, and production Redis. Tutorials deliberately stay metadata-free.
+ */
+const HIGH_RISK_DOCS = [
+  'docs/api-stability.md',
+  'docs/operations/privacy-retention.md',
+  'docs/operations/redis-production-runbook.md',
+  'docs/operations/release-process.md',
+  'docs/operations/security-secrets.md',
+] as const;
 
 function readRepoFile(relativePath: string): string {
   return readFileSync(path.join(process.cwd(), relativePath), 'utf8');
@@ -28,12 +52,16 @@ function parseCodeowners(content: string): ReadonlyMap<string, readonly string[]
 describe('documentation surface contract', () => {
   it('ships API-grade onboarding and reference docs', () => {
     const requiredDocs = [
+      'CHANGELOG.md',
       'CONTRIBUTING.md',
       'SECURITY.md',
+      'docs/README.md',
       'docs/getting-started.md',
       'docs/writing-tests.md',
       'docs/configuration.md',
       'docs/api.md',
+      'docs/api-stability.md',
+      'docs/development.md',
       'docs/adr/README.md',
       'docs/adr/0001-safety-first-self-healing.md',
       'docs/adr/0002-api-stability-tiers.md',
@@ -46,13 +74,18 @@ describe('documentation surface contract', () => {
       'docs/adr/0009-strategic-architecture.md',
       'docs/adr/0010-ci-cd-maturity-deferrals.md',
       'docs/architecture/adoption-readiness.md',
+      'docs/architecture/data-layer.md',
+      'docs/architecture/decision-log.md',
       'docs/architecture/locator-first-api.md',
+      'docs/architecture/observability-stack.md',
       'docs/architecture/self-healing.md',
       'docs/architecture/traceability.md',
       'docs/operations/artifact-schemas.md',
       'docs/operations/lifecycle.md',
       'docs/operations/privacy-retention.md',
       'docs/operations/redis-production-runbook.md',
+      'docs/operations/release-process.md',
+      'docs/operations/security-secrets.md',
       'docs/operations/observability-contract.md',
       'docs/operations/observability-support-tiers.md',
       'docs/operations/trend-durable-export.md',
@@ -62,6 +95,69 @@ describe('documentation surface contract', () => {
 
     for (const docPath of requiredDocs) {
       expect(readRepoFile(docPath).trim().length).toBeGreaterThan(200);
+    }
+  });
+
+  it('keeps every documentation file reachable from the documentation portal', () => {
+    const portalLinks = markdownLinks(readRepoFile(DOCUMENTATION_PORTAL));
+    const indexed = new Set(
+      portalLinks.flatMap((link) => {
+        const resolved = resolveMarkdownLink(DOCUMENTATION_PORTAL, link.target);
+        return resolved === undefined ? [] : [resolved];
+      }),
+    );
+
+    const unreachable = listMarkdownFiles('docs')
+      .filter((docPath) => docPath !== DOCUMENTATION_PORTAL)
+      .filter((docPath) => !indexed.has(docPath));
+
+    expect(
+      unreachable,
+      `Every document under docs/ must be indexed in ${DOCUMENTATION_PORTAL} so it stays discoverable; add each unlisted file to the audience section it serves.`,
+    ).toEqual([]);
+  });
+
+  it('routes the root readme to the documentation portal as the canonical index', () => {
+    const readme = readRepoFile('README.md');
+    const linksToPortal = markdownLinks(readme).some(
+      (link) => resolveMarkdownLink('README.md', link.target) === DOCUMENTATION_PORTAL,
+    );
+
+    expectInvariant(
+      linksToPortal,
+      `README.md must link to ${DOCUMENTATION_PORTAL} so readers reach the canonical documentation index.`,
+    );
+  });
+
+  it('records ownership and review metadata on high-risk documents', () => {
+    for (const docPath of HIGH_RISK_DOCS) {
+      const frontMatter = parseFrontMatter(readRepoFile(docPath));
+      expectInvariant(
+        frontMatter !== null,
+        `${docPath} governs release, security, privacy, compatibility, or production Redis, so it must open with YAML front matter recording ownership and review metadata.`,
+      );
+
+      const owner = frontMatter?.get('owner');
+      expectInvariant(
+        typeof owner === 'string' && owner.startsWith('@'),
+        `${docPath} front matter must name an owner handle so a stale high-risk document has someone to route to.`,
+      );
+
+      // Interval expiry is deliberately not enforced: calendar-driven build failures are out
+      // of scope. The metadata exists to drive manual or scheduled review sweeps.
+      const lastReviewed = frontMatter?.get('last-reviewed');
+      expectInvariant(
+        typeof lastReviewed === 'string' &&
+          /^\d{4}-\d{2}-\d{2}$/u.test(lastReviewed) &&
+          !Number.isNaN(Date.parse(lastReviewed)),
+        `${docPath} front matter must carry a parseable ISO last-reviewed date; found ${String(lastReviewed)}.`,
+      );
+
+      const updateTriggers = frontMatter?.get('update-triggers');
+      expectInvariant(
+        Array.isArray(updateTriggers) && updateTriggers.length > 0,
+        `${docPath} front matter must list at least one update trigger so contributors know which changes oblige them to revisit it.`,
+      );
     }
   });
 

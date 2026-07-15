@@ -1,6 +1,20 @@
+---
+owner: '@jsugg'
+status: current
+audience: package-consumers-and-maintainers
+last-reviewed: 2026-07-15
+review-interval-days: 180
+update-triggers:
+  - A root export is added, removed, renamed, or moved between stability tiers.
+  - A deprecation is announced or a deprecated export reaches its removal horizon.
+  - An artifact schema, metric name, or repository CLI compatibility surface changes.
+---
+
 # API stability
 
-AuroraFlow is published as a public npm library (`AUR-DEC-001`). Every export of the package root (`import { ... } from 'auroraflow'`) is classified into a stability tier, and the classification below is machine-readable: the package-surface contract test parses `src/index.ts` and the tables in this document and fails when any root export is unclassified, stale, or mislabeled. Repository-internal source paths are not part of the package contract.
+AuroraFlow is developed as a public npm library (`AUR-DEC-001`); it is not yet published to the npm registry — see the [release process](./operations/release-process.md#current-state-dry-run-only) for the canonical release state. Every export of the package root (`import { ... } from 'auroraflow'`) is classified into a stability tier, and the classification below is machine-readable: the package-surface contract test parses `src/index.ts` and the tables in this document and fails when any root export is unclassified, stale, or mislabeled. Repository-internal source paths are not part of the package contract.
+
+Throughout this document, "the changelog" means the repository's root [`CHANGELOG.md`](../CHANGELOG.md). It is the durable record of deprecation announcements, tier changes, and removals; the `changelog-draft.md` produced by a release dry run is a 30-day workflow artifact that feeds it, not a substitute for it.
 
 ## Stability tiers
 

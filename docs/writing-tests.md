@@ -75,6 +75,8 @@ On failure, the boundary logs context, captures a screenshot, optionally writes 
 
 Add stable `selectorId` values to action options for elements you expect to manage through the selector registry:
 
+<!-- snippet: no-compile (page-object method body fragment; `this` is the surrounding page object) -->
+
 ```ts
 await this.click('[data-testid="checkout-submit"]', {
   selectorId: 'checkout.submit',
@@ -89,6 +91,10 @@ Good selector IDs are stable domain identifiers, not raw CSS selectors. They let
 ## Assertions
 
 Prefer Playwright locators and user-visible assertions in specs:
+
+<!-- snippet: context
+import { expect } from '@playwright/test';
+-->
 
 ```ts
 await expect(page.getByRole('status')).toHaveText('Saved');

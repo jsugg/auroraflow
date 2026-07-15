@@ -1,3 +1,15 @@
+---
+owner: '@jsugg'
+status: current
+audience: security-and-privacy-reviewers
+last-reviewed: 2026-07-15
+review-interval-days: 180
+update-triggers:
+  - A new artifact data class is captured or an existing one changes shape.
+  - Capture defaults, privacy presets, or redaction behavior change.
+  - Retention guidance or the consumer-owned retention boundary changes.
+---
+
 # Artifact Privacy and Retention
 
 AuroraFlow treats test evidence as potentially sensitive even when tests use synthetic data. The current product scope covers synthetic data and non-production PII only. AuroraFlow does not claim support for regulated PII, production data, legal holds, or compliance-grade data-loss prevention.

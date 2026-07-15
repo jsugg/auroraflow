@@ -1,3 +1,15 @@
+---
+owner: '@jsugg'
+status: current
+audience: maintainers-and-release-owners
+last-reviewed: 2026-07-15
+review-interval-days: 180
+update-triggers:
+  - The release workflow changes its evidence, gating, or permissions.
+  - Publish gating, provenance, SBOM, or artifact-signing policy changes.
+  - The package is published for the first time, which supersedes the canonical release state below.
+---
+
 # Release Process
 
 This document defines the release policy for the `auroraflow` npm package: how release candidates are validated, what supply-chain evidence each release must produce, how changelogs are written, and how a bad release is rolled back.
@@ -5,6 +17,10 @@ This document defines the release policy for the `auroraflow` npm package: how r
 Policy source: `AUR-DEC-012` (see `docs/architecture/decision-log.md`) — npm provenance and SBOM are required for this public library; artifact signing is deferred until the product demonstrates release readiness.
 
 ## Current state: dry-run only
+
+This section is the canonical release-state declaration for the repository; other documents must link here instead of restating publish status.
+
+AuroraFlow is **pre-publish**. The `auroraflow` package has not been published to the npm registry, and no workflow in this repository is able to publish it. Each release dry run generates an SBOM and checks npm provenance readiness; provenance itself is produced only at a future real publish via trusted publishing, and artifact signing remains deferred (`AUR-DEC-012`). `AUR-DEC-001` records a public npm library as the product _target_, not as the current state.
 
 The release workflow (`.github/workflows/release.yml`) is manual (`workflow_dispatch`) and **never publishes**. It exists to make the release path auditable before the first publish:
 
@@ -34,7 +50,7 @@ Each run uploads a `release-dry-run-evidence` artifact (30-day retention) contai
 | `provenance-readiness.txt` | Verification that package metadata satisfies npm provenance prerequisites |
 | `changelog-draft.md` | Conventional Commits log since the previous tag, input for curated notes |
 
-The run also executes the full `npm run verify` gate and a clean `npm run build` so release evidence always reflects a healthy tree. Schema validation is also recorded as standalone release evidence, even though it is part of `verify`. Package validation then:
+The run also executes the full `npm run verify` gate and a clean `npm run build` so release evidence always reflects a healthy tree. Schema validation is recorded as standalone release evidence, as a separate gate that is not part of `verify`. Package validation then:
 
 - builds a local tarball with `npm pack --json`;
 - installs that tarball into a temporary consumer project with the supported Playwright peer floor;
@@ -57,7 +73,8 @@ Each lane runs type checking, focused page-object/factory unit tests, and the Ch
 
 - Versions follow [SemVer](https://semver.org/). Breaking changes to `stable` exports (see `docs/api-stability.md`) require a major release; the deprecation policy there governs removal timelines.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/) and are enforced by commitlint (`commitlint.config.cjs`).
-- Release notes start from the workflow's `changelog-draft.md` and are curated by the release maintainer: group by `feat`/`fix`/breaking changes, drop internal-only noise, and call out migration steps for any `advanced` or `experimental` surface changes.
+- Curated release notes land in the root [`CHANGELOG.md`](../../CHANGELOG.md) (Keep a Changelog format), and may be mirrored to GitHub Releases at publish time. `CHANGELOG.md` is the durable record that `docs/api-stability.md` calls "the changelog".
+- Notes start from the workflow's `changelog-draft.md` — a dry-run evidence artifact with 30-day retention, not a durable record — and are curated by the release maintainer: group by `feat`/`fix`/breaking changes, drop internal-only noise, and call out migration steps for any `advanced` or `experimental` surface changes.
 - The version bump itself (`npm version`) and tag push are maintainer actions and are out of scope for the dry-run workflow.
 
 ## Provenance and SBOM policy

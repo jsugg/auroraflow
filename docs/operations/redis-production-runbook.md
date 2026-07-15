@@ -1,3 +1,15 @@
+---
+owner: '@jsugg'
+status: current
+audience: maintainers-and-operators
+last-reviewed: 2026-07-15
+review-interval-days: 180
+update-triggers:
+  - The Redis key or namespace model changes.
+  - Selector-store commands, TTLs, or cleanup workflows change.
+  - The supported Redis version range or deployment topology changes.
+---
+
 # Redis Selector Registry Production Runbook
 
 This runbook documents Redis-backed selector registry operations. AuroraFlow can use Redis as an optional durable selector-store backend, but Redis is always consumer/operator-owned. AuroraFlow does not provision, patch, back up, monitor, scale, or incident-manage consumer Redis.
