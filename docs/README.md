@@ -98,3 +98,32 @@ You run the optional infrastructure AuroraFlow can integrate with. Both are cons
 | [Observability runbooks](operations/observability-runbooks.md) | Triage for missing telemetry and backend faults. |
 | [Observability dashboard review](operations/observability-dashboard-review.md) | The checklist for dashboard and alert changes. |
 | [Durable trend export](operations/trend-durable-export.md) | The optional, operator-owned durable trend path. |
+
+## Writing a new document
+
+Templates capture the information a reader needs, not a layout to reproduce. Cover each item somewhere findable; merge, reorder, or rename sections when that serves the material better.
+
+| Template | Use it for |
+| --- | --- |
+| [Architecture document](templates/architecture-doc.md) | A new document under `architecture/`. Cover context, scope, components and data flow, invariants, trust boundaries, failure modes, and related decisions. Reference implementation: [data layer foundation](architecture/data-layer.md). |
+| [Runbook](templates/runbook.md) | A new operational document under `operations/`. Cover scope, ownership, prerequisites, detection, mitigation, recovery, verification, escalation, and rollback. Reference implementation: [Redis production runbook](operations/redis-production-runbook.md). |
+
+Two document kinds have expectations but no template, because the existing documents are the clearest specification of them. An **API reference** entry gives the import path, the signature, the guarantees it holds, the errors it raises, its lifecycle, at least one example, and its stability tier — [API](api.md) is the reference implementation. A **tutorial** gives prerequisites, reproducible steps, the expected result, cleanup, and troubleshooting — [Getting started](getting-started.md) is the reference implementation.
+
+High-risk documents — those governing release, security, privacy, compatibility, or production Redis — additionally carry YAML front matter recording `owner`, `status`, `audience`, `last-reviewed`, `review-interval-days`, and `update-triggers`. A contract enforces it on those five documents; tutorials stay metadata-free rather than accumulating bureaucracy.
+
+## Exceptions and waivers
+
+A documentation requirement that is deliberately not met is recorded as a waiver, so the gap is a visible decision with an owner and an expiry rather than an undocumented lapse. See [exceptions](exceptions/README.md) for when a waiver is the right answer and [the waiver template](exceptions/TEMPLATE.md) for the fields one must record. There are currently no active waivers.
+
+## Conventions
+
+- **Normative words carry contract weight.** "Must", "supported", "guaranteed", and "required" describe commitments a contract test or workflow enforces. Use "prefer", "consider", or "recommended" for advice. Do not use a normative word for behavior nothing checks.
+- **Implemented before roadmap.** "Implemented", "available", and "enabled by" are only for behavior present in source; use "planned", "reference", or "roadmap" otherwise. The full rule lives in the [development guide](development.md).
+- **Publish status derives from one place.** The [release process](operations/release-process.md#current-state-dry-run-only) is the canonical release-state declaration. Link it rather than restating whether the package is published.
+- **Dates are ISO.** `YYYY-MM-DD`, everywhere, including front matter.
+- **Identifiers use the governance namespaces.** `AUR-DEC-*` for decisions in the [decision log](architecture/decision-log.md), `AUR-ARCH-*` for architecture issues. ADR files are numbered `NNNN-kebab-title.md`. No other identifier namespace is in use.
+- **Filenames are kebab-case `.md`**, named for the subject rather than the audience.
+- **Every code fence carries a language tag** (`ts`, `bash`, `json`, `yaml`, `text`, `mermaid`). TypeScript fences in the consumer-facing documents are compiled by `npm run docs:snippets`, so an untagged fence silently escapes that check.
+- **A diagram supplements prose; it never replaces it.** Mermaid is welcome, but a reader who cannot render the diagram must not lose information — the surrounding prose has to carry the explanation on its own.
+- **Links are relative and checked.** `npm run docs:links` validates every relative target, anchor, image alt text, heading progression, and link text. Link text names its destination; "here" and "link" do not.
