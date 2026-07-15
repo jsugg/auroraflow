@@ -47,8 +47,29 @@ const RELEASE_STATE_LINKING_DOCS = [
 const CANONICAL_RELEASE_STATE_DOC = 'docs/operations/release-process.md';
 const CANONICAL_RELEASE_STATE_ANCHOR = 'release-process.md#current-state-dry-run-only';
 
+/** Docs whose normative "the changelog" references must resolve to a durable file. */
+const CHANGELOG_REFERENCING_DOCS = [
+  'docs/api-stability.md',
+  'docs/operations/release-process.md',
+] as const;
+
 function readRepoFile(relativePath: string): string {
   return readFileSync(path.join(REPO_ROOT, relativePath), 'utf8');
+}
+
+function markdownLinkTargets(markdown: string): readonly string[] {
+  return [...markdown.matchAll(/\[[^\]]*\]\(([^)\s]+)\)/gu)].flatMap((match) =>
+    match[1] === undefined ? [] : [match[1]],
+  );
+}
+
+function linkResolvesTo(fromDoc: string, target: string, expectedRepoPath: string): boolean {
+  const [targetPath] = target.split('#');
+  if (targetPath === undefined || targetPath.length === 0) {
+    return false;
+  }
+  const resolved = path.resolve(path.dirname(path.join(REPO_ROOT, fromDoc)), targetPath);
+  return resolved === path.join(REPO_ROOT, expectedRepoPath);
 }
 
 function referencedScriptNames(markdown: string): readonly string[] {
@@ -121,6 +142,24 @@ describe('documentation consistency contract', () => {
       rationale:
         'Routine CI runs verify components as individual Static Analysis steps; only the manual release dry run invokes `npm run verify` verbatim.',
     });
+  });
+
+  it('resolves "the changelog" to the durable root CHANGELOG.md', () => {
+    expectTextIncludes(readRepoFile('CHANGELOG.md'), {
+      text: '## [Unreleased]',
+      rationale:
+        'Changelog must keep an Unreleased section so entries have a durable home before the first published release.',
+    });
+
+    for (const docPath of CHANGELOG_REFERENCING_DOCS) {
+      const linksToChangelog = markdownLinkTargets(readRepoFile(docPath)).some((target) =>
+        linkResolvesTo(docPath, target, 'CHANGELOG.md'),
+      );
+      expectInvariant(
+        linksToChangelog,
+        `${docPath} makes normative "the changelog" promises, so it must link to the durable root CHANGELOG.md rather than leave the reference dangling or point only at the 30-day changelog-draft.md artifact.`,
+      );
+    }
   });
 
   it('derives publish status from the canonical release-state declaration', () => {

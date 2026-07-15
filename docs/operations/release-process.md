@@ -61,7 +61,8 @@ Each lane runs type checking, focused page-object/factory unit tests, and the Ch
 
 - Versions follow [SemVer](https://semver.org/). Breaking changes to `stable` exports (see `docs/api-stability.md`) require a major release; the deprecation policy there governs removal timelines.
 - Commits follow [Conventional Commits](https://www.conventionalcommits.org/) and are enforced by commitlint (`commitlint.config.cjs`).
-- Release notes start from the workflow's `changelog-draft.md` and are curated by the release maintainer: group by `feat`/`fix`/breaking changes, drop internal-only noise, and call out migration steps for any `advanced` or `experimental` surface changes.
+- Curated release notes land in the root [`CHANGELOG.md`](../../CHANGELOG.md) (Keep a Changelog format), and may be mirrored to GitHub Releases at publish time. `CHANGELOG.md` is the durable record that `docs/api-stability.md` calls "the changelog".
+- Notes start from the workflow's `changelog-draft.md` — a dry-run evidence artifact with 30-day retention, not a durable record — and are curated by the release maintainer: group by `feat`/`fix`/breaking changes, drop internal-only noise, and call out migration steps for any `advanced` or `experimental` surface changes.
 - The version bump itself (`npm version`) and tag push are maintainer actions and are out of scope for the dry-run workflow.
 
 ## Provenance and SBOM policy

@@ -28,6 +28,7 @@ function parseCodeowners(content: string): ReadonlyMap<string, readonly string[]
 describe('documentation surface contract', () => {
   it('ships API-grade onboarding and reference docs', () => {
     const requiredDocs = [
+      'CHANGELOG.md',
       'CONTRIBUTING.md',
       'SECURITY.md',
       'docs/getting-started.md',
