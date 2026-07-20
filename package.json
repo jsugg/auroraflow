@@ -150,7 +150,7 @@
     "eslint": "^9.39.5",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
-    "lint-staged": "^17.0.8",
+    "lint-staged": "^17.1.0",
     "playwright": "^1.59.1",
     "prettier": "^3.9.5",
     "publint": "^0.3.21",
