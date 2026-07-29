@@ -160,6 +160,7 @@ beforeAll(async () => {
     if (redisIntegrationRequired() || runtime.usesExternalRedis) {
       throw new Error(
         `Redis integration is required but ${redisUnavailableSource()} setup failed: ${runtime.skipReason}`,
+        { cause: error },
       );
     }
   }

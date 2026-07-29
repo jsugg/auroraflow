@@ -175,14 +175,14 @@ describe('dependabot configuration contract', () => {
     ).toBe('weekly');
   });
 
-  it('ignores semver-major updates that are incompatible with the current toolchain', () => {
+  it('ignores TypeScript majors beyond the current type-aware lint peer range', () => {
     const config = readFileSync(DEPENDABOT_PATH, 'utf8');
     const npmUpdate = parseDependabotUpdates(config).get('npm');
 
     expect(
       npmUpdate?.ignoredMajorDependencies,
-      'Dependabot must keep semver-major ESLint and TypeScript updates blocked until the type-aware lint toolchain (typescript-eslint peer range) supports them.',
-    ).toEqual(expect.arrayContaining(['eslint', '@eslint/js', 'typescript']));
+      'Dependabot must keep semver-major TypeScript updates blocked until the type-aware lint toolchain supports them.',
+    ).toEqual(['typescript']);
   });
 
   it('keeps broad version-update groups separate from security-update groups', () => {

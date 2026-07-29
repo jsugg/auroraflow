@@ -201,7 +201,9 @@ function readMutationReport(reportPath, label) {
     parsed = JSON.parse(readFileSync(absolutePath, 'utf8'));
   } catch (error) {
     const detail = error instanceof Error ? error.message : String(error);
-    throw new Error(`${label} must be readable valid JSON (${absolutePath}): ${detail}`);
+    throw new Error(`${label} must be readable valid JSON (${absolutePath}): ${detail}`, {
+      cause: error,
+    });
   }
 
   if (parsed === null || typeof parsed !== 'object' || !Array.isArray(parsed.mutations)) {
