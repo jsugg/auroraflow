@@ -62,7 +62,7 @@ describe('quality workflow Node compatibility contract', () => {
     );
   });
 
-  it('runs format, lint, typecheck, contracts, integration, schema, shell, and workflow gates once on Node 22', () => {
+  it('runs format, lint, typecheck, contracts, schema, shell, and workflow gates once on Node 22', () => {
     const staticJob = getWorkflowJob(qualityWorkflow, 'static-analysis');
     const lockedInstallStep = getWorkflowStep(staticJob, 'Setup locked Node.js dependencies');
 
@@ -74,20 +74,53 @@ describe('quality workflow Node compatibility contract', () => {
     expect(getWorkflowStep(staticJob, 'Run lint').run).toBe('npm run lint');
     expect(getWorkflowStep(staticJob, 'Run typecheck').run).toBe('npm run typecheck');
     expect(getWorkflowStep(staticJob, 'Run contract tests').run).toBe('npm run test:contracts');
-    expect(getWorkflowStep(staticJob, 'Run Redis/OTLP integration tests').run).toBe(
-      'npm run test:integration',
-    );
-    expect(
-      getWorkflowStep(staticJob, 'Run Redis/OTLP integration tests').env.get(
-        'AURORAFLOW_REDIS_INTEGRATION_REQUIRED',
-      ),
-    ).toBe('true');
     expect(getWorkflowStep(staticJob, 'Validate artifact schemas').run).toBe(
       'npm run schemas:check',
     );
     expect(getWorkflowStep(staticJob, 'Run shell and workflow lint').run).toBe(
       'npm run shellcheck && npm run workflows:lint:check',
     );
+  });
+
+  it('isolates required Redis integration and retries transient image pulls', () => {
+    const integrationJob = getWorkflowJob(qualityWorkflow, 'integration');
+    const lockedInstallStep = getWorkflowStep(integrationJob, 'Setup locked Node.js dependencies');
+    const imagePullStep = getWorkflowStep(integrationJob, 'Pre-pull Redis image with retry');
+    const integrationStep = getWorkflowStep(integrationJob, 'Run Redis/OTLP integration tests');
+    const qualityGateJob = getWorkflowJob(qualityWorkflow, 'quality-gate');
+    const qualityGateRun = getWorkflowStep(
+      qualityGateJob,
+      'Enforce upstream quality lane results',
+    ).run;
+
+    expect(integrationJob.name).toBe('Integration (Redis/OTLP)');
+    expect(integrationJob.timeoutMinutes).toBe(7);
+    expect(lockedInstallStep.uses).toBe(lockedInstallActionPath);
+    expect(lockedInstallStep.with.get('node-version')).toBe('22');
+    expect(lockedInstallStep.with.get('cache-namespace')).toBe('integration');
+    expectTextIncludes(imagePullStep.run ?? '', {
+      text: 'set -euo pipefail',
+      rationale: 'The retry shell must fail closed on command, variable, and pipeline errors.',
+    });
+    expectTextIncludes(imagePullStep.run ?? '', {
+      text: 'for attempt in 1 2 3',
+      rationale: 'Transient registry failures must be retried within a bounded attempt budget.',
+    });
+    expectTextIncludes(imagePullStep.run ?? '', {
+      text: 'timeout 60 docker pull redis:7.2-alpine',
+      rationale: 'Each registry attempt must be time-bounded before retrying.',
+    });
+    expect(integrationStep.run).toBe('npm run test:integration');
+    expect(integrationStep.env.get('AURORAFLOW_REDIS_INTEGRATION_REQUIRED')).toBe('true');
+    expectInvariant(
+      qualityGateJob.needs.includes('integration'),
+      'The aggregate quality gate must depend on the required integration lane.',
+    );
+    expectTextIncludes(qualityGateRun ?? '', {
+      text: 'require_success "Integration (Redis/OTLP)" "$INTEGRATION_RESULT"',
+      rationale:
+        'The fail-closed aggregate gate must reject a failed or missing integration result.',
+    });
   });
 
   it('installs actionlint once and lints workflows through the non-installing command', () => {

@@ -120,7 +120,7 @@ describe('security workflow secret scanning contract', () => {
     });
   });
 
-  it('keeps full-lock npm audit skipped on pull requests and blocking on push/schedule', () => {
+  it('keeps full-lock npm audit blocking on every event', () => {
     const npmAuditJob = getWorkflowJob(securityWorkflow, 'npm-audit');
     const workflowSecurityJob = getWorkflowJob(securityWorkflow, 'workflow-security');
     const securityGateRun =
@@ -130,7 +130,7 @@ describe('security workflow secret scanning contract', () => {
       ).run ?? '';
 
     expect(npmAuditJob.name).toBe('NPM Audit');
-    expect(npmAuditJob.if).toBe("github.event_name != 'pull_request'");
+    expect(npmAuditJob.if).toBeUndefined();
     expect(getWorkflowStep(npmAuditJob, 'Run npm audit (high+)').run).toBe(
       'npm run security:audit',
     );
@@ -141,13 +141,13 @@ describe('security workflow secret scanning contract', () => {
       !getWorkflowStep(npmAuditJob, 'Run npm audit (high+)').run?.includes('zizmor'),
       'NPM audit job must not run workflow security scanning.',
     );
-    expectTextIncludes(securityGateRun, {
-      text: 'require_skipped "NPM Audit" "$NPM_AUDIT_RESULT"',
-      rationale: 'Security gate must verify npm audit is the only intentionally skipped PR job.',
-    });
+    expectInvariant(
+      !securityGateRun.includes('require_skipped "NPM Audit"'),
+      'Security gate must not allow pull requests to bypass the full-lock audit.',
+    );
     expectTextIncludes(securityGateRun, {
       text: 'require_success "NPM Audit" "$NPM_AUDIT_RESULT"',
-      rationale: 'Security gate must block failing npm audit only for trusted push/schedule runs.',
+      rationale: 'Security gate must block a failing npm audit on every event.',
     });
     expectTextIncludes(securityGateRun, {
       text: 'require_success "CodeQL" "$CODEQL_RESULT"',

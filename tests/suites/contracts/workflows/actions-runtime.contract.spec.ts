@@ -139,6 +139,17 @@ describe('workflow actions runtime contract', () => {
       text: 'npm ci',
       rationale: 'Composite locked install must keep reproducible npm ci semantics.',
     });
+    for (const retryConfig of [
+      "npm_config_fetch_retries: '5'",
+      "npm_config_fetch_retry_mintimeout: '10000'",
+      "npm_config_fetch_retry_maxtimeout: '60000'",
+      "npm_config_fetch_timeout: '120000'",
+    ]) {
+      expectTextIncludes(compositeAction, {
+        text: retryConfig,
+        rationale: 'Registry reads must use bounded npm-native retries without retrying npm ci.',
+      });
+    }
     expectTextIncludes(compositeAction, {
       text: "hashFiles('package-lock.json', 'configs/playwright.config.ts', 'configs/playwright.*.ts')",
       rationale: 'Playwright browser cache key must include lockfile and browser config hashes.',

@@ -140,11 +140,6 @@ jobs:
       - name: Run contract tests
         run: npm run test:contracts
 
-      - name: Run Redis/OTLP integration tests
-        env:
-          AURORAFLOW_REDIS_INTEGRATION_REQUIRED: 'true'
-        run: npm run test:integration
-
       - name: Validate artifact schemas
         run: npm run schemas:check
 
@@ -152,6 +147,47 @@ jobs:
         # workflows:lint:check reuses the actionlint installed above instead of
         # reinstalling it (workflows:lint would re-bootstrap the binary).
         run: npm run shellcheck && npm run workflows:lint:check
+
+  integration:
+    name: Integration (Redis/OTLP)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    timeout-minutes: 7
+    needs: preflight
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - name: Setup locked Node.js dependencies
+        uses: ./.github/actions/setup-node-cache
+        with:
+          node-version: '22'
+          cache-namespace: integration
+          cache-version: v1
+
+      - name: Pre-pull Redis image with retry
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if timeout 60 docker pull redis:7.2-alpine; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              delay=$((attempt * 10))
+              echo "::warning::Redis image pull attempt ${attempt} failed or timed out; retrying in ${delay}s"
+              sleep "$delay"
+            fi
+          done
+          echo "::error::Redis image pull failed after 3 attempts"
+          exit 1
+
+      - name: Run Redis/OTLP integration tests
+        env:
+          AURORAFLOW_REDIS_INTEGRATION_REQUIRED: 'true'
+        run: npm run test:integration
 
   node-compat:
     name: Node Compatibility (Node ${{ matrix.node-version }})
@@ -368,6 +404,7 @@ jobs:
       - preflight
       - lockfile-drift
       - static-analysis
+      - integration
       - node-compat
       - coverage
       - e2e-chrome
@@ -387,6 +424,7 @@ jobs:
           PREFLIGHT_RESULT: ${{ needs.preflight.result }}
           LOCKFILE_RESULT: ${{ needs.lockfile-drift.result }}
           STATIC_ANALYSIS_RESULT: ${{ needs.static-analysis.result }}
+          INTEGRATION_RESULT: ${{ needs.integration.result }}
           NODE_COMPAT_RESULT: ${{ needs.node-compat.result }}
           COVERAGE_RESULT: ${{ needs.coverage.result }}
           E2E_CHROME_RESULT: ${{ needs.e2e-chrome.result }}
@@ -429,6 +467,7 @@ jobs:
             echo "| --- | --- | --- |"
             echo "| Preflight | success | ${PREFLIGHT_RESULT:-missing} |"
             echo "| Static Analysis (Node 22) | success | ${STATIC_ANALYSIS_RESULT:-missing} |"
+            echo "| Integration (Redis/OTLP) | success | ${INTEGRATION_RESULT:-missing} |"
             echo "| Node Compatibility (20/22/24) | success | ${NODE_COMPAT_RESULT:-missing} |"
             echo "| Coverage (Unit Floors) | success | ${COVERAGE_RESULT:-missing} |"
             echo "| Lockfile Drift | ${lockfile_expected} | ${LOCKFILE_RESULT:-missing} |"
@@ -437,6 +476,7 @@ jobs:
 
           require_success "Preflight" "$PREFLIGHT_RESULT"
           require_success "Static Analysis (Node 22)" "$STATIC_ANALYSIS_RESULT"
+          require_success "Integration (Redis/OTLP)" "$INTEGRATION_RESULT"
           require_success "Node Compatibility (20/22/24)" "$NODE_COMPAT_RESULT"
           require_success "Coverage (Unit Floors)" "$COVERAGE_RESULT"
 

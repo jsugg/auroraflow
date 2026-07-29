@@ -70,7 +70,6 @@ jobs:
 
   npm-audit:
     name: NPM Audit
-    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 5
     permissions:
@@ -267,16 +266,14 @@ jobs:
 
           if [ "${{ github.event_name }}" = "pull_request" ]; then
             require_success "Dependency Review" "$DEPENDENCY_REVIEW_RESULT"
-            require_skipped "NPM Audit" "$NPM_AUDIT_RESULT"
             record_result "Dependency Review" "success" "$DEPENDENCY_REVIEW_RESULT"
-            record_result "NPM Audit" "skipped" "$NPM_AUDIT_RESULT"
           else
             require_skipped "Dependency Review" "$DEPENDENCY_REVIEW_RESULT"
-            require_success "NPM Audit" "$NPM_AUDIT_RESULT"
             record_result "Dependency Review" "skipped" "$DEPENDENCY_REVIEW_RESULT"
-            record_result "NPM Audit" "success" "$NPM_AUDIT_RESULT"
           fi
 
+          require_success "NPM Audit" "$NPM_AUDIT_RESULT"
+          record_result "NPM Audit" "success" "$NPM_AUDIT_RESULT"
           require_success "CodeQL" "$CODEQL_RESULT"
           require_success "Secret Scan" "$SECRET_SCAN_RESULT"
           require_success "Workflow Security" "$WORKFLOW_SECURITY_RESULT"
