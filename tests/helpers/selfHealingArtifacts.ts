@@ -141,7 +141,6 @@ export async function readSelfHealingArtifactFor<T>(
   const timeoutMs = options.timeoutMs ?? 5_000;
   const pollIntervalMs = options.pollIntervalMs ?? 50;
   const deadline = Date.now() + timeoutMs;
-  let matchCount = 0;
 
   do {
     const artifacts = await readSelfHealingArtifacts<T & SelfHealingArtifactIdentity>(scope);
@@ -152,14 +151,15 @@ export async function readSelfHealingArtifactFor<T>(
     if (matches.length === 1) {
       return matches[0];
     }
-    matchCount = matches.length;
     if (matches.length > 1) {
-      break;
+      throw new Error(
+        `Expected one self-healing artifact for ${scope.runId}/${scope.testId} under ${scope.artifactsDir}; found ${matches.length}.`,
+      );
     }
     await new Promise((resolve) => setTimeout(resolve, pollIntervalMs));
   } while (Date.now() < deadline);
 
   throw new Error(
-    `Expected one self-healing artifact for ${scope.runId}/${scope.testId} under ${scope.artifactsDir}; found ${matchCount}.`,
+    `Expected one self-healing artifact for ${scope.runId}/${scope.testId} under ${scope.artifactsDir}; found 0.`,
   );
 }

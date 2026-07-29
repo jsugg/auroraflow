@@ -9,6 +9,7 @@ function parseCompilerOptions(rawValue) {
     const detail = error instanceof Error ? error.message : String(error);
     throw new Error(
       `Invalid TS_NODE_COMPILER_OPTIONS: expected a JSON object; received malformed JSON (${detail}).`,
+      { cause: error },
     );
   }
 

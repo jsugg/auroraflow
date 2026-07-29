@@ -9,6 +9,7 @@ export default tseslint.config(
       'dist/**',
       'test-reports/**',
       'test-results/**',
+      '.cache/**',
       '.local/**',
       '.claude/worktrees/**',
     ],

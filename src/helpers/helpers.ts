@@ -111,13 +111,15 @@ export async function retry<T>({
           if (logger) {
             logger.error(`All ${retries} retries failed. Last error: ${err.message}`);
           }
-          throw new Error(`All ${retries} retries failed. Last error: ${err.message}`);
+          throw new Error(`All ${retries} retries failed. Last error: ${err.message}`, {
+            cause: err,
+          });
         }
 
         if (logger) {
           logger.error(`All ${retries} retries failed.`);
         }
-        throw new Error(`All ${retries} retries failed.`);
+        throw new Error(`All ${retries} retries failed.`, { cause: err });
       }
 
       const cappedDelay = Math.min(currentDelay, maxDelay);

@@ -39,19 +39,23 @@ describe('retry helper', () => {
 
   it('throws with the last error message after retries are exhausted', async () => {
     let attempts = 0;
+    const terminalError = new Error('boom');
 
     await expect(
       retry({
         fn: async () => {
           attempts += 1;
-          throw new Error('boom');
+          throw terminalError;
         },
         retries: 2,
         initialDelay: 1,
         backoffFactor: 2,
         logger: null,
       }),
-    ).rejects.toThrow('All 2 retries failed. Last error: boom');
+    ).rejects.toMatchObject({
+      cause: terminalError,
+      message: 'All 2 retries failed. Last error: boom',
+    });
 
     expect(attempts).toBe(2);
   });
@@ -70,7 +74,10 @@ describe('retry helper', () => {
         backoffFactor: 2,
         logger: null,
       }),
-    ).rejects.toThrow('All 2 retries failed.');
+    ).rejects.toMatchObject({
+      cause: 'boom',
+      message: 'All 2 retries failed.',
+    });
 
     expect(attempts).toBe(2);
   });

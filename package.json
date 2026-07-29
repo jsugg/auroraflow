@@ -140,14 +140,14 @@
     "@axe-core/playwright": "^4.12.1",
     "@commitlint/cli": "^21.2.1",
     "@commitlint/config-conventional": "^21.0.2",
-    "@eslint/js": "^9.39.5",
+    "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.61.1",
     "@types/node": "^26.1.1",
     "@vitest/coverage-v8": "^4.1.10",
     "actionlint": "^2.0.6",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
-    "eslint": "^9.39.5",
+    "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
     "husky": "^9.1.7",
     "lint-staged": "^17.0.8",
@@ -157,7 +157,7 @@
     "testcontainers": "^12.0.4",
     "ts-node": "^10.9.2",
     "typescript": "^6.0.3",
-    "typescript-eslint": "^8.64.0",
+    "typescript-eslint": "^8.65.0",
     "vitest": "^4.1.8"
   },
   "lint-staged": {
@@ -185,14 +185,10 @@
     "redis": "^6.1.0"
   },
   "overrides": {
+    "archiver": "^8.0.0",
     "diff": "^4.0.4",
-    "minimatch@10.2.5": {
-      "brace-expansion": "^5.0.6"
-    },
-    "archiver-utils": {
-      "glob": "^13.0.6"
-    },
+    "fast-uri": "^3.1.4",
     "js-yaml": "^4.2.0",
-    "protobufjs": "^7.6.3"
+    "protobufjs": "^7.6.5"
   }
 }

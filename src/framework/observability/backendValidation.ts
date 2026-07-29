@@ -568,6 +568,7 @@ async function fetchCheckPayload({
     } catch (error: unknown) {
       throw new Error(
         `${check.backend} check ${check.checkId} returned invalid JSON: ${toErrorMessage(error)}`,
+        { cause: error },
       );
     }
   } finally {
