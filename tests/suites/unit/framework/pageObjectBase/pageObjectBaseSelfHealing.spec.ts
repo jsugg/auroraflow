@@ -720,16 +720,19 @@ describe('PageObjectBase self-healing integration', () => {
     );
 
     expect(artifacts).toHaveLength(2);
-    expect(artifacts[0]?.sat).toBeDefined();
-    expect(artifacts[0]?.guardedValidation).toBeDefined();
-    expect(artifacts[0]?.guardedAutoHeal).toMatchObject({
+    const fullHealingArtifact = artifacts.find((artifact) => artifact.sat !== undefined);
+    const captureOnlyArtifact = artifacts.find((artifact) => artifact.sat === undefined);
+
+    expect(fullHealingArtifact?.sat).toBeDefined();
+    expect(fullHealingArtifact?.guardedValidation).toBeDefined();
+    expect(fullHealingArtifact?.guardedAutoHeal).toMatchObject({
       attempted: true,
       succeeded: false,
     });
-    expect(artifacts[1]?.suggestions).toEqual([]);
-    expect(artifacts[1]?.sat).toBeUndefined();
-    expect(artifacts[1]?.guardedValidation).toBeUndefined();
-    expect(artifacts[1]?.guardedAutoHeal).toBeUndefined();
+    expect(captureOnlyArtifact?.suggestions).toEqual([]);
+    expect(captureOnlyArtifact?.sat).toBeUndefined();
+    expect(captureOnlyArtifact?.guardedValidation).toBeUndefined();
+    expect(captureOnlyArtifact?.guardedAutoHeal).toBeUndefined();
   });
 
   it('skips guarded auto-heal application when policy blocks candidate validation', async () => {
