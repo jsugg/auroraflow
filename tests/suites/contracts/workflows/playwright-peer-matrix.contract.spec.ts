@@ -27,13 +27,19 @@ describe('Playwright peer matrix workflow', () => {
           'Peer matrix must fail loudly when resolved Playwright version leaves peer range.',
       },
     );
-    expectTextIncludes(
-      getWorkflowStep(peerMatrixJob, 'Install matrix Playwright version').run ?? '',
-      {
-        text: 'playwright-core@${PLAYWRIGHT_VERSION_SPEC}',
-        rationale:
-          'Peer matrix must keep playwright, playwright-core, and @playwright/test aligned.',
-      },
+    const matrixInstallRun =
+      getWorkflowStep(peerMatrixJob, 'Install matrix Playwright version').run ?? '';
+    expectTextIncludes(matrixInstallRun, {
+      text: 'playwright-core@${PLAYWRIGHT_VERSION_SPEC}',
+      rationale: 'Peer matrix must keep playwright, playwright-core, and @playwright/test aligned.',
+    });
+    expectTextIncludes(matrixInstallRun, {
+      text: 'npm install --no-save',
+      rationale: 'Peer matrix version swap must not persist into package.json or the lockfile.',
+    });
+    expectInvariant(
+      !matrixInstallRun.includes('--package-lock=false'),
+      'Peer matrix must anchor non-Playwright deps to the lockfile; --package-lock=false re-resolves the whole tree from registry state.',
     );
     // The lockfile gate runs once before matrix fan-out, not once per lane.
     const lockfileJob = getWorkflowJob(workflow, 'lockfile');

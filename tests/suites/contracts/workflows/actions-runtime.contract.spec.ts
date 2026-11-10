@@ -155,10 +155,24 @@ describe('workflow actions runtime contract', () => {
       rationale: 'Playwright browser cache key must include lockfile and browser config hashes.',
     });
     expectTextIncludes(compositeAction, {
-      text: '${{ runner.os }}-playwright-${{ inputs.cache-version }}-${{ inputs.cache-namespace }}-',
+      text: '. /etc/os-release',
       rationale:
-        'Playwright browser cache must keep namespace restore keys for warm dependency bumps.',
+        'Browser and apt caches must resolve the runner OS release to scope their keys by distro.',
     });
+    for (const restorePrefix of [
+      '${{ runner.os }}-${{ steps.os-release.outputs.release }}-playwright-${{ inputs.cache-version }}-${{ inputs.cache-namespace }}-',
+      '${{ runner.os }}-${{ steps.os-release.outputs.release }}-pw-aptdebs-${{ inputs.cache-version }}-${{ inputs.browser-name }}-',
+    ]) {
+      expectTextIncludes(compositeAction, {
+        text: restorePrefix,
+        rationale:
+          'Playwright caches must keep OS-release-scoped namespace restore keys: browser revision dirs are distro-agnostic, so an unscoped prefix restores binaries built for another image.',
+      });
+    }
+    expectInvariant(
+      !/\$\{\{ runner\.os \}\}-(playwright|pw-aptdebs)-/.test(compositeAction),
+      'Playwright cache keys and restore prefixes must not omit the OS release segment.',
+    );
   });
 
   it('cancels stale pull-request runs without cancelling main evidence runs', () => {

@@ -59,14 +59,28 @@ runs:
         npm_config_fetch_timeout: '120000'
       run: npm ci
 
+    # Playwright stores every browser under the same `<name>-<revision>` directory on
+    # every distro, and `--with-deps` .debs are release-specific too. Without the OS
+    # release in the key and restore prefix, a cache saved on ubuntu-24.04 restores onto
+    # a newer `ubuntu-latest` image, install skips the download, and WebKit fails to
+    # launch against missing system libraries (libicu*.so.74, libxml2.so.2).
+    - name: Resolve runner OS release
+      id: os-release
+      if: ${{ inputs.install-browsers == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        . /etc/os-release
+        echo "release=${ID}-${VERSION_ID}" >> "$GITHUB_OUTPUT"
+
     - name: Cache Playwright browsers
       if: ${{ inputs.install-browsers == 'true' }}
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-${{ inputs.cache-version }}-${{ inputs.cache-namespace }}-${{ hashFiles('package-lock.json', 'configs/playwright.config.ts', 'configs/playwright.*.ts') }}
+        key: ${{ runner.os }}-${{ steps.os-release.outputs.release }}-playwright-${{ inputs.cache-version }}-${{ inputs.cache-namespace }}-${{ hashFiles('package-lock.json', 'configs/playwright.config.ts', 'configs/playwright.*.ts') }}
         restore-keys: |
-          ${{ runner.os }}-playwright-${{ inputs.cache-version }}-${{ inputs.cache-namespace }}-
+          ${{ runner.os }}-${{ steps.os-release.outputs.release }}-playwright-${{ inputs.cache-version }}-${{ inputs.cache-namespace }}-
 
     # Cache the OS-level .deb packages that `--with-deps` installs. webkit pulls
     # ~114 MB; downloading it every run makes the job hostage to apt mirror speed
@@ -81,9 +95,9 @@ runs:
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ~/.cache/playwright-apt-debs
-        key: ${{ runner.os }}-pw-aptdebs-${{ inputs.cache-version }}-${{ inputs.browser-name }}-${{ hashFiles('package-lock.json', 'configs/playwright.config.ts') }}
+        key: ${{ runner.os }}-${{ steps.os-release.outputs.release }}-pw-aptdebs-${{ inputs.cache-version }}-${{ inputs.browser-name }}-${{ hashFiles('package-lock.json', 'configs/playwright.config.ts') }}
         restore-keys: |
-          ${{ runner.os }}-pw-aptdebs-${{ inputs.cache-version }}-${{ inputs.browser-name }}-
+          ${{ runner.os }}-${{ steps.os-release.outputs.release }}-pw-aptdebs-${{ inputs.cache-version }}-${{ inputs.browser-name }}-
 
     - name: Ensure Playwright browser is installed
       if: ${{ inputs.install-browsers == 'true' }}

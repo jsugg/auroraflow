@@ -9,6 +9,6 @@ rules:
     ignore:
       # The Playwright peer matrix exists to prove cross-version compatibility, so it
       # deliberately installs arbitrary Playwright versions outside the lockfile
-      # (`npm install --no-save --package-lock=false ...`). That ad-hoc install is the
+      # (`npm install --no-save ...`). That ad-hoc install is the
       # job's entire purpose, so this audit is expected for this workflow only.
       - playwright-peer-matrix.yml

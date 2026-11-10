@@ -77,7 +77,11 @@ jobs:
         # Installing arbitrary Playwright versions outside the lockfile is this job's whole
         # purpose (cross-version peer compatibility); zizmor's adhoc-packages audit is
         # expected here and allowlisted for this file in .github/zizmor.yml.
-        run: npm install --no-save --package-lock=false --ignore-scripts "playwright@${PLAYWRIGHT_VERSION_SPEC}" "playwright-core@${PLAYWRIGHT_VERSION_SPEC}" "@playwright/test@${PLAYWRIGHT_VERSION_SPEC}"
+        # `--no-save` keeps the swap ephemeral while the locked tree anchors every other
+        # dependency. `--package-lock=false` would re-resolve the whole tree from manifest
+        # ranges, making lanes hostage to registry drift (it crashed npm 10 arborist on a
+        # new vite optional-peer cycle: "Cannot read properties of null (reading 'edgesOut')").
+        run: npm install --no-save --ignore-scripts "playwright@${PLAYWRIGHT_VERSION_SPEC}" "playwright-core@${PLAYWRIGHT_VERSION_SPEC}" "@playwright/test@${PLAYWRIGHT_VERSION_SPEC}"
 
       - name: Verify installed Playwright version
         env:
