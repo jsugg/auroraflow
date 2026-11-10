@@ -78,8 +78,10 @@ describe('pre-push verification stamp contract', () => {
         });
         expect(runStamp(repo, 'check').status).not.toBe(0);
 
-        const prePushHook = readFileSync(path.join(REPO_ROOT, '.husky/pre-push'), 'utf8').trim();
-        expect(prePushHook).toBe('node scripts/verify-stamp.mjs pre-push');
+        const prePushHookLines = readFileSync(path.join(REPO_ROOT, '.husky/pre-push'), 'utf8')
+          .trim()
+          .split('\n');
+        expect(prePushHookLines.at(-1)).toBe('node scripts/verify-stamp.mjs pre-push');
       } finally {
         rmSync(repo, { recursive: true, force: true });
       }

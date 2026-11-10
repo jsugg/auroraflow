@@ -1,0 +1,60 @@
+name: Attribution Guard
+
+# Required status context of its own (not folded into an aggregate gate): edited/labeled
+# events must re-evaluate the required status without a new commit.
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited, labeled, unlabeled, ready_for_review]
+  push:
+    branches: [main]
+
+concurrency:
+  group: attribution-guard-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  attribution-guard:
+    name: Attribution Guard
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      # The helper runs from the trusted base so a pull request cannot weaken the guard that
+      # judges it. The candidate checkout is used only when the base predates the guard.
+      - name: Checkout trusted base
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+          path: trusted
+
+      - name: Checkout candidate
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+          path: candidate
+
+      - name: Setup Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '22'
+
+      - name: Check refs, labels, PR text, and commits for attribution
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          helper=trusted/scripts/attribution-guard.mjs
+          if [ ! -f "${helper}" ]; then
+            echo "::warning::Base commit predates the attribution guard; bootstrapping from the candidate checkout."
+            helper=candidate/scripts/attribution-guard.mjs
+          fi
+          node "${helper}" github

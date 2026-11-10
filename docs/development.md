@@ -132,6 +132,8 @@ Calibration-critical code (scoring, config, guarded validation, retry, Redis CAS
 
 Branch protection depends on two stable aggregate gates, `Quality Gate` and `Security Gate`, not on individual matrix-leg or internal job names. Each aggregate runs with `if: always()`, verifies the expected success-or-skipped result of every upstream lane for the current event, fails closed on a missing/cancelled/unexpectedly-skipped lane, and publishes a result table to the job summary.
 
+Branch protection also requires `Attribution Guard` (`.github/workflows/attribution-guard.yml`) as its own context rather than an aggregate lane, because pull request `edited`, `labeled`, and `unlabeled` events must re-evaluate it without a new commit. It refetches the pull request through the API and rejects AI-tool attribution in the title, body, head ref, labels, and every commit message and author/committer email. It also audits each push to `main`. The helper runs from the base commit, so a pull request cannot weaken the check that judges it. The patterns in `scripts/attribution-patterns.mjs` are vendored byte-identically from a shared cross-repository source. The Husky `commit-msg` and `pre-push` hooks run the same `scripts/attribution-guard.mjs` locally, the latter on the pushed ref name and every commit not yet on the remote.
+
 | Gate | Cost tier | Runs | Responsibility |
 | --- | --- | --- | --- |
 | `Lockfile Drift` | Fast dependency check | Manifest/dependabot changes, Dependabot PRs, `main`, scheduled, and manual quality workflow runs | Fails early with clear remediation when `package-lock.json` is not synchronized with `package.json`; the one explicit lockfile gate (the shared setup no longer dry-runs it before every `npm ci`). |

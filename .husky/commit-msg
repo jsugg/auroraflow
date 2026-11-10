@@ -1,1 +1,2 @@
+node scripts/attribution-guard.mjs commit-msg "$1"
 npx commitlint --edit "$1"
