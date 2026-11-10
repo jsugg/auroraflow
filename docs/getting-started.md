@@ -4,7 +4,7 @@ This guide gets a new AuroraFlow test project running with Playwright, page obje
 
 ## Requirements
 
-- Node.js `>=20 <25`
+- Node.js `>=22.15.0 <27` (tested on 22, 24, and 26)
 - npm
 - Playwright browsers
 - Docker only when running Redis integration tests or the local observability stack

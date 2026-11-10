@@ -6,6 +6,7 @@ import { METRIC_NAMES } from '../../../../../src/framework/observability/metricN
 import { createOtelTelemetry } from '../../../../../src/framework/observability/otelTelemetry';
 import type { TelemetryDiagnosticLogger } from '../../../../../src/framework/observability/telemetry';
 import { resolveTelemetryConfig } from '../../../../../src/framework/observability/telemetryConfig';
+import { decodeOtlpResourceAttributes } from '../../../../helpers/otlpResource';
 
 interface CapturedOtlpRequest {
   readonly path: string;
@@ -72,18 +73,16 @@ describe('OTLP telemetry export', () => {
     };
     vi.stubEnv('OTEL_EXPORTER_OTLP_ENDPOINT', url);
 
-    const telemetry = createOtelTelemetry(
-      resolveTelemetryConfig({
-        AURORAFLOW_OBSERVABILITY_ENABLED: 'true',
-        AURORAFLOW_OBSERVABILITY_ENVIRONMENT: 'ci',
-        AURORAFLOW_OBSERVABILITY_METRIC_EXPORT_INTERVAL_MS: '1000',
-        AURORAFLOW_OBSERVABILITY_SHUTDOWN_TIMEOUT_MS: '5000',
-        AURORAFLOW_OBSERVABILITY_SERVICE_NAME: 'auroraflow-otlp-test',
-        AURORAFLOW_RUN_ID: 'focused-otlp-run',
-        OTEL_EXPORTER_OTLP_ENDPOINT: url,
-      }),
-      logger,
-    );
+    const config = resolveTelemetryConfig({
+      AURORAFLOW_OBSERVABILITY_ENABLED: 'true',
+      AURORAFLOW_OBSERVABILITY_ENVIRONMENT: 'ci',
+      AURORAFLOW_OBSERVABILITY_METRIC_EXPORT_INTERVAL_MS: '1000',
+      AURORAFLOW_OBSERVABILITY_SHUTDOWN_TIMEOUT_MS: '5000',
+      AURORAFLOW_OBSERVABILITY_SERVICE_NAME: 'auroraflow-otlp-test',
+      AURORAFLOW_RUN_ID: 'focused-otlp-run',
+      OTEL_EXPORTER_OTLP_ENDPOINT: url,
+    });
+    const telemetry = createOtelTelemetry(config, logger);
 
     try {
       const result = await telemetry.runSpan({
@@ -132,5 +131,18 @@ describe('OTLP telemetry export', () => {
       'succeeded',
       'auroraflow-otlp-test',
     ]);
+
+    // Resource parity: the exported resource is exactly the configured attributes. SDK default
+    // detectors (host.*, os.*, process.*, service.instance.id) and SDK-identity attributes must
+    // not appear unless AuroraFlow opts into them.
+    for (const request of [traceRequest, metricRequest]) {
+      const resources = decodeOtlpResourceAttributes(request.body);
+      expect(resources.length, `${request.path} must carry at least one resource`).toBeGreaterThan(
+        0,
+      );
+      for (const resource of resources) {
+        expect(resource, `${request.path} resource attributes`).toEqual(config.resourceAttributes);
+      }
+    }
   });
 });

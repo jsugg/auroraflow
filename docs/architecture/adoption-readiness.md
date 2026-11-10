@@ -34,7 +34,7 @@ Evidence-gate result: not approved for expansion.
 | Target market | Public TypeScript Playwright library for teams that want page-object primitives, guarded self-healing diagnostics, optional Redis selector registry, and CI artifacts. | Keep public-library rigor; do not claim platform/SaaS maturity. |
 | Scale | Local and small-team use is credible. Shared durable selector registries require consumer/operator-owned Redis with reviewed promotion controls. | Defer multi-tenant/shared-service architecture. |
 | Install and dependency weight | Redis and OpenTelemetry dependencies are present, but no npm adoption or install-size complaint evidence exists. | Monitor; do not split packages before evidence and owner exist. |
-| Support needs | Current support surface is Node `>=20 <25`, Playwright `>=1.59 <2`, GitHub Actions examples, optional Redis, and optional observability. | Do not add support surfaces without named owner capacity. |
+| Support needs | Current support surface is Node `>=22.15.0 <27`, Playwright `>=1.59 <2`, GitHub Actions examples, optional Redis, and optional observability. | Do not add support surfaces without named owner capacity. |
 | Sensitive data | Supported privacy posture is synthetic and non-prod PII only; regulated or prod-like data remains out of scope. | Do not broaden compliance claims. |
 | Maintainer capacity | No issue demand or additional owner evidence was found. | Prefer documentation precision and contract tests over expansion. |
 

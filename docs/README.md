@@ -72,6 +72,7 @@ You own releases, architecture decisions, and the durable record of both.
 | [ADR 0008](adr/0008-adoption-gated-extensibility.md) | Adoption-gated backend and CI extensibility. |
 | [ADR 0009](adr/0009-strategic-architecture.md) | Strategic structure: package split, hosted SAT, and observability repository. |
 | [ADR 0010](adr/0010-ci-cd-maturity-deferrals.md) | CI/CD maturity deferrals. |
+| [ADR 0011](adr/0011-node-floor-and-opentelemetry-sdk3.md) | Node.js floor, OpenTelemetry SDK 3, and telemetry resource parity. |
 
 ## Security and privacy reviewer
 

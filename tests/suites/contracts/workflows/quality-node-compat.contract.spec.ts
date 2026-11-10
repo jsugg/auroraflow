@@ -17,22 +17,22 @@ const packageJson = JSON.parse(readFileSync(path.join(process.cwd(), 'package.js
 };
 
 describe('quality workflow Node compatibility contract', () => {
-  it('runs the Node matrix for 20, 22, and 24 on runtime-sensitive behavior only', () => {
+  it('runs the Node matrix for 22, 24, and 26 on runtime-sensitive behavior only', () => {
     const nodeCompatJob = getWorkflowJob(qualityWorkflow, 'node-compat');
 
     expect(nodeCompatJob.name).toBe('Node Compatibility (Node ${{ matrix.node-version }})');
     expect(
       getWorkflowMatrixValues(nodeCompatJob, 'node-version'),
       'Node compatibility matrix must cover supported Node floor/current/ceiling versions.',
-    ).toEqual(['20', '22', '24']);
+    ).toEqual(['22', '24', '26']);
     expect(
       getWorkflowStep(nodeCompatJob, 'Run unit tests').run,
       'Node matrix must exercise runtime-sensitive unit behavior only.',
     ).toBe('npm test');
   });
 
-  it('declares engines range compatible with Node 24', () => {
-    expect(packageJson.engines?.node).toBe('>=20 <25');
+  it('declares the OpenTelemetry SDK 3 floor and admits Node 26 LTS', () => {
+    expect(packageJson.engines?.node).toBe('>=22.15.0 <27');
   });
 
   it('keeps runtime-insensitive static gates out of the Node matrix', () => {

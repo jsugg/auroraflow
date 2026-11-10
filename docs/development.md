@@ -18,7 +18,7 @@ Important current boundaries:
 
 ## Prerequisites
 
-- Node.js `>=20 <25`
+- Node.js `>=22.15.0 <27` (tested on 22, 24, and 26)
 - npm
 - Docker, for Redis/Testcontainers integration tests and the local observability stack
 - Playwright browsers, for smoke, examples, and E2E tests
@@ -137,7 +137,7 @@ Branch protection also requires `Attribution Guard` (`.github/workflows/attribut
 | Gate | Cost tier | Runs | Responsibility |
 | --- | --- | --- | --- |
 | `Lockfile Drift` | Fast dependency check | Manifest/dependabot changes, Dependabot PRs, `main`, scheduled, and manual quality workflow runs | Fails early with clear remediation when `package-lock.json` is not synchronized with `package.json`; the one explicit lockfile gate (the shared setup no longer dry-runs it before every `npm ci`). |
-| `Node Compatibility (Node 20/22/24)` | Fast matrix | Pull requests, `main`, scheduled, and manual quality workflow runs | `npm ci` and unit tests only — runtime-sensitive behavior across supported Node versions; no lint/typecheck/schema (those are runtime-insensitive and run once), no Docker, Redis, OTLP collector, or browser install. |
+| `Node Compatibility (Node 22/24/26)` | Fast matrix | Pull requests, `main`, scheduled, and manual quality workflow runs | `npm ci` and unit tests only — runtime-sensitive behavior across supported Node versions; no lint/typecheck/schema (those are runtime-insensitive and run once), no Docker, Redis, OTLP collector, or browser install. |
 | `Static Analysis (Node 22)` | Static + Docker integration | Pull requests, `main`, scheduled, and manual quality workflow runs | Format, lint, typecheck, contracts, Redis/OTLP integration with `AURORAFLOW_REDIS_INTEGRATION_REQUIRED=true`, schemas, ShellCheck, and workflow lint — the canonical runtime-insensitive gates, run once. actionlint is installed once and reused. |
 | `Coverage (Unit Floors)` | Coverage | Pull requests, `main`, scheduled, and manual quality workflow runs | One complete unit coverage run enforcing the global `src/**` floor and risk-weighted per-file floors for high-risk modules once on Node 22. The former critical-only coverage pass was a strict subset with identical floors and was removed. |
 | `E2E (Chrome)` | Browser heavy | Browser-relevant changes, `main`, scheduled/manual runs, or `full-e2e`/`risk:e2e` PR labels; skipped (no runner) otherwise | Runs the full Chrome project once — the union of the former smoke, guarded self-heal, examples, and risk subsets, so no Playwright test ID runs twice on the same event — then evaluates self-healing governance on that run's artifacts. |
