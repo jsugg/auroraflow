@@ -23,7 +23,7 @@ Phase 6 maturity work is advisory or deferred:
 
 ## Consequences
 
-The hardened CI/CD foundation remains strict where it protects current users: pull requests, package consumers, release dry-run evidence, CodeQL/security gates, Node 20/22/24 compatibility, Redis-required integration, critical coverage, and observability receipts. Optional maturity signals can still be measured without accidentally expanding the product, blocking a single maintainer, or creating a publish path.
+The hardened CI/CD foundation remains strict where it protects current users: pull requests, package consumers, release dry-run evidence, CodeQL/security gates, Node 22/24/26 compatibility (ADR 0011), Redis-required integration, critical coverage, and observability receipts. Optional maturity signals can still be measured without accidentally expanding the product, blocking a single maintainer, or creating a publish path.
 
 The cost is that Scorecard thresholds, hard egress blocking, merge queue, signed commits, and real npm publishing remain unavailable until maintainers provide the missing evidence and approvals.
 

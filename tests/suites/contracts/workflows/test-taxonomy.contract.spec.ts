@@ -279,7 +279,7 @@ describe('test script taxonomy contract', () => {
       'Parallel Chrome proof for guarded self-heal at the default gate.',
     );
     for (const text of [
-      'Node Compatibility (Node 20/22/24)',
+      'Node Compatibility (Node 22/24/26)',
       'Static Analysis (Node 22)',
       'E2E (Chrome)',
       'risk-weighted per-file floors for high-risk modules once on Node 22.',

@@ -73,6 +73,7 @@ describe('documentation surface contract', () => {
       'docs/adr/0008-adoption-gated-extensibility.md',
       'docs/adr/0009-strategic-architecture.md',
       'docs/adr/0010-ci-cd-maturity-deferrals.md',
+      'docs/adr/0011-node-floor-and-opentelemetry-sdk3.md',
       'docs/architecture/adoption-readiness.md',
       'docs/architecture/data-layer.md',
       'docs/architecture/decision-log.md',

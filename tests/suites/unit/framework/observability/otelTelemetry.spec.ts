@@ -200,7 +200,8 @@ describe('OtelTelemetry', () => {
     expect(otel.state.start).toHaveBeenCalledTimes(1);
     expect(otel.state.nodeSdkConfigs).toHaveLength(1);
     const sdkConfig = otel.state.nodeSdkConfigs[0];
-    expect(sdkConfig.autoDetectResources).toBe(false);
+    expect(sdkConfig.resourceDetectors).toEqual([]);
+    expect(sdkConfig).not.toHaveProperty('autoDetectResources');
     expect(Array.isArray(sdkConfig.metricReaders)).toBe(true);
     expect((sdkConfig.metricReaders as unknown[]).length).toBe(1);
     expect(otel.state.metricReaderOptions).toHaveLength(1);

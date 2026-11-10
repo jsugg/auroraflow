@@ -22,7 +22,7 @@ See [Observability support tiers](./observability-support-tiers.md) for commands
 - `AURORAFLOW_OBSERVABILITY_SHUTDOWN_TIMEOUT_MS`: bounded flush/shutdown timeout.
 - `OTEL_EXPORTER_OTLP_ENDPOINT`: standard OTLP endpoint used by OpenTelemetry exporters.
 - `OTEL_SERVICE_NAME`: standard fallback for `service.name`.
-- `OTEL_RESOURCE_ATTRIBUTES`: standard comma-separated resource attributes.
+- `OTEL_RESOURCE_ATTRIBUTES`: standard comma-separated resource attributes. This is the supported way to add resource attributes. OpenTelemetry SDK resource detectors (host, OS, process, `service.instance.id`) are explicitly disabled, so `OTEL_NODE_RESOURCE_DETECTORS` is not honored ([ADR 0011](../adr/0011-node-floor-and-opentelemetry-sdk3.md)).
 
 ## Resource Attributes
 

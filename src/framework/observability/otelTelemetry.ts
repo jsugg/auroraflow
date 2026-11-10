@@ -89,7 +89,10 @@ export class OtelTelemetry implements AuroraFlowTelemetry {
     });
 
     this.sdk = new NodeSDK({
-      autoDetectResources: false,
+      // Telemetry parity: the resource is exactly the configured attributes. An explicit empty
+      // detector list keeps SDK defaults (host, os, process, service.instance.id) and
+      // OTEL_NODE_RESOURCE_DETECTORS from silently widening what telemetry contains.
+      resourceDetectors: [],
       resource: resourceFromAttributes(config.resourceAttributes),
       traceExporter: new OTLPTraceExporter(),
       metricReaders: [metricReader],
