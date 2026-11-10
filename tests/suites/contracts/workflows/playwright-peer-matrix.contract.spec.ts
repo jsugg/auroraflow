@@ -19,6 +19,14 @@ describe('Playwright peer matrix workflow', () => {
       { lane: 'current', versionSpec: '' },
       { lane: 'latest', versionSpec: '^1.59.0' },
     ]);
+    expect(
+      peerMatrixJob.strategy?.include.map((entry) => entry.get('runner')),
+      'Floor lane must run on an image its Playwright version ships browser builds for; other lanes track ubuntu-latest.',
+    ).toEqual(['ubuntu-24.04', 'ubuntu-latest', 'ubuntu-latest']);
+    expectTextIncludes(peerMatrixJob.raw, {
+      text: 'runs-on: ${{ matrix.runner }}',
+      rationale: 'Peer matrix lanes must take their runner image from the matrix entry.',
+    });
     expectTextIncludes(
       getWorkflowStep(peerMatrixJob, 'Verify installed Playwright version').run ?? '',
       {
