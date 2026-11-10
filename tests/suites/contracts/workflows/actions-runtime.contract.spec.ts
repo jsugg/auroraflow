@@ -5,6 +5,7 @@ import { expectInvariant, expectTextIncludes } from '../../../helpers/contractAs
 import { getWorkflowActionReferences, readWorkflowModel } from '../../../helpers/workflowModel';
 
 const WORKFLOW_FILES = [
+  '.github/workflows/attribution-guard.yml',
   '.github/workflows/ci.yml',
   '.github/workflows/quality.yml',
   '.github/workflows/security.yml',
@@ -14,6 +15,7 @@ const WORKFLOW_FILES = [
   '.github/workflows/release.yml',
 ] as const;
 const PR_AND_EVIDENCE_WORKFLOW_FILES = [
+  '.github/workflows/attribution-guard.yml',
   '.github/workflows/quality.yml',
   '.github/workflows/security.yml',
 ] as const;
