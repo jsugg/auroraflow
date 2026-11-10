@@ -39,20 +39,27 @@ jobs:
 
   peer-matrix:
     name: Playwright ${{ matrix.lane }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
     needs: lockfile
     timeout-minutes: 20
     strategy:
       fail-fast: false
       max-parallel: 2
       matrix:
+        # The floor lane proves API compatibility at the declared peer minimum, so it runs
+        # on an image that minimum supports: Playwright 1.59.1 predates ubuntu26.04 browser
+        # builds ("does not support ffmpeg on ubuntu26.04-x64"). Move it to ubuntu-latest
+        # only when the peer floor itself is raised.
         include:
           - lane: floor
             version_spec: 1.59.1
+            runner: ubuntu-24.04
           - lane: current
             version_spec: ''
+            runner: ubuntu-latest
           - lane: latest
             version_spec: ^1.59.0
+            runner: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -77,7 +84,11 @@ jobs:
         # Installing arbitrary Playwright versions outside the lockfile is this job's whole
         # purpose (cross-version peer compatibility); zizmor's adhoc-packages audit is
         # expected here and allowlisted for this file in .github/zizmor.yml.
-        run: npm install --no-save --package-lock=false --ignore-scripts "playwright@${PLAYWRIGHT_VERSION_SPEC}" "playwright-core@${PLAYWRIGHT_VERSION_SPEC}" "@playwright/test@${PLAYWRIGHT_VERSION_SPEC}"
+        # `--no-save` keeps the swap ephemeral while the locked tree anchors every other
+        # dependency. `--package-lock=false` would re-resolve the whole tree from manifest
+        # ranges, making lanes hostage to registry drift (it crashed npm 10 arborist on a
+        # new vite optional-peer cycle: "Cannot read properties of null (reading 'edgesOut')").
+        run: npm install --no-save --ignore-scripts "playwright@${PLAYWRIGHT_VERSION_SPEC}" "playwright-core@${PLAYWRIGHT_VERSION_SPEC}" "@playwright/test@${PLAYWRIGHT_VERSION_SPEC}"
 
       - name: Verify installed Playwright version
         env:

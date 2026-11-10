@@ -19,6 +19,14 @@ describe('Playwright peer matrix workflow', () => {
       { lane: 'current', versionSpec: '' },
       { lane: 'latest', versionSpec: '^1.59.0' },
     ]);
+    expect(
+      peerMatrixJob.strategy?.include.map((entry) => entry.get('runner')),
+      'Floor lane must run on an image its Playwright version ships browser builds for; other lanes track ubuntu-latest.',
+    ).toEqual(['ubuntu-24.04', 'ubuntu-latest', 'ubuntu-latest']);
+    expectTextIncludes(peerMatrixJob.raw, {
+      text: 'runs-on: ${{ matrix.runner }}',
+      rationale: 'Peer matrix lanes must take their runner image from the matrix entry.',
+    });
     expectTextIncludes(
       getWorkflowStep(peerMatrixJob, 'Verify installed Playwright version').run ?? '',
       {
@@ -27,13 +35,19 @@ describe('Playwright peer matrix workflow', () => {
           'Peer matrix must fail loudly when resolved Playwright version leaves peer range.',
       },
     );
-    expectTextIncludes(
-      getWorkflowStep(peerMatrixJob, 'Install matrix Playwright version').run ?? '',
-      {
-        text: 'playwright-core@${PLAYWRIGHT_VERSION_SPEC}',
-        rationale:
-          'Peer matrix must keep playwright, playwright-core, and @playwright/test aligned.',
-      },
+    const matrixInstallRun =
+      getWorkflowStep(peerMatrixJob, 'Install matrix Playwright version').run ?? '';
+    expectTextIncludes(matrixInstallRun, {
+      text: 'playwright-core@${PLAYWRIGHT_VERSION_SPEC}',
+      rationale: 'Peer matrix must keep playwright, playwright-core, and @playwright/test aligned.',
+    });
+    expectTextIncludes(matrixInstallRun, {
+      text: 'npm install --no-save',
+      rationale: 'Peer matrix version swap must not persist into package.json or the lockfile.',
+    });
+    expectInvariant(
+      !matrixInstallRun.includes('--package-lock=false'),
+      'Peer matrix must anchor non-Playwright deps to the lockfile; --package-lock=false re-resolves the whole tree from registry state.',
     );
     // The lockfile gate runs once before matrix fan-out, not once per lane.
     const lockfileJob = getWorkflowJob(workflow, 'lockfile');
