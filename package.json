@@ -152,7 +152,7 @@
     "husky": "^9.1.7",
     "lint-staged": "^17.6.0",
     "playwright": "^1.59.1",
-    "prettier": "^3.9.10",
+    "prettier": "^3.10.1",
     "publint": "^0.3.25",
     "testcontainers": "^12.2.1",
     "ts-node": "^10.9.2",
