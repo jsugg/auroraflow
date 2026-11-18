@@ -7,7 +7,6 @@ import {
 import {
   RedisClient,
   RedisConfigError,
-  RedisOperationError,
   resolveRedisRuntimeConfig,
   type RedisClientDriver,
 } from '../../../../../src/utils/redisClient';
@@ -246,7 +245,7 @@ describe('RedisClient', () => {
       name: 'RedisOperationError',
       operationName: 'set',
       attempts: 3,
-    } as Partial<RedisOperationError>);
+    });
 
     expect(fakeDriver.set).toHaveBeenCalledTimes(3);
     const setSpan = telemetry.spans.find(
