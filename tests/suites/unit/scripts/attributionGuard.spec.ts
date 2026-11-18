@@ -85,11 +85,17 @@ function runGuard(
   });
 }
 
+// Under a git hook (husky pre-push) GIT_DIR and friends point at the real repository;
+// inheriting them would make these fixture commands rewrite its config.
+const HOST_ENV_WITHOUT_GIT = Object.fromEntries(
+  Object.entries(process.env).filter(([key]) => !key.startsWith('GIT_')),
+);
+
 function git(cwd: string, args: readonly string[], env: NodeJS.ProcessEnv = {}): string {
   const result = spawnSync('git', [...args], {
     cwd,
     encoding: 'utf8',
-    env: { ...process.env, ...env },
+    env: { ...HOST_ENV_WITHOUT_GIT, ...env },
   });
   if (result.status !== 0) {
     throw new Error(`git ${args.join(' ')} failed: ${result.stderr}`);
