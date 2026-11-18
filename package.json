@@ -91,7 +91,7 @@
     "workflows:lint": "npm run tools:actionlint --silent && node scripts/workflows-lint.mjs",
     "workflows:security": "npm run security:workflows",
     "shellcheck": "PATH=\"$HOME/.local/bin:$PATH\" shellcheck scripts/*.sh",
-    "security:audit": "npm audit --audit-level=high",
+    "security:audit": "node scripts/security-audit.mjs",
     "security:workflows": "pipx run --spec zizmor==1.26.1 zizmor .github/workflows",
     "security:all": "npm run security:audit && npm run security:workflows",
     "security:check": "npm run security:all",
