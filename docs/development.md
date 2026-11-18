@@ -258,7 +258,7 @@ npm run security:workflows
 npm run security:all
 ```
 
-`npm run security:audit` owns high-severity npm audit only. `npm run security:workflows` owns zizmor workflow analysis only. `npm run security:all` combines both local security checks; `npm run security:check` remains a compatibility alias.
+`npm run security:audit` owns high-severity npm audit only. It fails on any high or critical advisory except those listed in `configs/security/accepted-advisories.json`. Every entry there needs a reason and an expiry date, and the gate fails once an entry expires or stops being reported. `npm run security:workflows` owns zizmor workflow analysis only. `npm run security:all` combines both local security checks; `npm run security:check` remains a compatibility alias.
 
 Security workflows cover dependency review on pull requests, high-severity npm audit on non-PR events, CodeQL on non-PR events, gitleaks, a synthetic gitleaks failure proof, workflow security scanning, and a final security gate.
 
