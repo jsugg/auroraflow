@@ -1,0 +1,11 @@
+{
+  "$comment": "High/critical npm advisories accepted by scripts/security-audit.mjs. Each entry needs a reason and an expiry; the gate fails once an entry expires or stops being reported.",
+  "accepted": [
+    {
+      "advisory": "GHSA-fc5q-39xc-vjpf",
+      "package": "picomatch",
+      "reason": "No patched picomatch exists (all releases <= 4.0.7 are affected). Only dev tooling pulls it in (vitest, lint-staged, typescript-eslint); `npm ls picomatch --omit=dev` is empty and it only matches repo-authored globs.",
+      "expires": "2027-02-17"
+    }
+  ]
+}
