@@ -22,7 +22,7 @@ const scripts = packageJson.scripts ?? {};
 
 describe('security workflow secret scanning contract', () => {
   it('splits security command ownership between dependency audit and workflow analysis', () => {
-    expect(scripts['security:audit']).toBe('npm audit --audit-level=high');
+    expect(scripts['security:audit']).toBe('node scripts/security-audit.mjs');
     // Match the analyzer command shape while requiring an immutable version pin (see the
     // dedicated pin test below) so this assertion can never drift back to unpinned.
     expectTextMatches(scripts['security:workflows'] ?? '', {
